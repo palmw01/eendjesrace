@@ -104,11 +104,15 @@ def maak_mollie_client() -> Client:
 
 # Bekende Mollie webhook IP's (zie docs.mollie.com/overview/ip-addresses)
 MOLLIE_WEBHOOK_IPS = {
+    # Mollie reeks 1
     "87.233.217.240", "87.233.217.241", "87.233.217.242", "87.233.217.243",
     "87.233.217.244", "87.233.217.245", "87.233.217.246", "87.233.217.247",
     "87.233.217.248", "87.233.217.249", "87.233.217.250", "87.233.217.251",
     "87.233.217.252", "87.233.217.253", "87.233.217.254", "87.233.217.255",
+    # Mollie reeks 2
     "213.148.130.195", "213.148.130.196",
+    # Mollie reeks 3 (157.52.108.0/24 — waargenomen in productie)
+    *[f"157.52.108.{i}" for i in range(256)],
     "127.0.0.1",  # lokaal testen
 }
 
@@ -294,9 +298,14 @@ def stuur_bevestigingsmail(naam, email, aantal, lot_van, lot_tot, bedrag):
     msg.attach(MIMEText(mail_html, "html"))
 
     try:
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as server:
+        if SMTP_PORT == 465:
+            smtp_cls = smtplib.SMTP_SSL
+        else:
+            smtp_cls = smtplib.SMTP
+        with smtp_cls(SMTP_HOST, SMTP_PORT, timeout=15) as server:
             server.ehlo()
-            server.starttls()
+            if SMTP_PORT != 465:
+                server.starttls()
             server.login(SMTP_USER, SMTP_PASS)
             server.sendmail(SMTP_USER, [email], msg.as_string())
         app.logger.info(f"Mail verstuurd → {email}")
