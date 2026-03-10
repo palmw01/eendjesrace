@@ -75,6 +75,20 @@
     }
     .knop-csv:hover { background: #C8E6C9; }
 
+    .knop-wijzig {
+      padding: 3px 9px; background: #E3F2FD; color: #0077B6;
+      border: 1px solid #90CAF9; border-radius: 6px;
+      text-decoration: none; font-size: .76rem; font-weight: 700; white-space: nowrap;
+    }
+    .knop-wijzig:hover { background: #BBDEFB; }
+
+    .knop-delete {
+      padding: 3px 9px; background: #FFEBEE; color: #C62828;
+      border: 1px solid #EF9A9A; border-radius: 6px; cursor: pointer;
+      font-family: 'Nunito', sans-serif; font-size: .76rem; font-weight: 700; white-space: nowrap;
+    }
+    .knop-delete:hover { background: #FFCDD2; }
+
     .zoek { margin-bottom: 16px; }
     .zoek input {
       padding: 10px 14px; border: 2px solid #E0E0E0; border-radius: 10px;
@@ -155,6 +169,7 @@
         <th>Status</th>
         <th>Mail</th>
         <th>Datum</th>
+        <th>Acties</th>
       </tr>
     </thead>
     <tbody>
@@ -189,6 +204,14 @@
           {% else %}—{% endif %}
         </td>
         <td style="white-space:nowrap;color:#888;font-size:.8rem">{{ b['aangemaakt_op'][:16] }}</td>
+        <td style="white-space:nowrap;">
+          <a href="/admin/bestelling/{{ b['id'] }}/wijzigen" class="knop-wijzig">✏ Wijzig</a>
+          <form method="POST" action="/admin/bestelling/{{ b['id'] }}/verwijderen" style="display:inline"
+                onsubmit="return confirm('Bestelling #{{ b.id }} van {{ b.naam }} verwijderen? Dit kan niet ongedaan worden gemaakt.')">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="knop-delete">✕ Verwijder</button>
+          </form>
+        </td>
       </tr>
       {% endfor %}
     </tbody>

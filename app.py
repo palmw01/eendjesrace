@@ -784,6 +784,77 @@ def export_csv():
     )
 
 
+@app.route("/admin/bestelling/<int:bestelling_id>/wijzigen", methods=["GET", "POST"])
+@login_vereist
+def wijzig_bestelling(bestelling_id):
+    """Bewerk naam, contact, status en lotnummers van een bestelling."""
+    db  = get_db()
+    rij = db.execute("SELECT * FROM bestellingen WHERE id=?", (bestelling_id,)).fetchone()
+    if not rij:
+        abort(404)
+
+    fouten = []
+    if request.method == "POST":
+        naam           = request.form.get("naam", "").strip()
+        telefoon       = request.form.get("telefoon", "").strip()
+        email          = request.form.get("email", "").strip().lower()
+        status         = request.form.get("status", "").strip()
+        lot_van_raw    = request.form.get("lot_van", "").strip()
+        lot_tot_raw    = request.form.get("lot_tot", "").strip()
+        mail_verstuurd = 1 if request.form.get("mail_verstuurd") == "1" else 0
+
+        geldige_statussen = ("aangemaakt", "betaald", "mislukt", "geannuleerd", "verlopen")
+        if len(naam) < 2:
+            fouten.append("Naam is verplicht (minimaal 2 tekens).")
+        if status not in geldige_statussen:
+            fouten.append("Ongeldige status.")
+
+        lot_van = lot_tot = None
+        if lot_van_raw:
+            try:
+                lot_van = int(lot_van_raw)
+            except ValueError:
+                fouten.append("Lot van moet een geheel getal zijn.")
+        if lot_tot_raw:
+            try:
+                lot_tot = int(lot_tot_raw)
+            except ValueError:
+                fouten.append("Lot tot moet een geheel getal zijn.")
+
+        if not fouten:
+            try:
+                db.execute(
+                    "UPDATE bestellingen SET naam=?, telefoon=?, email=?, status=?, "
+                    "lot_van=?, lot_tot=?, mail_verstuurd=?, "
+                    "bijgewerkt_op=datetime('now','localtime') WHERE id=?",
+                    (naam, telefoon, email, status, lot_van, lot_tot, mail_verstuurd, bestelling_id),
+                )
+                db.commit()
+            except sqlite3.Error as e:
+                app.logger.error(f"DB-fout wijzig_bestelling: {e}")
+                abort(500)
+            return redirect(url_for("admin"))
+
+    return render_template("wijzigen.html", bestelling=rij, fouten=fouten)
+
+
+@app.route("/admin/bestelling/<int:bestelling_id>/verwijderen", methods=["POST"])
+@login_vereist
+def verwijder_bestelling(bestelling_id):
+    """Verwijder een bestelling permanent."""
+    try:
+        db  = get_db()
+        rij = db.execute("SELECT id FROM bestellingen WHERE id=?", (bestelling_id,)).fetchone()
+        if not rij:
+            abort(404)
+        db.execute("DELETE FROM bestellingen WHERE id=?", (bestelling_id,))
+        db.commit()
+    except sqlite3.Error as e:
+        app.logger.error(f"DB-fout verwijder_bestelling: {e}")
+        abort(500)
+    return redirect(url_for("admin"))
+
+
 # ─── Database initialisatie (ook voor gunicorn) ───────────────────────────────
 # BUG-FIX: init_db() stond alleen in if __name__ == "__main__", waardoor gunicorn
 # (Procfile: gunicorn app:app) de tabellen nooit aanmaakte en direct crashte

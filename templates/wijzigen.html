@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bestelling wijzigen – Eendjesrace</title>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Nunito', sans-serif; background: #F0F4F8; color: #1A1A2E; padding: 24px; }
+
+    .topbar {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 24px;
+    }
+    h1 { font-family: 'Fredoka One', cursive; font-size: 2rem; color: #0077B6; }
+    .terug {
+      padding: 8px 18px; background: #E3F2FD; color: #0077B6;
+      border-radius: 99px; text-decoration: none; font-weight: 700; font-size: .9rem;
+    }
+    .terug:hover { background: #BBDEFB; }
+
+    .kaart {
+      background: white; border-radius: 14px; padding: 28px 32px;
+      box-shadow: 0 2px 12px rgba(0,0,0,.07); max-width: 560px;
+    }
+
+    .fouten {
+      background: #FFEBEE; border: 2px solid #EF9A9A; border-radius: 10px;
+      padding: 12px 16px; margin-bottom: 20px; color: #C62828;
+    }
+    .fouten ul { padding-left: 18px; }
+
+    .veld { margin-bottom: 18px; }
+    label { display: block; font-weight: 700; font-size: .9rem; margin-bottom: 5px; color: #444; }
+    input[type="text"], input[type="email"], input[type="number"], select {
+      width: 100%; padding: 10px 12px;
+      border: 2px solid #E0E0E0; border-radius: 10px;
+      font-family: 'Nunito', sans-serif; font-size: .95rem;
+    }
+    input:focus, select:focus { outline: none; border-color: #0077B6; }
+
+    .rij-twee { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+    .checkbox-rij { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+    .checkbox-rij input { width: auto; }
+    .checkbox-rij label { margin: 0; font-weight: 600; }
+
+    .knop-opslaan {
+      width: 100%; padding: 12px; background: #0077B6; color: white;
+      border: none; border-radius: 10px; font-family: 'Nunito', sans-serif;
+      font-size: 1rem; font-weight: 700; cursor: pointer;
+    }
+    .knop-opslaan:hover { background: #005f99; }
+
+    .info { font-size: .82rem; color: #999; margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <h1>🦆 Bestelling #{{ bestelling['id'] }} wijzigen</h1>
+    <a href="/admin" class="terug">← Terug</a>
+  </div>
+
+  <div class="kaart">
+    {% if fouten %}
+    <div class="fouten">
+      <ul>{% for f in fouten %}<li>{{ f }}</li>{% endfor %}</ul>
+    </div>
+    {% endif %}
+
+    <form method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <div class="veld">
+        <label for="naam">Naam</label>
+        <input type="text" id="naam" name="naam" value="{{ bestelling['naam'] }}" maxlength="100" required>
+      </div>
+
+      <div class="rij-twee">
+        <div class="veld">
+          <label for="telefoon">Telefoon</label>
+          <input type="text" id="telefoon" name="telefoon" value="{{ bestelling['telefoon'] }}" maxlength="20">
+        </div>
+        <div class="veld">
+          <label for="email">E-mail</label>
+          <input type="email" id="email" name="email" value="{{ bestelling['email'] }}" maxlength="200">
+        </div>
+      </div>
+
+      <div class="veld">
+        <label for="status">Status</label>
+        <select id="status" name="status">
+          {% for s in ["aangemaakt", "betaald", "mislukt", "geannuleerd", "verlopen"] %}
+          <option value="{{ s }}" {% if bestelling['status'] == s %}selected{% endif %}>{{ s }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="rij-twee">
+        <div class="veld">
+          <label for="lot_van">Lot van</label>
+          <input type="number" id="lot_van" name="lot_van" value="{{ bestelling['lot_van'] or '' }}" min="1">
+          <p class="info">Leeg = nog geen loten</p>
+        </div>
+        <div class="veld">
+          <label for="lot_tot">Lot tot</label>
+          <input type="number" id="lot_tot" name="lot_tot" value="{{ bestelling['lot_tot'] or '' }}" min="1">
+        </div>
+      </div>
+
+      <div class="checkbox-rij">
+        <input type="checkbox" id="mail_verstuurd" name="mail_verstuurd" value="1"
+               {% if bestelling['mail_verstuurd'] %}checked{% endif %}>
+        <label for="mail_verstuurd">Bevestigingsmail verstuurd</label>
+      </div>
+
+      <button type="submit" class="knop-opslaan">Wijzigingen opslaan</button>
+    </form>
+  </div>
+</body>
+</html>

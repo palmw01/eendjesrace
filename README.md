@@ -83,6 +83,8 @@ zodat Mollie de webhook kan aanroepen.
 | `/` | Bestelformulier voor kopers |
 | `/admin` | Overzicht van alle bestellingen en omzet |
 | `/admin/export-csv` | Download alle bestellingen als CSV (via admin-knop) |
+| `/admin/bestelling/<id>/wijzigen` | Bewerk een bestelling (naam, status, lotnummers, …) |
+| `/admin/bestelling/<id>/verwijderen` | Verwijder een bestelling (met bevestigingsdialoog) |
 | `/betaald/<id>` | Bevestigingspagina na betaling |
 
 > ⚠️ **Beveilig `/admin`** in productie met een wachtwoord!  

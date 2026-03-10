@@ -1005,7 +1005,110 @@ class TestBugRegressie(unittest.TestCase):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 12. TRANSACTIEKOSTEN
+# 12. WIJZIGEN & VERWIJDEREN
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestWijzigenVerwijderen(unittest.TestCase):
+
+    def setUp(self):
+        self.client, self.ctx = maak_flask_client()
+        doe_bestelling(self.client, naam="Jan Jansen", aantal=2)
+        self._login()
+
+    def tearDown(self):
+        self.ctx.pop()
+
+    def _login(self):
+        self.client.post("/admin/login",
+                         data={"gebruiker": "admin", "wachtwoord": "testpass"})
+
+    def _wijzig(self, bestelling_id=1, **kwargs):
+        data = {
+            "naam": "Jan Jansen", "telefoon": "0612345678",
+            "email": "jan@test.nl", "status": "aangemaakt",
+            "lot_van": "", "lot_tot": "", "mail_verstuurd": "0",
+        }
+        data.update(kwargs)
+        return self.client.post(f"/admin/bestelling/{bestelling_id}/wijzigen", data=data)
+
+    # ── wijzigen GET ──────────────────────────────────────────────────────────
+
+    def test_wijzigen_get_geeft_200(self):
+        self.assertEqual(self.client.get("/admin/bestelling/1/wijzigen").status_code, 200)
+
+    def test_wijzigen_get_onbekend_id_geeft_404(self):
+        self.assertEqual(self.client.get("/admin/bestelling/99999/wijzigen").status_code, 404)
+
+    def test_wijzigen_get_zonder_login_geeft_302(self):
+        self.client.get("/admin/logout")
+        self.assertEqual(self.client.get("/admin/bestelling/1/wijzigen").status_code, 302)
+
+    # ── wijzigen POST ─────────────────────────────────────────────────────────
+
+    def test_wijzigen_post_redirect_naar_admin(self):
+        r = self._wijzig(naam="Piet Pietersen")
+        self.assertEqual(r.status_code, 302)
+        self.assertIn("/admin", r.headers["Location"])
+
+    def test_wijzigen_naam_wordt_opgeslagen(self):
+        self._wijzig(naam="Piet Pietersen")
+        rij = App.get_db().execute("SELECT naam FROM bestellingen WHERE id=1").fetchone()
+        self.assertEqual(rij["naam"], "Piet Pietersen")
+
+    def test_wijzigen_status_wordt_opgeslagen(self):
+        self._wijzig(status="betaald")
+        rij = App.get_db().execute("SELECT status FROM bestellingen WHERE id=1").fetchone()
+        self.assertEqual(rij["status"], "betaald")
+
+    def test_wijzigen_lotnummers_worden_opgeslagen(self):
+        self._wijzig(status="betaald", lot_van="10", lot_tot="11")
+        rij = App.get_db().execute("SELECT lot_van, lot_tot FROM bestellingen WHERE id=1").fetchone()
+        self.assertEqual(rij["lot_van"], 10)
+        self.assertEqual(rij["lot_tot"], 11)
+
+    def test_wijzigen_lege_naam_geeft_fout(self):
+        r = self._wijzig(naam="")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(b"verplicht", r.data)
+
+    def test_wijzigen_ongeldige_status_geeft_fout(self):
+        r = self._wijzig(status="onbekend")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(b"status", r.data.lower())
+
+    def test_wijzigen_onbekend_id_geeft_404(self):
+        r = self._wijzig(bestelling_id=99999)
+        self.assertEqual(r.status_code, 404)
+
+    def test_wijzigen_mail_verstuurd_vlag_opgeslagen(self):
+        self._wijzig(mail_verstuurd="1")
+        rij = App.get_db().execute("SELECT mail_verstuurd FROM bestellingen WHERE id=1").fetchone()
+        self.assertEqual(rij["mail_verstuurd"], 1)
+
+    # ── verwijderen ───────────────────────────────────────────────────────────
+
+    def test_verwijderen_redirect_naar_admin(self):
+        r = self.client.post("/admin/bestelling/1/verwijderen")
+        self.assertEqual(r.status_code, 302)
+        self.assertIn("/admin", r.headers["Location"])
+
+    def test_verwijderen_rij_weg_uit_db(self):
+        self.client.post("/admin/bestelling/1/verwijderen")
+        rij = App.get_db().execute("SELECT id FROM bestellingen WHERE id=1").fetchone()
+        self.assertIsNone(rij)
+
+    def test_verwijderen_onbekend_id_geeft_404(self):
+        r = self.client.post("/admin/bestelling/99999/verwijderen")
+        self.assertEqual(r.status_code, 404)
+
+    def test_verwijderen_zonder_login_geeft_302(self):
+        self.client.get("/admin/logout")
+        r = self.client.post("/admin/bestelling/1/verwijderen")
+        self.assertEqual(r.status_code, 302)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 13. TRANSACTIEKOSTEN
 # ══════════════════════════════════════════════════════════════════════════════
 
 class TestTransactiekosten(unittest.TestCase):

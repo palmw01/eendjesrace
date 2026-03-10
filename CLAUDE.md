@@ -74,7 +74,7 @@ An optional iDEAL transaction fee (`TRANSACTIEKOSTEN = 0.32`) can be added to th
 
 ### Admin
 
-`/admin` (protected by session login, timing-safe password check) shows order statistics, lets admins resend confirmation emails for failed deliveries, and offers a CSV export (`/admin/export-csv`) of all orders — semicolon-delimited with UTF-8 BOM for Excel compatibility.
+`/admin` (protected by session login, timing-safe password check) shows order statistics, lets admins resend confirmation emails for failed deliveries, and offers a CSV export (`/admin/export-csv`) of all orders — semicolon-delimited with UTF-8 BOM for Excel compatibility. Each order row has an edit button (`/admin/bestelling/<id>/wijzigen`) and a delete button (`/admin/bestelling/<id>/verwijderen`, POST with JS confirm).
 
 ## Testing Notes
 
