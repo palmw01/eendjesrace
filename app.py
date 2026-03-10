@@ -4,7 +4,9 @@ Vereisten: pip install flask flask-wtf flask-limiter mollie-api-python
 """
 
 import os
+import csv
 import html
+import io
 import json
 import re
 import sqlite3
@@ -23,7 +25,7 @@ from functools import wraps
 from logging.handlers import RotatingFileHandler
 from flask import (
     Flask, request, render_template, redirect,
-    url_for, jsonify, session, abort, g
+    url_for, jsonify, session, abort, g, Response
 )
 from werkzeug.middleware.proxy_fix import ProxyFix
 from flask_wtf import CSRFProtect
@@ -735,6 +737,43 @@ def mail_opnieuw(bestelling_id):
         app.logger.error(f"DB-fout mail-opnieuw: {e}")
         abort(500)
     return redirect(url_for("admin"))
+
+
+@app.route("/admin/export-csv")
+@login_vereist
+def export_csv():
+    """Download alle bestellingen als CSV-bestand."""
+    try:
+        db = get_db()
+        bestellingen = db.execute(
+            "SELECT id, naam, email, telefoon, aantal, bedrag, "
+            "lot_van, lot_tot, status, mail_verstuurd, aangemaakt_op "
+            "FROM bestellingen ORDER BY id ASC"
+        ).fetchall()
+    except sqlite3.Error as e:
+        app.logger.error(f"DB-fout export-csv: {e}")
+        abort(500)
+
+    uitvoer = io.StringIO()
+    schrijver = csv.writer(uitvoer, delimiter=";")
+    schrijver.writerow([
+        "ID", "Naam", "E-mail", "Telefoon", "Aantal", "Bedrag (€)",
+        "Lot van", "Lot tot", "Status", "Mail verstuurd", "Aangemaakt op"
+    ])
+    for b in bestellingen:
+        schrijver.writerow([
+            b["id"], b["naam"], b["email"], b["telefoon"],
+            b["aantal"], f"{b['bedrag']:.2f}",
+            b["lot_van"] or "", b["lot_tot"] or "",
+            b["status"], "ja" if b["mail_verstuurd"] else "nee",
+            b["aangemaakt_op"],
+        ])
+
+    return Response(
+        "\ufeff" + uitvoer.getvalue(),  # BOM voor correcte weergave in Excel
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment; filename=bestellingen.csv"}
+    )
 
 
 # ─── Database initialisatie (ook voor gunicorn) ───────────────────────────────

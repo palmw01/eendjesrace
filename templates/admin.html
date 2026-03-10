@@ -68,6 +68,13 @@
     }
     .knop-mail:hover { background: #BBDEFB; }
 
+    .knop-csv {
+      padding: 8px 18px; background: #E8F5E9; color: #2E7D32;
+      border: 1px solid #A5D6A7; border-radius: 99px;
+      text-decoration: none; font-weight: 700; font-size: .9rem;
+    }
+    .knop-csv:hover { background: #C8E6C9; }
+
     .zoek { margin-bottom: 16px; }
     .zoek input {
       padding: 10px 14px; border: 2px solid #E0E0E0; border-radius: 10px;
@@ -84,7 +91,10 @@
 <body>
   <div class="topbar">
     <h1>🦆 Eendjesrace – Beheer</h1>
-    <a href="/admin/logout" class="uitloggen">Uitloggen</a>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+      <a href="/admin/export-csv" class="knop-csv">⬇ CSV downloaden</a>
+      <a href="/admin/logout" class="uitloggen">Uitloggen</a>
+    </div>
   </div>
 
   {% if stats['mails_mislukt'] > 0 %}
