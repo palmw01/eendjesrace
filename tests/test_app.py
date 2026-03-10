@@ -69,6 +69,11 @@ _stub_module("mollie.api")
 _mollie_client  = _stub_module("mollie.api.client")
 _mollie_error   = _stub_module("mollie.api.error")
 
+# resend
+_resend = _stub_module("resend")
+_resend.api_key = ""
+_resend.Emails  = type("Emails", (), {"send": staticmethod(lambda params: {"id": "test"})})
+
 class _FakeMollieClient:
     def __init__(self):
         self.payments = MagicMock()
@@ -349,28 +354,13 @@ class TestWijsLotnummersToe(unittest.TestCase):
 class TestEmailVeiligheid(unittest.TestCase):
 
     def _stuur_en_vang_body(self, naam):
-        import email as email_module
         verzonden = {}
-        class NepSMTP:
-            def __init__(self, *a, **kw): pass
-            def __enter__(self): return self
-            def __exit__(self, *a): pass
-            def ehlo(self): pass
-            def starttls(self): pass
-            def login(self, *a): pass
-            def sendmail(self, van, aan, bericht):
-                verzonden["bericht"] = bericht
-        with patch("smtplib.SMTP", NepSMTP):
+        def nep_send(params):
+            verzonden["html"] = params.get("html", "")
+            return {"id": "test"}
+        with patch("resend.Emails.send", side_effect=nep_send):
             stuur_bevestigingsmail(naam, "test@test.nl", 2, 1, 2, 5.00)
-        raw = verzonden.get("bericht", "")
-        # Decodeer de HTML-body uit het MIME-bericht (mogelijk base64/QP gecodeerd)
-        msg = email_module.message_from_string(raw)
-        for part in msg.walk():
-            if part.get_content_type() == "text/html":
-                payload = part.get_payload(decode=True)
-                if payload:
-                    return payload.decode("utf-8", errors="replace")
-        return raw
+        return verzonden.get("html", "")
 
     def test_scripttag_in_naam_geescaped(self):
         body = self._stuur_en_vang_body('<script>alert(1)</script>')
@@ -384,24 +374,15 @@ class TestEmailVeiligheid(unittest.TestCase):
         body = self._stuur_en_vang_body("Jan Jansen")
         self.assertIn("Jan Jansen", body)
 
-    def test_smtp_fout_geeft_false_geen_exception(self):
-        with patch("smtplib.SMTP", side_effect=OSError("connectie mislukt")):
+    def test_resend_fout_geeft_false_geen_exception(self):
+        with patch("resend.Emails.send", side_effect=Exception("API fout")):
             resultaat = stuur_bevestigingsmail("Jan", "jan@t.nl", 1, 1, 1, 2.50)
         self.assertFalse(resultaat)
 
-    def test_smtp_auth_fout_geeft_false(self):
-        import smtplib
-        class AuthFoutSMTP:
-            def __init__(self, *a, **kw): pass
-            def __enter__(self): return self
-            def __exit__(self, *a): pass
-            def ehlo(self): pass
-            def starttls(self): pass
-            def login(self, *a):
-                raise smtplib.SMTPAuthenticationError(535, b"auth failed")
-        with patch("smtplib.SMTP", AuthFoutSMTP):
+    def test_resend_geeft_true_bij_succes(self):
+        with patch("resend.Emails.send", return_value={"id": "abc123"}):
             resultaat = stuur_bevestigingsmail("Jan", "jan@t.nl", 1, 1, 1, 2.50)
-        self.assertFalse(resultaat)
+        self.assertTrue(resultaat)
 
 
 # ══════════════════════════════════════════════════════════════════════════════

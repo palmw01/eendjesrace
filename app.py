@@ -15,12 +15,10 @@ if os.path.exists(_config_pad):
     with open(_config_pad) as _f:
         for _k, _v in json.load(_f).items():
             os.environ.setdefault(_k, str(_v))
-import smtplib
 import logging
 import hmac
 import secrets
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+import resend
 from functools import wraps
 from logging.handlers import RotatingFileHandler
 from flask import (
@@ -77,10 +75,8 @@ MAX_EENDJES      = int(os.environ.get("MAX_EENDJES", 3000))
 PRIJS_PER_STUK   = 2.50
 PRIJS_VIJF_STUKS = 10.00
 
-SMTP_HOST        = os.environ.get("SMTP_HOST", "smtp.gmail.com")
-SMTP_PORT        = int(os.environ.get("SMTP_PORT", 587))
-SMTP_USER        = os.environ.get("SMTP_USER", "")
-SMTP_PASS        = os.environ.get("SMTP_PASS", "")
+RESEND_API_KEY   = os.environ.get("RESEND_API_KEY", "")
+RESEND_FROM      = os.environ.get("RESEND_FROM", "")
 AFZENDER_NAAM    = "Hervormde Gemeente Wapenveld"
 
 ADMIN_GEBRUIKER  = os.environ.get("ADMIN_USER", "admin")
@@ -291,33 +287,18 @@ def stuur_bevestigingsmail(naam, email, aantal, lot_van, lot_tot, bedrag):
       </div>
     </body></html>
     """
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = "🦆 Jouw lotnummers – Eendjesrace!"
-    msg["From"]    = f"{AFZENDER_NAAM} <{SMTP_USER}>"
-    msg["To"]      = email
-    msg.attach(MIMEText(mail_html, "html"))
-
     try:
-        if SMTP_PORT == 465:
-            smtp_cls = smtplib.SMTP_SSL
-        else:
-            smtp_cls = smtplib.SMTP
-        with smtp_cls(SMTP_HOST, SMTP_PORT, timeout=15) as server:
-            server.ehlo()
-            if SMTP_PORT != 465:
-                server.starttls()
-            server.login(SMTP_USER, SMTP_PASS)
-            server.sendmail(SMTP_USER, [email], msg.as_string())
+        resend.api_key = RESEND_API_KEY
+        resend.Emails.send({
+            "from":    f"{AFZENDER_NAAM} <{RESEND_FROM}>",
+            "to":      [email],
+            "subject": "🦆 Jouw lotnummers – Eendjesrace!",
+            "html":    mail_html,
+        })
         app.logger.info(f"Mail verstuurd → {email}")
         return True
-    except smtplib.SMTPAuthenticationError:
-        app.logger.error("SMTP-authenticatiefout – controleer SMTP_USER/SMTP_PASS")
-    except smtplib.SMTPRecipientsRefused:
-        app.logger.error(f"E-mailadres geweigerd: {email}")
-    except smtplib.SMTPException as e:
-        app.logger.error(f"SMTP-fout: {e}")
-    except OSError as e:
-        app.logger.error(f"Netwerkfout (mail): {e}")
+    except Exception as e:
+        app.logger.error(f"Resend-fout: {e}")
     return False
 
 # ─── Security helpers ─────────────────────────────────────────────────────────
