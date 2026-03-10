@@ -53,7 +53,7 @@ The entire backend lives in `app.py` (single file). Templates are in `templates/
 
 ### Database (SQLite, `eendjes.db`, 3 tables)
 
-- **`bestellingen`**: orders — `naam`, `email`, `telefoon`, `aantal`, `bedrag`, `mollie_id`, `status` (aangemaakt/betaald/mislukt/geannuleerd/verlopen), `lot_van`/`lot_tot` (ticket range), `mail_verstuurd`, `pogingen`
+- **`bestellingen`**: orders — `naam`, `email`, `telefoon`, `aantal`, `bedrag`, `transactiekosten` (0/1), `mollie_id`, `status` (aangemaakt/betaald/mislukt/geannuleerd/verlopen), `lot_van`/`lot_tot` (ticket range), `mail_verstuurd`, `pogingen`
 - **`teller`**: single row tracking `volgend_lot` (next ticket number, starts at 1)
 - **`webhook_log`**: audit log of webhook calls
 
@@ -70,9 +70,11 @@ def bereken_bedrag(aantal):
     return round(vijftallen * 10.00 + rest * 2.50, 2)
 ```
 
+An optional iDEAL transaction fee (`TRANSACTIEKOSTEN = 0.32`) can be added to the order. The buyer checks a checkbox on the form; the fee is stored in the `transactiekosten` column and included in the total charged to Mollie. The confirmation email mentions the fee when applicable.
+
 ### Admin
 
-`/admin` (protected by session login, timing-safe password check) shows order statistics and lets admins resend confirmation emails for failed deliveries.
+`/admin` (protected by session login, timing-safe password check) shows order statistics, lets admins resend confirmation emails for failed deliveries, and offers a CSV export (`/admin/export-csv`) of all orders — semicolon-delimited with UTF-8 BOM for Excel compatibility.
 
 ## Testing Notes
 

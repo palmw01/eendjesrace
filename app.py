@@ -76,6 +76,7 @@ BASE_URL         = os.environ.get("BASE_URL", "http://localhost:5000")
 MAX_EENDJES      = int(os.environ.get("MAX_EENDJES", 3000))
 PRIJS_PER_STUK   = 2.50
 PRIJS_VIJF_STUKS = 10.00
+TRANSACTIEKOSTEN = 0.32  # iDEAL-transactiekosten Mollie
 
 RESEND_API_KEY   = os.environ.get("RESEND_API_KEY", "")
 RESEND_FROM      = os.environ.get("RESEND_FROM", "")
@@ -197,6 +198,11 @@ def init_db():
         )
     """)
     conn.execute("INSERT OR IGNORE INTO teller (id, volgend_lot) VALUES (1, 1)")
+    # Migratie: voeg transactiekosten toe aan bestaande databases
+    try:
+        conn.execute("ALTER TABLE bestellingen ADD COLUMN transactiekosten INTEGER NOT NULL DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass  # kolom bestaat al
     conn.commit()
     conn.close()
 
@@ -256,7 +262,7 @@ def wijs_lotnummers_toe(db, bestelling_id, aantal):
     return start, einde
 
 
-def stuur_bevestigingsmail(naam, email, aantal, lot_van, lot_tot, bedrag):
+def stuur_bevestigingsmail(naam, email, aantal, lot_van, lot_tot, bedrag, transactiekosten=False):
     """Geeft True bij succes, False bij fout — gooit nooit een exception."""
     naam = html.escape(naam)  # voorkom XSS via naam in HTML e-mail
     if lot_van == lot_tot:
@@ -273,7 +279,7 @@ def stuur_bevestigingsmail(naam, email, aantal, lot_van, lot_tot, bedrag):
       </div>
       <div style="background:#fffdf0;padding:32px;border:1px solid #eee;border-radius:0 0 12px 12px;">
         <p>Beste <strong>{naam}</strong>,</p>
-        <p>Bedankt voor je bestelling! Je betaling van <strong>&euro;&nbsp;{bedrag:.2f}</strong> is ontvangen.</p>
+        <p>Bedankt voor je bestelling! Je betaling van <strong>&euro;&nbsp;{bedrag:.2f}</strong> is ontvangen{' (incl. &euro;&nbsp;0,32 iDEAL-transactiekosten)' if transactiekosten else ''}.</p>
         <div style="background:#fff;border:2px solid #FFD700;border-radius:10px;padding:24px;margin:24px 0;text-align:center;">
           <p style="font-size:17px;margin:0 0 8px;">
             Je hebt <strong>{aantal}&nbsp;eend{'je' if aantal==1 else 'jes'}</strong> en ontvangt:
@@ -387,8 +393,9 @@ def api_prijs():
         aantal = int(request.args.get("aantal", 0))
         if not (1 <= aantal <= 100):
             return jsonify({"fout": "Aantal moet tussen 1 en 100 liggen."}), 400
-        bedrag = bereken_bedrag(aantal)
-        return jsonify({"bedrag": bedrag,
+        incl_tk = request.args.get("transactiekosten", "0") == "1"
+        bedrag  = bereken_bedrag(aantal) + (TRANSACTIEKOSTEN if incl_tk else 0)
+        return jsonify({"bedrag": round(bedrag, 2),
                         "bedrag_tekst": f"€ {bedrag:.2f}".replace(".", ",")})
     except (ValueError, TypeError):
         return jsonify({"fout": "Ongeldig aantal."}), 400
@@ -397,10 +404,11 @@ def api_prijs():
 @app.route("/bestellen", methods=["POST"])
 @limiter.limit("10 per minute")
 def bestellen():
-    naam     = request.form.get("naam", "").strip()
-    telefoon = request.form.get("telefoon", "").strip()
-    email    = request.form.get("email", "").strip().lower()
-    vorig    = {"naam": naam, "telefoon": telefoon, "email": email}
+    naam             = request.form.get("naam", "").strip()
+    telefoon         = request.form.get("telefoon", "").strip()
+    email            = request.form.get("email", "").strip().lower()
+    incl_tk          = request.form.get("transactiekosten") == "1"
+    vorig            = {"naam": naam, "telefoon": telefoon, "email": email, "transactiekosten": incl_tk}
 
     try:
         aantal = int(request.form.get("aantal", 0))
@@ -423,7 +431,7 @@ def bestellen():
                                fouten=fouten,
                                vorig=vorig), 422
 
-    bedrag = bereken_bedrag(aantal)
+    bedrag = round(bereken_bedrag(aantal) + (TRANSACTIEKOSTEN if incl_tk else 0), 2)
 
     # Controleer beschikbaarheid en sla op — atomisch
     try:
@@ -444,8 +452,8 @@ def bestellen():
                                    vorig=vorig), 409
 
         cursor = db.execute(
-            "INSERT INTO bestellingen (naam, telefoon, email, aantal, bedrag) VALUES (?,?,?,?,?)",
-            (naam, telefoon, email, aantal, bedrag),
+            "INSERT INTO bestellingen (naam, telefoon, email, aantal, bedrag, transactiekosten) VALUES (?,?,?,?,?,?)",
+            (naam, telefoon, email, aantal, bedrag, 1 if incl_tk else 0),
         )
         bestelling_id = cursor.lastrowid
         db.commit()
@@ -566,7 +574,7 @@ def webhook():
             )
             mail_ok = stuur_bevestigingsmail(
                 rij["naam"], rij["email"], rij["aantal"],
-                lot_van, lot_tot, rij["bedrag"],
+                lot_van, lot_tot, rij["bedrag"], bool(rij["transactiekosten"]),
             )
             db.execute(
                 "UPDATE bestellingen SET mail_verstuurd=?, pogingen=pogingen+1 WHERE id=?",
@@ -631,7 +639,7 @@ def betaald(bestelling_id):
                 lot_van, lot_tot = wijs_lotnummers_toe(db, bestelling_id, rij["aantal"])
                 mail_ok = stuur_bevestigingsmail(
                     rij["naam"], rij["email"], rij["aantal"],
-                    lot_van, lot_tot, rij["bedrag"],
+                    lot_van, lot_tot, rij["bedrag"], bool(rij["transactiekosten"]),
                 )
                 db.execute(
                     "UPDATE bestellingen SET mail_verstuurd=?, pogingen=pogingen+1 WHERE id=?",

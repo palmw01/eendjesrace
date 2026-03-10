@@ -11,6 +11,7 @@ Gebouwd met **Python/Flask** + **Mollie** (iDEAL) + **SQLite** + **Resend** (e-m
 |------|-|
 | Bestelling ontvangen | ✅ Ingebouwd formulier |
 | Prijs berekenen | ✅ Live in de browser |
+| iDEAL-transactiekosten | ✅ Optioneel door koper te betalen (€0,32) |
 | Betaalverzoek sturen | ✅ Directe iDEAL-betaling |
 | Lotnummers toewijzen | ✅ Direct na betaling |
 | Bevestiging sturen | ✅ Automatische e-mail via Resend |
@@ -81,6 +82,7 @@ zodat Mollie de webhook kan aanroepen.
 |-----|-------------|
 | `/` | Bestelformulier voor kopers |
 | `/admin` | Overzicht van alle bestellingen en omzet |
+| `/admin/export-csv` | Download alle bestellingen als CSV (via admin-knop) |
 | `/betaald/<id>` | Bevestigingspagina na betaling |
 
 > ⚠️ **Beveilig `/admin`** in productie met een wachtwoord!  
@@ -108,6 +110,7 @@ In `app.py` bovenaan staan alle instellingen:
 MAX_EENDJES      = 3000      # Maximaal aantal te verkopen eendjes
 PRIJS_PER_STUK   = 2.50      # Prijs per los eendje
 PRIJS_VIJF_STUKS = 10.00     # Prijs voor 5 eendjes
+TRANSACTIEKOSTEN = 0.32      # iDEAL-transactiekosten (optioneel door koper te betalen)
 ```
 
 ---

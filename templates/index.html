@@ -275,6 +275,28 @@
     }
     .kleine-tekst a { color: var(--blauw); }
 
+    /* Transactiekosten checkbox */
+    .tk-rij {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      background: #F0F9FF;
+      border: 1px solid #BAE6FD;
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin-top: 16px;
+      cursor: pointer;
+    }
+    .tk-rij input[type="checkbox"] {
+      width: 18px; height: 18px;
+      margin-top: 2px; flex-shrink: 0; cursor: pointer;
+    }
+    .tk-rij label {
+      font-size: 0.88rem; color: #0369A1;
+      font-weight: 600; cursor: pointer; margin-bottom: 0;
+    }
+    .tk-rij label span { font-weight: 400; color: #555; }
+
     /* Info sectie */
     .info-kaart {
       background: rgba(255,255,255,0.12);
@@ -448,6 +470,16 @@
         </div>
       </div>
 
+      <div class="tk-rij" onclick="document.getElementById('transactiekosten').click()">
+        <input type="checkbox" id="transactiekosten" name="transactiekosten" value="1"
+               {% if vorig and vorig.transactiekosten %}checked{% endif %}
+               onclick="event.stopPropagation(); updatePrijs()">
+        <label for="transactiekosten" onclick="event.preventDefault()">
+          Ik betaal de iDEAL-transactiekosten (€&nbsp;0,32)
+          <span>— zo gaat het volledige lotbedrag naar het goede doel.</span>
+        </label>
+      </div>
+
       <button type="submit" class="bestel-knop" id="bestelKnop">
         🦆 Betalen via iDEAL
       </button>
@@ -465,6 +497,7 @@
   const prijsWaarde = document.getElementById('prijsWaarde');
   const prijsTip    = document.getElementById('prijsTip');
   const knop        = document.getElementById('bestelKnop');
+  const tkCheckbox  = document.getElementById('transactiekosten');
 
   function berekenPrijs(n) {
     const vijftallen = Math.floor(n / 5);
@@ -475,11 +508,13 @@
   function updatePrijs() {
     const n = parseInt(aantalInput.value) || 0;
     if (n < 1) { prijsWaarde.textContent = '—'; prijsTip.textContent = ''; return; }
-    const bedrag = berekenPrijs(n);
+    const basisBedrag = berekenPrijs(n);
+    const tk          = tkCheckbox?.checked ? 0.32 : 0;
+    const bedrag      = basisBedrag + tk;
     prijsWaarde.textContent = '€ ' + bedrag.toFixed(2).replace('.', ',');
     const vijftallen = Math.floor(n / 5);
     if (vijftallen > 0) {
-      const besparing = (n * 2.5 - bedrag).toFixed(2).replace('.', ',');
+      const besparing = (n * 2.5 - basisBedrag).toFixed(2).replace('.', ',');
       prijsTip.textContent = `Je bespaart € ${besparing}!`;
     } else {
       prijsTip.textContent = n >= 3 ? 'Tip: 5 stuks = € 10,-' : '';
@@ -487,6 +522,7 @@
   }
 
   aantalInput?.addEventListener('input', updatePrijs);
+  tkCheckbox?.addEventListener('change', updatePrijs);
   updatePrijs();
 
   document.getElementById('bestelForm')?.addEventListener('submit', function() {

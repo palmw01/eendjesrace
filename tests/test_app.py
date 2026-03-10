@@ -117,6 +117,7 @@ def maak_db():
             lot_van INTEGER, lot_tot INTEGER,
             mail_verstuurd INTEGER NOT NULL DEFAULT 0,
             pogingen INTEGER NOT NULL DEFAULT 0,
+            transactiekosten INTEGER NOT NULL DEFAULT 0,
             aangemaakt_op TEXT NOT NULL DEFAULT (datetime('now','localtime')),
             bijgewerkt_op TEXT NOT NULL DEFAULT (datetime('now','localtime'))
         )""",
@@ -160,14 +161,15 @@ def simuleer_mollie_betaling(status: str) -> MagicMock:
 
 
 def doe_bestelling(client, naam="Jan Jansen", telefoon="0612345678",
-                   email="jan@test.nl", aantal=2):
+                   email="jan@test.nl", aantal=2, transactiekosten=False):
     mock_b = simuleer_mollie_betaling("open")
     with patch("app.maak_mollie_client") as mc:
         mc.return_value.payments.create.return_value = mock_b
-        return client.post("/bestellen", data={
-            "naam": naam, "telefoon": telefoon,
-            "email": email, "aantal": str(aantal),
-        })
+        data = {"naam": naam, "telefoon": telefoon,
+                "email": email, "aantal": str(aantal)}
+        if transactiekosten:
+            data["transactiekosten"] = "1"
+        return client.post("/bestellen", data=data)
 
 
 def doe_webhook(client, mollie_id: str, status: str, ip="127.0.0.1"):
@@ -1000,6 +1002,88 @@ class TestBugRegressie(unittest.TestCase):
         ).fetchone()
         # Status blijft aangemaakt — webhook zet het daarna op mislukt
         self.assertIn(rij["status"], ("aangemaakt", "mislukt"))
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 12. TRANSACTIEKOSTEN
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestTransactiekosten(unittest.TestCase):
+
+    def setUp(self):
+        self.client, self.ctx = maak_flask_client()
+
+    def tearDown(self):
+        self.ctx.pop()
+
+    # ── /api/prijs ─────────────────────────────────────────────────────────────
+
+    def test_prijs_zonder_tk_geen_toeslag(self):
+        r = self.client.get("/api/prijs?aantal=2")
+        self.assertEqual(r.get_json()["bedrag"], 5.00)
+
+    def test_prijs_met_tk_voegt_32_cent_toe(self):
+        r = self.client.get("/api/prijs?aantal=2&transactiekosten=1")
+        self.assertAlmostEqual(r.get_json()["bedrag"], 5.32, places=2)
+
+    def test_prijs_met_tk_tekst_bevat_komma(self):
+        r = self.client.get("/api/prijs?aantal=1&transactiekosten=1")
+        self.assertIn(",", r.get_json()["bedrag_tekst"])
+
+    def test_prijs_tk_nul_geen_toeslag(self):
+        """transactiekosten=0 moet zelfde resultaat geven als geen param."""
+        r = self.client.get("/api/prijs?aantal=5&transactiekosten=0")
+        self.assertEqual(r.get_json()["bedrag"], 10.00)
+
+    # ── /bestellen opslaan ────────────────────────────────────────────────────
+
+    def test_bestelling_zonder_tk_slaat_nul_op(self):
+        doe_bestelling(self.client, transactiekosten=False)
+        rij = App.get_db().execute(
+            "SELECT transactiekosten FROM bestellingen WHERE id=1"
+        ).fetchone()
+        self.assertEqual(rij["transactiekosten"], 0)
+
+    def test_bestelling_met_tk_slaat_een_op(self):
+        doe_bestelling(self.client, transactiekosten=True)
+        rij = App.get_db().execute(
+            "SELECT transactiekosten FROM bestellingen WHERE id=1"
+        ).fetchone()
+        self.assertEqual(rij["transactiekosten"], 1)
+
+    def test_bestelling_met_tk_hogere_bedrag_opgeslagen(self):
+        doe_bestelling(self.client, aantal=2, transactiekosten=True)
+        rij = App.get_db().execute(
+            "SELECT bedrag FROM bestellingen WHERE id=1"
+        ).fetchone()
+        self.assertAlmostEqual(rij["bedrag"], 5.32, places=2)
+
+    def test_bestelling_zonder_tk_normaal_bedrag_opgeslagen(self):
+        doe_bestelling(self.client, aantal=2, transactiekosten=False)
+        rij = App.get_db().execute(
+            "SELECT bedrag FROM bestellingen WHERE id=1"
+        ).fetchone()
+        self.assertAlmostEqual(rij["bedrag"], 5.00, places=2)
+
+    # ── e-mail tekst ──────────────────────────────────────────────────────────
+
+    def test_email_met_tk_vermeldt_transactiekosten(self):
+        verzonden = {}
+        def nep_send(params):
+            verzonden["html"] = params.get("html", "")
+            return {"id": "test"}
+        with patch("resend.Emails.send", side_effect=nep_send):
+            stuur_bevestigingsmail("Jan", "jan@t.nl", 2, 1, 2, 5.32, transactiekosten=True)
+        self.assertIn("transactiekosten", verzonden.get("html", "").lower())
+
+    def test_email_zonder_tk_vermeldt_geen_transactiekosten(self):
+        verzonden = {}
+        def nep_send(params):
+            verzonden["html"] = params.get("html", "")
+            return {"id": "test"}
+        with patch("resend.Emails.send", side_effect=nep_send):
+            stuur_bevestigingsmail("Jan", "jan@t.nl", 2, 1, 2, 5.00, transactiekosten=False)
+        self.assertNotIn("transactiekosten", verzonden.get("html", "").lower())
 
 
 # ══════════════════════════════════════════════════════════════════════════════
