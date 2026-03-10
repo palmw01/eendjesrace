@@ -34,10 +34,11 @@ gunicorn app:app
 |----------|-------------|
 | `MOLLIE_API_KEY` | Mollie test/live API key |
 | `BASE_URL` | Public domain (used for webhook + redirect URLs) |
+| `RESEND_API_KEY` | Resend API key for transactional email |
 | `ADMIN_PASS` | Admin password (app refuses to start without this) |
 | `ADMIN_USER` | Admin username (default: `admin`) |
 
-Key optional variables: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAX_EENDJES` (default 3000), `DATABASE` (default `eendjes.db`), `HTTPS` (set `true` in production), `SECRET_KEY`, `LOG_DIR` (default `logs`), `FLASK_DEBUG` (set `true` for debug mode).
+Key optional variables: `RESEND_FROM` (verified sender address), `MAX_EENDJES` (default 3000), `DATABASE` (default `eendjes.db`), `HTTPS` (set `true` in production), `SECRET_KEY`, `LOG_DIR` (default `logs`), `FLASK_DEBUG` (set `true` for debug mode).
 
 ## Architecture
 
@@ -75,7 +76,7 @@ def bereken_bedrag(aantal):
 
 ## Testing Notes
 
-`tests/test_app.py` stubs out Mollie, Flask-WTF CSRF, and Flask-Limiter so tests run with only Flask installed. Tests cover pricing, input validation, database operations, atomic transactions, email sending, and webhook processing.
+`tests/test_app.py` stubs out Mollie, Resend, Flask-WTF CSRF, and Flask-Limiter so tests run with only Flask installed. Tests cover pricing, input validation, database operations, atomic transactions, email sending, and webhook processing. The test database uses `/tmp/eendjes_test.db` (reset before each test class).
 
 ## Key Patterns
 

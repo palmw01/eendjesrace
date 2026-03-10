@@ -1,20 +1,20 @@
 # 🦆 Eendjesrace – Lotenverkoop applicatie
 
-Een complete webapplicatie voor de lotenverkoop van de eendjesrace.  
-Gebouwd met **Python/Flask** + **Mollie** (iDEAL) + **SQLite**.
+Een complete webapplicatie voor de lotenverkoop van de **Badeendjesrace Wapenveld** (30 mei 2026).
+Gebouwd met **Python/Flask** + **Mollie** (iDEAL) + **SQLite** + **Resend** (e-mail).
 
 ---
 
 ## ✅ Wat doet de app automatisch?
 
-| Stap | Handmatig vroeger | Nu automatisch |
-|------|------------------|----------------|
-| Bestelling ontvangen | Google Forms | ✅ Ingebouwd formulier |
-| Prijs berekenen | Handmatig | ✅ Live in de browser |
-| Betaalverzoek sturen | Handmatig per persoon | ✅ Directe iDEAL-betaling |
-| Lotnummers toewijzen | Handmatig in Excel | ✅ Direct na betaling |
-| Bevestiging sturen | Handmatig e-mail | ✅ Automatische e-mail |
-| Overzicht bijhouden | Excel bijwerken | ✅ Admin-pagina (/admin) |
+| Stap | |
+|------|-|
+| Bestelling ontvangen | ✅ Ingebouwd formulier |
+| Prijs berekenen | ✅ Live in de browser |
+| Betaalverzoek sturen | ✅ Directe iDEAL-betaling |
+| Lotnummers toewijzen | ✅ Direct na betaling |
+| Bevestiging sturen | ✅ Automatische e-mail via Resend |
+| Overzicht bijhouden | ✅ Admin-pagina (/admin) |
 
 ---
 
@@ -38,15 +38,14 @@ MOLLIE_API_KEY=test_xxxxxxxxxxxxxxxxxxxx
 # De publieke URL van jouw server (belangrijk voor Mollie webhook!)
 BASE_URL=https://jouwdomein.nl
 
-# E-mail instellingen (bijv. Gmail)
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=jouwemail@gmail.com
-SMTP_PASS=jouw-app-wachtwoord   # Gebruik een Gmail App Password, niet je gewone wachtwoord
+# Resend e-mail (haal op via resend.com → API Keys)
+RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxx
+RESEND_FROM=noreply@jouwdomein.nl
 ```
 
-> **Gmail App Password aanmaken:**  
-> Google-account → Beveiliging → 2-stapsverificatie → App-wachtwoorden
+> **Resend instellen:**
+> Maak een gratis account op [resend.com](https://resend.com), verifieer je domein en maak een API key aan.
+> Zonder geverifieerd domein kun je tijdelijk `onboarding@resend.dev` gebruiken als `RESEND_FROM` (mails gaan dan alleen naar je eigen Resend-account e-mailadres).
 
 ### 3. App starten
 

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>🦆 Eendjesrace – Bestel je loten</title>
+  <title>🦆 Badeendjesrace Wapenveld – Bestel je loten</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
   <style>
@@ -275,6 +275,53 @@
     }
     .kleine-tekst a { color: var(--blauw); }
 
+    /* Info sectie */
+    .info-kaart {
+      background: rgba(255,255,255,0.12);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.25);
+      border-radius: 20px;
+      padding: 24px 24px;
+      margin-bottom: 24px;
+      color: white;
+    }
+    .info-kaart h2 {
+      font-family: 'Fredoka One', cursive;
+      font-size: 1.5rem;
+      color: var(--geel);
+      margin-bottom: 10px;
+    }
+    .info-kaart p {
+      font-size: 0.95rem;
+      line-height: 1.6;
+      color: rgba(255,255,255,0.9);
+      margin-bottom: 10px;
+    }
+    .info-kaart p:last-child { margin-bottom: 0; }
+    .evenement-details {
+      background: rgba(255,255,255,0.08);
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin: 14px 0;
+      font-size: 0.95rem;
+      line-height: 2;
+    }
+    .hoe-werkt-het {
+      margin-top: 14px;
+    }
+    .hoe-werkt-het h3 {
+      font-family: 'Fredoka One', cursive;
+      font-size: 1.1rem;
+      color: var(--geel);
+      margin-bottom: 8px;
+    }
+    .hoe-werkt-het ol {
+      padding-left: 20px;
+      font-size: 0.9rem;
+      line-height: 1.8;
+      color: rgba(255,255,255,0.9);
+    }
+
     /* Uitverkocht banner */
     .uitverkocht {
       text-align: center;
@@ -304,6 +351,40 @@
     <h1>Eendjesrace!</h1>
     <p>Hervormde Gemeente Wapenveld</p>
   </header>
+
+  <!-- Evenementinformatie -->
+  <div class="info-kaart">
+    <h2>Badeendjesrace Wapenveld</h2>
+    <p>
+      Op zaterdag 30 mei 2026 organiseert de HGJB-commissie van de Hervormde Kerk Wapenveld
+      een bijzonder en gezellig evenement: de Badeendjesrace Wapenveld.
+    </p>
+    <p>
+      Tijdens dit vrolijke spektakel nemen honderden gele badeendjes het tegen elkaar op in een
+      spannende race over het water. Tegelijkertijd zamelen we geld in voor het diaconale project
+      <strong>'Ik geloof, ik deel'</strong>. Met de opbrengst ondersteunen we christenen in Albanië
+      en willen we mensen bewust maken van wat het betekent om te delen vanuit ons geloof.
+    </p>
+    <p>Iedereen is van harte welkom om te komen kijken, mee te doen en dit mooie doel te steunen!</p>
+
+    <div class="evenement-details">
+      📅 <strong>Datum:</strong> Zaterdag 30 mei 2026<br>
+      🕢 <strong>Tijd:</strong> Rond 19:30 uur<br>
+      📍 <strong>Locatie:</strong> Het Apeldoorns Kanaal, bij de Manenbergerbrug / de Loswal in Wapenveld
+    </div>
+
+    <div class="hoe-werkt-het">
+      <h3>Hoe werkt de race?</h3>
+      <ol>
+        <li>Er gaan maximaal 3000 badeendjes tegelijk het water in.</li>
+        <li>Elk badeendje heeft een uniek nummer van 1 t/m 3000.</li>
+        <li>Wanneer je een lot koopt, krijg je een nummer dat overeenkomt met een specifiek badeendje.</li>
+        <li>Na de start drijven alle eendjes richting de finishlijn. De wind of hulp van de brandweer zorgt ervoor dat de eendjes in beweging blijven.</li>
+        <li>Het eendje dat als eerste de finishgeul binnenkomt, wint de hoofdprijs.</li>
+        <li>Daarna worden de overige prijzen verdeeld op basis van de volgorde van binnenkomst.</li>
+      </ol>
+    </div>
+  </div>
 
   <!-- Voortgangsbalk -->
   <div class="voortgang-card">
