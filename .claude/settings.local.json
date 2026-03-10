@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bash -c 'set -a; source .env; set +a; timeout 5 python app.py 2>&1; true')",
+      "Bash(bash -c 'set -a; source .env; set +a; timeout 5 .venv/bin/python app.py 2>&1; true')",
+      "Bash(.venv/bin/pip install:*)",
+      "Bash(timeout 5 .venv/bin/python app.py 2>&1; true)",
+      "Bash(.venv/bin/python -m pytest tests/test_app.py -v 2>&1)",
+      "Bash(.venv/bin/python -m pytest tests/test_app.py::TestBestellen::test_lege_naam_geeft_422 -v 2>&1 | tail -40)",
+      "Bash(git -C /home/willardp/Documenten/Projecten/eendjesrace status 2>&1 | head -5)"
+    ]
+  }
+}

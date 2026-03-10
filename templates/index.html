@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🦆 Eendjesrace – Bestel je loten</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --geel:   #FFD700;
+      --geel2:  #FFC107;
+      --blauw:  #0077B6;
+      --lichtblauw: #90E0EF;
+      --wit:    #FFFDF5;
+      --donker: #1A1A2E;
+      --oranje: #FF8C00;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Nunito', sans-serif;
+      background: var(--blauw);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Water animatie achtergrond */
+    .water-bg {
+      position: fixed;
+      inset: 0;
+      background: linear-gradient(180deg, #0096C7 0%, #0077B6 40%, #023E8A 100%);
+      z-index: 0;
+    }
+    .golven {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      height: 120px;
+      background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 120'%3E%3Cpath fill='%2390E0EF' fill-opacity='0.3' d='M0,64L48,69.3C96,75,192,85,288,80C384,75,480,53,576,48C672,43,768,53,864,64C960,75,1056,85,1152,80C1248,75,1344,53,1392,42.7L1440,32L1440,120L0,120Z'/%3E%3C/svg%3E") repeat-x bottom;
+      animation: golf 4s ease-in-out infinite alternate;
+      z-index: 0;
+    }
+    @keyframes golf {
+      from { transform: translateX(0); }
+      to   { transform: translateX(-40px); }
+    }
+
+    /* Drijvende eendjes decoratie */
+    .eendjes-deco {
+      position: fixed;
+      font-size: 2rem;
+      animation: drijf linear infinite;
+      opacity: 0.6;
+      z-index: 1;
+      user-select: none;
+    }
+    @keyframes drijf {
+      from { transform: translateX(-80px) translateY(0); }
+      50%  { transform: translateX(calc(50vw)) translateY(-10px); }
+      to   { transform: translateX(calc(100vw + 80px)) translateY(0); }
+    }
+
+    /* Container */
+    .container {
+      position: relative;
+      z-index: 10;
+      max-width: 520px;
+      margin: 0 auto;
+      padding: 40px 20px 80px;
+    }
+
+    /* Header */
+    header {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+    .eend-groot {
+      font-size: 5rem;
+      animation: wiebel 2s ease-in-out infinite;
+      display: block;
+      filter: drop-shadow(0 4px 12px rgba(0,0,0,0.3));
+    }
+    @keyframes wiebel {
+      0%,100% { transform: rotate(-5deg); }
+      50%      { transform: rotate(5deg); }
+    }
+    header h1 {
+      font-family: 'Fredoka One', cursive;
+      font-size: 2.8rem;
+      color: var(--geel);
+      text-shadow: 3px 3px 0 rgba(0,0,0,0.3);
+      letter-spacing: 1px;
+      margin-top: 8px;
+    }
+    header p {
+      color: var(--lichtblauw);
+      font-size: 1.05rem;
+      margin-top: 6px;
+    }
+
+    /* Voortgangsbalk */
+    .voortgang-card {
+      background: rgba(255,255,255,0.1);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 16px;
+      padding: 16px 20px;
+      margin-bottom: 24px;
+      color: white;
+    }
+    .voortgang-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.9rem;
+      margin-bottom: 8px;
+    }
+    .voortgang-bar {
+      height: 14px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+    .voortgang-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--geel), var(--oranje));
+      border-radius: 99px;
+      transition: width 1s ease;
+    }
+    .voortgang-label {
+      text-align: center;
+      font-size: 0.85rem;
+      margin-top: 6px;
+      color: var(--lichtblauw);
+    }
+
+    /* Formulier kaart */
+    .kaart {
+      background: var(--wit);
+      border-radius: 24px;
+      padding: 32px 28px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    .kaart h2 {
+      font-family: 'Fredoka One', cursive;
+      font-size: 1.6rem;
+      color: var(--donker);
+      margin-bottom: 6px;
+    }
+    .kaart .subtitel {
+      color: #666;
+      font-size: 0.9rem;
+      margin-bottom: 24px;
+    }
+
+    /* Prijsinfo */
+    .prijsinfo {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 24px;
+    }
+    .prijs-badge {
+      flex: 1;
+      text-align: center;
+      padding: 10px;
+      border-radius: 12px;
+      border: 2px solid var(--geel2);
+      background: #FFFDE7;
+    }
+    .prijs-badge .bedrag {
+      font-family: 'Fredoka One', cursive;
+      font-size: 1.4rem;
+      color: var(--blauw);
+    }
+    .prijs-badge .omschr {
+      font-size: 0.78rem;
+      color: #888;
+    }
+    .prijs-badge.aanbieding {
+      background: #E8F5E9;
+      border-color: #4CAF50;
+    }
+    .prijs-badge.aanbieding .bedrag { color: #2E7D32; }
+
+    /* Formulier elementen */
+    .form-groep {
+      margin-bottom: 18px;
+    }
+    label {
+      display: block;
+      font-weight: 700;
+      font-size: 0.9rem;
+      color: var(--donker);
+      margin-bottom: 6px;
+    }
+    input[type="text"],
+    input[type="email"],
+    input[type="tel"],
+    input[type="number"] {
+      width: 100%;
+      padding: 12px 16px;
+      border: 2px solid #E0E0E0;
+      border-radius: 12px;
+      font-family: 'Nunito', sans-serif;
+      font-size: 1rem;
+      transition: border-color .2s, box-shadow .2s;
+      background: #FAFAFA;
+    }
+    input:focus {
+      outline: none;
+      border-color: var(--blauw);
+      box-shadow: 0 0 0 4px rgba(0,119,182,0.12);
+      background: white;
+    }
+
+    /* Aantal + live prijs */
+    .aantal-rij {
+      display: flex;
+      gap: 12px;
+      align-items: flex-end;
+    }
+    .aantal-rij .form-groep { flex: 1; margin-bottom: 0; }
+    .prijs-live {
+      flex: 1;
+      background: linear-gradient(135deg, var(--blauw), #0096C7);
+      border-radius: 12px;
+      padding: 12px 16px;
+      color: white;
+      text-align: center;
+    }
+    .prijs-live .label { font-size: 0.75rem; opacity: .8; }
+    .prijs-live .waarde {
+      font-family: 'Fredoka One', cursive;
+      font-size: 1.8rem;
+      line-height: 1;
+    }
+    .prijs-live .tip {
+      font-size: 0.7rem;
+      opacity: .7;
+      margin-top: 2px;
+    }
+
+    /* Knop */
+    .bestel-knop {
+      width: 100%;
+      padding: 16px;
+      margin-top: 24px;
+      background: linear-gradient(135deg, var(--geel), var(--oranje));
+      border: none;
+      border-radius: 14px;
+      font-family: 'Fredoka One', cursive;
+      font-size: 1.3rem;
+      color: var(--donker);
+      cursor: pointer;
+      box-shadow: 0 6px 20px rgba(255,140,0,0.4);
+      transition: transform .15s, box-shadow .15s;
+      letter-spacing: .5px;
+    }
+    .bestel-knop:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 28px rgba(255,140,0,0.5);
+    }
+    .bestel-knop:active { transform: translateY(0); }
+    .bestel-knop:disabled {
+      opacity: .5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .kleine-tekst {
+      text-align: center;
+      font-size: 0.78rem;
+      color: #999;
+      margin-top: 14px;
+    }
+    .kleine-tekst a { color: var(--blauw); }
+
+    /* Uitverkocht banner */
+    .uitverkocht {
+      text-align: center;
+      padding: 20px;
+      background: #FFEBEE;
+      border-radius: 12px;
+      border: 2px solid #EF9A9A;
+      color: #C62828;
+      font-weight: 700;
+      margin-top: 16px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="water-bg"></div>
+<div class="golven"></div>
+
+<!-- Drijvende eendjes decoratie -->
+<span class="eendjes-deco" style="top:15%;animation-duration:18s;animation-delay:-3s">🦆</span>
+<span class="eendjes-deco" style="top:60%;animation-duration:22s;animation-delay:-9s;font-size:1.4rem">🦆</span>
+<span class="eendjes-deco" style="top:35%;animation-duration:28s;animation-delay:-15s;font-size:1.1rem">🦆</span>
+
+<div class="container">
+  <header>
+    <span class="eend-groot">🦆</span>
+    <h1>Eendjesrace!</h1>
+    <p>Hervormde Gemeente Wapenveld</p>
+  </header>
+
+  <!-- Voortgangsbalk -->
+  <div class="voortgang-card">
+    <div class="voortgang-header">
+      <span>🦆 {{ verkocht }} eendjes verkocht</span>
+      <span>{{ beschikbaar }} over</span>
+    </div>
+    <div class="voortgang-bar">
+      <div class="voortgang-fill" style="width: {{ ((verkocht / max_eendjes * 100)|round(1)) if max_eendjes else 0 }}%"></div>
+    </div>
+    <div class="voortgang-label">Maximaal {{ max_eendjes }} eendjes beschikbaar</div>
+  </div>
+
+  <!-- Bestelformulier -->
+  <div class="kaart">
+    <h2>Bestel je loten</h2>
+    <p class="subtitel">Betaal direct via iDEAL — je ontvangt daarna je lotnummers per e-mail.</p>
+
+    <!-- Prijsinfo -->
+    <div class="prijsinfo">
+      <div class="prijs-badge">
+        <div class="bedrag">€ 2,50</div>
+        <div class="omschr">per eendje</div>
+      </div>
+      <div class="prijs-badge aanbieding">
+        <div class="bedrag">€ 10,-</div>
+        <div class="omschr">🎉 5 voor de prijs van 4!</div>
+      </div>
+    </div>
+
+    {% if beschikbaar <= 0 %}
+    <div class="uitverkocht">
+      😢 Alle eendjes zijn verkocht! Bedankt voor de geweldige opkomst.
+    </div>
+    {% else %}
+    <form method="POST" action="/bestellen" id="bestelForm">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="form-groep">
+        <label for="naam">Naam</label>
+        <input type="text" id="naam" name="naam" placeholder="Jan Jansen" required autocomplete="name">
+      </div>
+      <div class="form-groep">
+        <label for="email">E-mailadres</label>
+        <input type="email" id="email" name="email" placeholder="jan@voorbeeld.nl" required autocomplete="email">
+      </div>
+      <div class="form-groep">
+        <label for="telefoon">Telefoonnummer</label>
+        <input type="tel" id="telefoon" name="telefoon" placeholder="06-12345678" required autocomplete="tel">
+      </div>
+
+      <div class="aantal-rij">
+        <div class="form-groep">
+          <label for="aantal">Aantal eendjes</label>
+          <input type="number" id="aantal" name="aantal"
+                 min="1" max="{{ beschikbaar }}" value="1" required>
+        </div>
+        <div class="prijs-live" id="prijsLive">
+          <div class="label">Te betalen</div>
+          <div class="waarde" id="prijsWaarde">€ 2,50</div>
+          <div class="tip" id="prijsTip"></div>
+        </div>
+      </div>
+
+      <button type="submit" class="bestel-knop" id="bestelKnop">
+        🦆 Betalen via iDEAL
+      </button>
+    </form>
+    <p class="kleine-tekst">
+      Veilig betalen via <strong>Mollie</strong> · iDEAL, creditcard<br>
+      Na betaling ontvang je direct je lotnummers per e-mail.
+    </p>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+  const aantalInput = document.getElementById('aantal');
+  const prijsWaarde = document.getElementById('prijsWaarde');
+  const prijsTip    = document.getElementById('prijsTip');
+  const knop        = document.getElementById('bestelKnop');
+
+  function berekenPrijs(n) {
+    const vijftallen = Math.floor(n / 5);
+    const rest       = n % 5;
+    return vijftallen * 10 + rest * 2.5;
+  }
+
+  function updatePrijs() {
+    const n = parseInt(aantalInput.value) || 0;
+    if (n < 1) { prijsWaarde.textContent = '—'; prijsTip.textContent = ''; return; }
+    const bedrag = berekenPrijs(n);
+    prijsWaarde.textContent = '€ ' + bedrag.toFixed(2).replace('.', ',');
+    const vijftallen = Math.floor(n / 5);
+    if (vijftallen > 0) {
+      const besparing = (n * 2.5 - bedrag).toFixed(2).replace('.', ',');
+      prijsTip.textContent = `Je bespaart € ${besparing}!`;
+    } else {
+      prijsTip.textContent = n >= 3 ? 'Tip: 5 stuks = € 10,-' : '';
+    }
+  }
+
+  aantalInput?.addEventListener('input', updatePrijs);
+  updatePrijs();
+
+  document.getElementById('bestelForm')?.addEventListener('submit', function() {
+    knop.disabled = true;
+    knop.textContent = '⏳ Doorsturen naar betaalpagina…';
+  });
+</script>
+</body>
+</html>

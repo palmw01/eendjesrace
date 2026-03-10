@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin login – Eendjesrace</title>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Nunito', sans-serif;
+      background: linear-gradient(180deg, #1A1A2E 0%, #0077B6 100%);
+      min-height: 100vh;
+      display: flex; align-items: center; justify-content: center; padding: 20px;
+    }
+    .kaart {
+      background: #FFFDF5; border-radius: 20px; padding: 40px 32px;
+      max-width: 380px; width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,.4);
+    }
+    h1 { font-family: 'Fredoka One', cursive; font-size: 1.8rem; color: #0077B6; margin-bottom: 6px; }
+    .sub { color: #888; font-size: .9rem; margin-bottom: 24px; }
+    label { display: block; font-weight: 700; font-size: .9rem; margin-bottom: 6px; color: #333; }
+    input[type="text"], input[type="password"] {
+      width: 100%; padding: 12px 14px; border: 2px solid #E0E0E0;
+      border-radius: 10px; font-family: 'Nunito', sans-serif; font-size: 1rem;
+      margin-bottom: 16px; background: #FAFAFA; transition: border-color .2s;
+    }
+    input:focus { outline: none; border-color: #0077B6; background: white; }
+    .fout-melding {
+      background: #FFEBEE; border: 1px solid #EF9A9A;
+      color: #C62828; border-radius: 8px; padding: 10px 14px;
+      font-size: .9rem; margin-bottom: 16px;
+    }
+    button {
+      width: 100%; padding: 14px; background: #0077B6; color: white;
+      border: none; border-radius: 12px; font-family: 'Fredoka One', cursive;
+      font-size: 1.2rem; cursor: pointer; transition: background .2s;
+    }
+    button:hover { background: #0096C7; }
+  </style>
+</head>
+<body>
+  <div class="kaart">
+    <h1>🔒 Admin</h1>
+    <p class="sub">Eendjesrace – beheerders login</p>
+
+    {% if fout %}
+    <div class="fout-melding">⚠️ {{ fout }}</div>
+    {% endif %}
+
+    <form method="POST" action="/admin/login">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label for="gebruiker">Gebruikersnaam</label>
+      <input type="text" id="gebruiker" name="gebruiker" autocomplete="username" required>
+      <label for="wachtwoord">Wachtwoord</label>
+      <input type="password" id="wachtwoord" name="wachtwoord" autocomplete="current-password" required>
+      <button type="submit">Inloggen</button>
+    </form>
+  </div>
+</body>
+</html>

@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% if status_klasse == 'succes' %}✅ Betaald{% else %}Betaalstatus{% endif %} – Eendjesrace</title>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Nunito', sans-serif;
+      background: linear-gradient(180deg, #0096C7 0%, #023E8A 100%);
+      min-height: 100vh;
+      display: flex; align-items: center; justify-content: center; padding: 20px;
+    }
+    .kaart {
+      background: #FFFDF5; border-radius: 24px; padding: 40px 32px;
+      max-width: 500px; width: 100%; text-align: center;
+      box-shadow: 0 20px 60px rgba(0,0,0,.3);
+    }
+    .icoon { font-size: 4rem; display: block; margin-bottom: 10px; }
+    h1 { font-family: 'Fredoka One', cursive; font-size: 2rem; color: #0077B6; margin-bottom: 6px; }
+    .sub { color: #666; margin-bottom: 24px; }
+
+    .status-box { border-radius: 14px; padding: 22px; margin: 16px 0; }
+    .status-box.succes   { background: #E8F5E9; border: 2px solid #4CAF50; color: #1B5E20; }
+    .status-box.fout     { background: #FFEBEE; border: 2px solid #EF9A9A; color: #C62828; }
+    .status-box.waarsch  { background: #FFF8E1; border: 2px solid #FFD700; color: #E65100; }
+    .status-box.wacht    { background: #E3F2FD; border: 2px solid #90CAF9; color: #1565C0; }
+    .status-box h2 { font-family: 'Fredoka One', cursive; font-size: 1.5rem; margin-bottom: 10px; }
+    .lotnummers {
+      font-family: 'Fredoka One', cursive; font-size: 1.8rem;
+      color: #0077B6; letter-spacing: 2px; margin-top: 10px;
+    }
+    .info { color: #555; font-size: .9rem; line-height: 1.6; margin-top: 14px; }
+    .actie-knop {
+      display: inline-block; margin-top: 10px; padding: 10px 24px;
+      background: #0077B6; color: white; border-radius: 99px;
+      text-decoration: none; font-weight: 700; transition: transform .15s;
+    }
+    .actie-knop:hover { transform: translateY(-2px); }
+    .actie-knop.secundair { background: #E3F2FD; color: #0077B6; margin-left: 8px; }
+    .terug { display: inline-block; margin-top: 24px; color: #0077B6; text-decoration: none; font-size: .9rem; }
+    .mail-waarsch {
+      margin-top: 14px; padding: 10px 14px;
+      background: #FFF8E1; border: 1px solid #FFD700;
+      border-radius: 8px; font-size: .85rem; color: #E65100;
+    }
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.5; } }
+    .wacht-anim { animation: pulse 1.5s ease-in-out infinite; }
+  </style>
+</head>
+<body>
+  <div class="kaart">
+
+    {% if status_klasse == 'succes' %}
+      <span class="icoon">🎉</span>
+      <h1>Gelukt, {{ bestelling['naam'].split()[0] }}!</h1>
+      <p class="sub">Bedankt voor je deelname aan de Eendjesrace.</p>
+      <div class="status-box succes">
+        <h2>{{ status_label }}</h2>
+        <p>Je hebt <strong>{{ bestelling['aantal'] }} eend{{ 'je' if bestelling['aantal'] == 1 else 'jes' }}</strong> gekocht.</p>
+        <p style="margin-top:8px;">Jouw lotnummer{{ 's' if bestelling['lot_van'] != bestelling['lot_tot'] }}:</p>
+        <div class="lotnummers">
+          {% if bestelling['lot_van'] == bestelling['lot_tot'] %}
+            #{{ bestelling['lot_van'] }}
+          {% else %}
+            {% for n in range(bestelling['lot_van'], bestelling['lot_tot'] + 1) %}
+              #{{ n }}{% if not loop.last %}&nbsp;&middot;{% endif %}
+            {% endfor %}
+          {% endif %}
+        </div>
+      </div>
+      {% if not bestelling['mail_verstuurd'] %}
+      <div class="mail-waarsch">
+        ⚠️ Het is helaas niet gelukt om een bevestigingsmail te sturen.
+        Noteer je lotnummer(s) hierboven goed! Neem contact op met de kerk als je hulp nodig hebt.
+      </div>
+      {% else %}
+      <p class="info">📧 Een bevestiging is verstuurd naar <strong>{{ bestelling['email'] }}</strong>.</p>
+      {% endif %}
+
+    {% elif status_klasse == 'fout' %}
+      <span class="icoon">😔</span>
+      <h1>Betaling mislukt</h1>
+      <p class="sub">Er is iets misgegaan bij de betaling.</p>
+      <div class="status-box fout">
+        <h2>{{ status_label }}</h2>
+        <p>Je bestelling is <strong>niet verwerkt</strong> en er is niets van je rekening afgeschreven.</p>
+      </div>
+      <p class="info">Je kunt het gewoon opnieuw proberen. Selecteer opnieuw je eendjes en kies een andere betaalmethode als dat helpt.</p>
+      <br>
+      <a href="/" class="actie-knop">↺ Opnieuw bestellen</a>
+
+    {% elif status_klasse == 'waarsch' %}
+      <span class="icoon">↩️</span>
+      <h1>Betaling niet afgerond</h1>
+      <p class="sub">Je betaling is niet voltooid.</p>
+      <div class="status-box waarsch">
+        <h2>{{ status_label }}</h2>
+        <p>
+          {% if bestelling['status'] == 'geannuleerd' %}
+            Je hebt de betaling geannuleerd. Niets is afgeschreven.
+          {% else %}
+            Je betaling is verlopen doordat deze te lang open stond. Niets is afgeschreven.
+          {% endif %}
+        </p>
+      </div>
+      <p class="info">Wil je toch meedoen? Bestel opnieuw — je lotnummers worden pas toegewezen na een succesvolle betaling.</p>
+      <br>
+      <a href="/" class="actie-knop">← Opnieuw bestellen</a>
+
+    {% else %}
+      <!-- Wacht / status onbekend -->
+      <span class="icoon wacht-anim">⏳</span>
+      <h1>Betaling wordt verwerkt</h1>
+      <p class="sub">Even geduld…</p>
+      <div class="status-box wacht">
+        <h2>{{ status_label }}</h2>
+        <p>Je betaling is ontvangen maar wordt nog bevestigd door de bank.
+           Dit duurt normaal slechts enkele seconden.</p>
+      </div>
+      <p class="info">
+        Je ontvangt automatisch een e-mail op <strong>{{ bestelling['email'] }}</strong>
+        zodra de betaling is bevestigd en je lotnummers zijn toegewezen.<br><br>
+        <em>Niets ontvangen na 10 minuten? Neem dan contact op met de kerk.</em>
+      </p>
+      <br>
+      <a href="/betaald/{{ bestelling['id'] }}" class="actie-knop secundair" onclick="this.textContent='↻ Laden…'">↻ Status vernieuwen</a>
+    {% endif %}
+
+    <br>
+    <a href="/" class="terug">← Terug naar de Eendjesrace</a>
+  </div>
+</body>
+</html>

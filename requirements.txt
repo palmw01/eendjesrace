@@ -1,0 +1,5 @@
+flask>=3.0
+flask-wtf>=1.2
+flask-limiter>=3.5
+mollie-api-python>=3.0
+gunicorn>=21.0

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fout {{ code }} – Eendjesrace</title>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Nunito', sans-serif;
+      background: linear-gradient(180deg, #0096C7 0%, #023E8A 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .kaart {
+      background: #FFFDF5;
+      border-radius: 24px;
+      padding: 48px 36px;
+      max-width: 460px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0,0,0,.3);
+    }
+    .eend { font-size: 4rem; display: block; margin-bottom: 12px;
+            animation: schudden .5s ease-in-out 3; }
+    @keyframes schudden {
+      0%,100% { transform: rotate(0); }
+      25%      { transform: rotate(-10deg); }
+      75%      { transform: rotate(10deg); }
+    }
+    .code {
+      font-family: 'Fredoka One', cursive;
+      font-size: 5rem;
+      color: #EF9A9A;
+      line-height: 1;
+    }
+    h1 {
+      font-family: 'Fredoka One', cursive;
+      font-size: 1.8rem;
+      color: #0077B6;
+      margin: 8px 0;
+    }
+    p { color: #555; line-height: 1.6; margin-top: 10px; }
+
+    .acties { margin-top: 28px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    .knop {
+      display: inline-block;
+      padding: 12px 24px;
+      border-radius: 99px;
+      text-decoration: none;
+      font-weight: 700;
+      transition: transform .15s;
+    }
+    .knop:hover { transform: translateY(-2px); }
+    .knop-primair { background: #0077B6; color: white; }
+    .knop-secundair { background: #E3F2FD; color: #0077B6; }
+
+    {% if code == 503 %}
+    .melding {
+      background: #FFF8E1; border: 2px solid #FFD700;
+      border-radius: 12px; padding: 16px; margin-top: 20px;
+      font-size: .9rem; color: #E65100;
+    }
+    {% endif %}
+  </style>
+</head>
+<body>
+  <div class="kaart">
+    <span class="eend">🦆</span>
+    <div class="code">{{ code }}</div>
+    <h1>{{ titel }}</h1>
+    <p>{{ bericht }}</p>
+
+    {% if code == 503 %}
+    <div class="melding">
+      💡 Je bestelling is <strong>nog niet verwerkt</strong>.
+      Probeer het over een paar minuten opnieuw — je wordt dan opnieuw doorgestuurd naar de betaalpagina.
+    </div>
+    {% endif %}
+
+    {% if code in [404, 500, 503] %}
+    <div class="melding" style="background:#E8F5E9;border-color:#4CAF50;color:#1B5E20;margin-top:16px;">
+      💡 Heb je al betaald maar zie je deze pagina?
+      Controleer je e-mail — mogelijk is je bevestiging al verstuurd.
+    </div>
+    {% endif %}
+
+    <div class="acties">
+      <a href="/" class="knop knop-primair">← Terug naar start</a>
+      {% if code >= 500 %}
+      <a href="javascript:location.reload()" class="knop knop-secundair">↻ Probeer opnieuw</a>
+      {% endif %}
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin – Eendjesrace</title>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Nunito', sans-serif; background: #F0F4F8; color: #1A1A2E; padding: 24px; }
+
+    .topbar {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 24px; flex-wrap: wrap; gap: 12px;
+    }
+    h1 { font-family: 'Fredoka One', cursive; font-size: 2rem; color: #0077B6; }
+    .uitloggen {
+      padding: 8px 18px; background: #FFEBEE; color: #C62828;
+      border-radius: 99px; text-decoration: none; font-weight: 700; font-size: .9rem;
+    }
+
+    .waarschuwing {
+      background: #FFF8E1; border: 2px solid #FFD700; border-radius: 12px;
+      padding: 14px 18px; margin-bottom: 20px; color: #E65100; font-weight: 600;
+    }
+
+    .stats { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 28px; }
+    .stat {
+      background: white; border-radius: 14px; padding: 18px 22px;
+      box-shadow: 0 2px 12px rgba(0,0,0,.07); flex: 1; min-width: 140px;
+    }
+    .stat .getal { font-family: 'Fredoka One', cursive; font-size: 2rem; color: #0077B6; }
+    .stat .label { font-size: .82rem; color: #888; margin-top: 2px; }
+    .stat.alarm .getal { color: #C62828; }
+
+    /* Voortgangsbalk */
+    .voortgang { background: white; border-radius: 14px; padding: 18px 22px;
+                 margin-bottom: 24px; box-shadow: 0 2px 12px rgba(0,0,0,.07); }
+    .voortgang-bar { height: 14px; background: #E0E0E0; border-radius: 99px; overflow: hidden; margin: 8px 0; }
+    .voortgang-fill { height: 100%; background: linear-gradient(90deg,#FFD700,#FF8C00);
+                      border-radius: 99px; }
+
+    table { width: 100%; border-collapse: collapse; background: white;
+            border-radius: 14px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,.07);
+            font-size: .86rem; }
+    th { background: #0077B6; color: white; padding: 11px 12px; text-align: left; white-space: nowrap; }
+    td { padding: 9px 12px; border-bottom: 1px solid #F0F4F8; vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #F7FBFF; }
+
+    .badge {
+      display: inline-block; padding: 2px 10px; border-radius: 99px;
+      font-size: .76rem; font-weight: 700; white-space: nowrap;
+    }
+    .badge-betaald    { background: #E8F5E9; color: #2E7D32; }
+    .badge-aangemaakt { background: #FFF8E1; color: #E65100; }
+    .badge-mislukt,
+    .badge-verlopen,
+    .badge-geannuleerd { background: #FFEBEE; color: #C62828; }
+
+    .mail-fout { font-size: .8rem; color: #C62828; }
+    .mail-ok   { font-size: .8rem; color: #2E7D32; }
+
+    .knop-mail {
+      padding: 4px 10px; background: #E3F2FD; color: #0077B6;
+      border: 1px solid #90CAF9; border-radius: 6px; cursor: pointer;
+      font-family: 'Nunito', sans-serif; font-size: .78rem; font-weight: 700;
+    }
+    .knop-mail:hover { background: #BBDEFB; }
+
+    .zoek { margin-bottom: 16px; }
+    .zoek input {
+      padding: 10px 14px; border: 2px solid #E0E0E0; border-radius: 10px;
+      font-family: 'Nunito', sans-serif; font-size: .95rem; width: 100%; max-width: 320px;
+    }
+    .zoek input:focus { outline: none; border-color: #0077B6; }
+
+    @media (max-width: 700px) {
+      table { font-size: .78rem; }
+      th, td { padding: 7px 8px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <h1>🦆 Eendjesrace – Beheer</h1>
+    <a href="/admin/logout" class="uitloggen">Uitloggen</a>
+  </div>
+
+  {% if stats['mails_mislukt'] > 0 %}
+  <div class="waarschuwing">
+    ⚠️ {{ stats['mails_mislukt'] }} bevestigingsmail{{ 's zijn' if stats['mails_mislukt'] > 1 else ' is' }}
+    niet verstuurd. Gebruik de knop "↺ Mail" in de tabel om opnieuw te versturen.
+  </div>
+  {% endif %}
+
+  <!-- Statistieken -->
+  <div class="stats">
+    <div class="stat">
+      <div class="getal">{{ stats['totaal_bestellingen'] }}</div>
+      <div class="label">Bestellingen totaal</div>
+    </div>
+    <div class="stat">
+      <div class="getal">{{ stats['verkochte_eendjes'] }}</div>
+      <div class="label">Eendjes verkocht</div>
+    </div>
+    <div class="stat">
+      <div class="getal">€ {{ "%.2f"|format(stats['totaal_omzet']) }}</div>
+      <div class="label">Omzet (betaald)</div>
+    </div>
+    <div class="stat {% if stats['mails_mislukt'] > 0 %}alarm{% endif %}">
+      <div class="getal">{{ stats['mails_mislukt'] }}</div>
+      <div class="label">Mails mislukt</div>
+    </div>
+  </div>
+
+  <!-- Voortgangsbalk -->
+  <div class="voortgang">
+    {% set pct = (stats['verkochte_eendjes'] / max_eendjes * 100)|round(1) %}
+    <div style="display:flex;justify-content:space-between;font-size:.9rem;color:#555;">
+      <span>🦆 {{ stats['verkochte_eendjes'] }} / {{ max_eendjes }} eendjes verkocht</span>
+      <span>{{ pct }}%</span>
+    </div>
+    <div class="voortgang-bar">
+      <div class="voortgang-fill" style="width:{{ pct }}%"></div>
+    </div>
+  </div>
+
+  <!-- Zoekbalk -->
+  <div class="zoek">
+    <input type="text" id="zoek" placeholder="🔍 Zoek op naam, e-mail of lotnummer…" oninput="filterTabel()">
+  </div>
+
+  <!-- Bestellingen tabel -->
+  <table id="tabel">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Naam</th>
+        <th>E-mail</th>
+        <th>Telefoon</th>
+        <th>Aantal</th>
+        <th>Bedrag</th>
+        <th>Loten</th>
+        <th>Status</th>
+        <th>Mail</th>
+        <th>Datum</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for b in bestellingen %}
+      <tr>
+        <td>{{ b['id'] }}</td>
+        <td>{{ b['naam'] }}</td>
+        <td>{{ b['email'] }}</td>
+        <td>{{ b['telefoon'] }}</td>
+        <td style="text-align:center">{{ b['aantal'] }}</td>
+        <td>€ {{ "%.2f"|format(b['bedrag']) }}</td>
+        <td>
+          {% if b['lot_van'] %}
+            {% if b['lot_van'] == b['lot_tot'] %}#{{ b['lot_van'] }}
+            {% else %}#{{ b['lot_van'] }}–{{ b['lot_tot'] }}{% endif %}
+          {% else %}—{% endif %}
+        </td>
+        <td>
+          <span class="badge badge-{{ b['status'] }}">{{ b['status'] }}</span>
+        </td>
+        <td>
+          {% if b['status'] == 'betaald' %}
+            {% if b['mail_verstuurd'] %}
+              <span class="mail-ok">✅</span>
+            {% else %}
+              <span class="mail-fout">❌</span>
+              <form method="POST" action="/admin/mail-opnieuw/{{ b['id'] }}" style="display:inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="knop-mail" title="Mail opnieuw versturen">↺ Mail</button>
+              </form>
+            {% endif %}
+          {% else %}—{% endif %}
+        </td>
+        <td style="white-space:nowrap;color:#888;font-size:.8rem">{{ b['aangemaakt_op'][:16] }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <script>
+    function filterTabel() {
+      const zoekterm = document.getElementById('zoek').value.toLowerCase();
+      const rijen    = document.querySelectorAll('#tabel tbody tr');
+      rijen.forEach(rij => {
+        rij.style.display = rij.textContent.toLowerCase().includes(zoekterm) ? '' : 'none';
+      });
+    }
+  </script>
+</body>
+</html>
