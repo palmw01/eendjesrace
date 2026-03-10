@@ -74,7 +74,7 @@ An optional iDEAL transaction fee (`TRANSACTIEKOSTEN = 0.32`) can be added to th
 
 ### Admin
 
-`/admin` (protected by session login, timing-safe password check) shows order statistics, lets admins resend confirmation emails for failed deliveries, and offers a CSV export (`/admin/export-csv`) of all orders — semicolon-delimited with UTF-8 BOM for Excel compatibility. Each order row has an edit button (`/admin/bestelling/<id>/wijzigen`) and a delete button (`/admin/bestelling/<id>/verwijderen`, POST with JS confirm).
+`/admin` (protected by session login, timing-safe password check) shows order statistics, lets admins resend confirmation emails for failed deliveries, and offers a CSV export (`/admin/export-csv`) of all orders — semicolon-delimited with UTF-8 BOM for Excel compatibility. Each order row has an edit button (`/admin/bestelling/<id>/wijzigen`) that allows updating naam, email, telefoon, status, and mail_verstuurd — **not** lotnummers. A "Gevaarzone" section at the bottom of the admin page offers a full database reset (`POST /admin/reset`) that wipes all orders and webhook_log and resets `volgend_lot` to 1; the user must type `RESET` in a text field as confirmation.
 
 ## Testing Notes
 

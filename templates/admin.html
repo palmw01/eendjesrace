@@ -82,12 +82,23 @@
     }
     .knop-wijzig:hover { background: #BBDEFB; }
 
-    .knop-delete {
-      padding: 3px 9px; background: #FFEBEE; color: #C62828;
-      border: 1px solid #EF9A9A; border-radius: 6px; cursor: pointer;
-      font-family: 'Nunito', sans-serif; font-size: .76rem; font-weight: 700; white-space: nowrap;
+    .gevaarzone {
+      margin-top: 40px; border: 2px solid #EF9A9A; border-radius: 14px;
+      padding: 22px 28px; background: #FFEBEE;
     }
-    .knop-delete:hover { background: #FFCDD2; }
+    .gevaarzone h2 { color: #C62828; font-family: 'Fredoka One', cursive; font-size: 1.4rem; margin-bottom: 8px; }
+    .gevaarzone p { font-size: .9rem; color: #555; margin-bottom: 14px; }
+    .gevaarzone input[type="text"] {
+      padding: 9px 12px; border: 2px solid #EF9A9A; border-radius: 10px;
+      font-family: 'Nunito', sans-serif; font-size: .95rem; width: 180px; margin-right: 10px;
+    }
+    .gevaarzone input[type="text"]:focus { outline: none; border-color: #C62828; }
+    .knop-reset {
+      padding: 9px 20px; background: #C62828; color: white;
+      border: none; border-radius: 10px; cursor: pointer;
+      font-family: 'Nunito', sans-serif; font-size: .95rem; font-weight: 700;
+    }
+    .knop-reset:hover { background: #b71c1c; }
 
     .zoek { margin-bottom: 16px; }
     .zoek input {
@@ -206,16 +217,31 @@
         <td style="white-space:nowrap;color:#888;font-size:.8rem">{{ b['aangemaakt_op'][:16] }}</td>
         <td style="white-space:nowrap;">
           <a href="/admin/bestelling/{{ b['id'] }}/wijzigen" class="knop-wijzig">✏ Wijzig</a>
-          <form method="POST" action="/admin/bestelling/{{ b['id'] }}/verwijderen" style="display:inline"
-                onsubmit="return confirm('Bestelling #{{ b.id }} van {{ b.naam }} verwijderen? Dit kan niet ongedaan worden gemaakt.')">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit" class="knop-delete">✕ Verwijder</button>
-          </form>
         </td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
+
+  <!-- Gevaarzone: database resetten -->
+  {% with berichten = get_flashed_messages(with_categories=true) %}
+    {% for categorie, bericht in berichten %}
+    <div class="waarschuwing" style="margin-top:20px">⚠️ {{ bericht }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  <div class="gevaarzone">
+    <h2>⚠ Gevaarzone</h2>
+    <p>
+      Dit verwijdert <strong>alle bestellingen</strong> en reset de lotnummering naar 1.
+      De webhook-log wordt ook gewist. Dit kan <strong>niet</strong> ongedaan worden gemaakt.
+    </p>
+    <form method="POST" action="/admin/reset">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="text" name="bevestiging" placeholder="Typ RESET" autocomplete="off">
+      <button type="submit" class="knop-reset">Database resetten</button>
+    </form>
+  </div>
 
   <script>
     function filterTabel() {

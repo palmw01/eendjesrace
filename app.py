@@ -25,7 +25,7 @@ from functools import wraps
 from logging.handlers import RotatingFileHandler
 from flask import (
     Flask, request, render_template, redirect,
-    url_for, jsonify, session, abort, g, Response
+    url_for, jsonify, session, abort, g, Response, flash, get_flashed_messages
 )
 from werkzeug.middleware.proxy_fix import ProxyFix
 from flask_wtf import CSRFProtect
@@ -787,7 +787,7 @@ def export_csv():
 @app.route("/admin/bestelling/<int:bestelling_id>/wijzigen", methods=["GET", "POST"])
 @login_vereist
 def wijzig_bestelling(bestelling_id):
-    """Bewerk naam, contact, status en lotnummers van een bestelling."""
+    """Bewerk naam, contact en status van een bestelling."""
     db  = get_db()
     rij = db.execute("SELECT * FROM bestellingen WHERE id=?", (bestelling_id,)).fetchone()
     if not rij:
@@ -799,8 +799,6 @@ def wijzig_bestelling(bestelling_id):
         telefoon       = request.form.get("telefoon", "").strip()
         email          = request.form.get("email", "").strip().lower()
         status         = request.form.get("status", "").strip()
-        lot_van_raw    = request.form.get("lot_van", "").strip()
-        lot_tot_raw    = request.form.get("lot_tot", "").strip()
         mail_verstuurd = 1 if request.form.get("mail_verstuurd") == "1" else 0
 
         geldige_statussen = ("aangemaakt", "betaald", "mislukt", "geannuleerd", "verlopen")
@@ -809,25 +807,12 @@ def wijzig_bestelling(bestelling_id):
         if status not in geldige_statussen:
             fouten.append("Ongeldige status.")
 
-        lot_van = lot_tot = None
-        if lot_van_raw:
-            try:
-                lot_van = int(lot_van_raw)
-            except ValueError:
-                fouten.append("Lot van moet een geheel getal zijn.")
-        if lot_tot_raw:
-            try:
-                lot_tot = int(lot_tot_raw)
-            except ValueError:
-                fouten.append("Lot tot moet een geheel getal zijn.")
-
         if not fouten:
             try:
                 db.execute(
                     "UPDATE bestellingen SET naam=?, telefoon=?, email=?, status=?, "
-                    "lot_van=?, lot_tot=?, mail_verstuurd=?, "
-                    "bijgewerkt_op=datetime('now','localtime') WHERE id=?",
-                    (naam, telefoon, email, status, lot_van, lot_tot, mail_verstuurd, bestelling_id),
+                    "mail_verstuurd=?, bijgewerkt_op=datetime('now','localtime') WHERE id=?",
+                    (naam, telefoon, email, status, mail_verstuurd, bestelling_id),
                 )
                 db.commit()
             except sqlite3.Error as e:
@@ -838,19 +823,23 @@ def wijzig_bestelling(bestelling_id):
     return render_template("wijzigen.html", bestelling=rij, fouten=fouten)
 
 
-@app.route("/admin/bestelling/<int:bestelling_id>/verwijderen", methods=["POST"])
+@app.route("/admin/reset", methods=["POST"])
 @login_vereist
-def verwijder_bestelling(bestelling_id):
-    """Verwijder een bestelling permanent."""
+def reset_database():
+    """Verwijder alle bestellingen en reset de lotnummering."""
+    bevestiging = request.form.get("bevestiging", "").strip()
+    if bevestiging != "RESET":
+        flash("Voer 'RESET' in om de database te wissen.", "fout")
+        return redirect(url_for("admin"))
     try:
-        db  = get_db()
-        rij = db.execute("SELECT id FROM bestellingen WHERE id=?", (bestelling_id,)).fetchone()
-        if not rij:
-            abort(404)
-        db.execute("DELETE FROM bestellingen WHERE id=?", (bestelling_id,))
+        db = get_db()
+        db.execute("DELETE FROM bestellingen")
+        db.execute("DELETE FROM webhook_log")
+        db.execute("UPDATE teller SET volgend_lot=1")
         db.commit()
+        app.logger.warning("Database volledig gereset door admin.")
     except sqlite3.Error as e:
-        app.logger.error(f"DB-fout verwijder_bestelling: {e}")
+        app.logger.error(f"DB-fout reset_database: {e}")
         abort(500)
     return redirect(url_for("admin"))
 

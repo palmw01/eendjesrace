@@ -1026,7 +1026,7 @@ class TestWijzigenVerwijderen(unittest.TestCase):
         data = {
             "naam": "Jan Jansen", "telefoon": "0612345678",
             "email": "jan@test.nl", "status": "aangemaakt",
-            "lot_van": "", "lot_tot": "", "mail_verstuurd": "0",
+            "mail_verstuurd": "0",
         }
         data.update(kwargs)
         return self.client.post(f"/admin/bestelling/{bestelling_id}/wijzigen", data=data)
@@ -1060,12 +1060,6 @@ class TestWijzigenVerwijderen(unittest.TestCase):
         rij = App.get_db().execute("SELECT status FROM bestellingen WHERE id=1").fetchone()
         self.assertEqual(rij["status"], "betaald")
 
-    def test_wijzigen_lotnummers_worden_opgeslagen(self):
-        self._wijzig(status="betaald", lot_van="10", lot_tot="11")
-        rij = App.get_db().execute("SELECT lot_van, lot_tot FROM bestellingen WHERE id=1").fetchone()
-        self.assertEqual(rij["lot_van"], 10)
-        self.assertEqual(rij["lot_tot"], 11)
-
     def test_wijzigen_lege_naam_geeft_fout(self):
         r = self._wijzig(naam="")
         self.assertEqual(r.status_code, 200)
@@ -1085,25 +1079,24 @@ class TestWijzigenVerwijderen(unittest.TestCase):
         rij = App.get_db().execute("SELECT mail_verstuurd FROM bestellingen WHERE id=1").fetchone()
         self.assertEqual(rij["mail_verstuurd"], 1)
 
-    # ── verwijderen ───────────────────────────────────────────────────────────
+    # ── database reset ────────────────────────────────────────────────────────
 
-    def test_verwijderen_redirect_naar_admin(self):
-        r = self.client.post("/admin/bestelling/1/verwijderen")
+    def test_reset_juiste_bevestiging_wist_alles(self):
+        r = self.client.post("/admin/reset", data={"bevestiging": "RESET"})
         self.assertEqual(r.status_code, 302)
-        self.assertIn("/admin", r.headers["Location"])
+        db = App.get_db()
+        self.assertEqual(db.execute("SELECT COUNT(*) FROM bestellingen").fetchone()[0], 0)
+        self.assertEqual(db.execute("SELECT volgend_lot FROM teller").fetchone()[0], 1)
 
-    def test_verwijderen_rij_weg_uit_db(self):
-        self.client.post("/admin/bestelling/1/verwijderen")
-        rij = App.get_db().execute("SELECT id FROM bestellingen WHERE id=1").fetchone()
-        self.assertIsNone(rij)
+    def test_reset_verkeerde_bevestiging_doet_niets(self):
+        r = self.client.post("/admin/reset", data={"bevestiging": "reset"})
+        self.assertEqual(r.status_code, 302)
+        db = App.get_db()
+        self.assertGreater(db.execute("SELECT COUNT(*) FROM bestellingen").fetchone()[0], 0)
 
-    def test_verwijderen_onbekend_id_geeft_404(self):
-        r = self.client.post("/admin/bestelling/99999/verwijderen")
-        self.assertEqual(r.status_code, 404)
-
-    def test_verwijderen_zonder_login_geeft_302(self):
+    def test_reset_zonder_login_geeft_302(self):
         self.client.get("/admin/logout")
-        r = self.client.post("/admin/bestelling/1/verwijderen")
+        r = self.client.post("/admin/reset", data={"bevestiging": "RESET"})
         self.assertEqual(r.status_code, 302)
 
 

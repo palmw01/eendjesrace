@@ -97,18 +97,6 @@
         </select>
       </div>
 
-      <div class="rij-twee">
-        <div class="veld">
-          <label for="lot_van">Lot van</label>
-          <input type="number" id="lot_van" name="lot_van" value="{{ bestelling['lot_van'] or '' }}" min="1">
-          <p class="info">Leeg = nog geen loten</p>
-        </div>
-        <div class="veld">
-          <label for="lot_tot">Lot tot</label>
-          <input type="number" id="lot_tot" name="lot_tot" value="{{ bestelling['lot_tot'] or '' }}" min="1">
-        </div>
-      </div>
-
       <div class="checkbox-rij">
         <input type="checkbox" id="mail_verstuurd" name="mail_verstuurd" value="1"
                {% if bestelling['mail_verstuurd'] %}checked{% endif %}>
