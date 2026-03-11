@@ -35,7 +35,7 @@ gunicorn app:app
 | `MOLLIE_API_KEY` | Mollie test/live API key |
 | `BASE_URL` | Public domain (used for webhook + redirect URLs) |
 | `RESEND_API_KEY` | Resend API key for transactional email |
-| `ADMIN_PASS` | Admin password (app refuses to start without this) |
+| `ADMIN_PASS` | Admin password — minimum 12 characters (app refuses to start otherwise) |
 | `ADMIN_USER` | Admin username (default: `admin`) |
 
 Key optional variables: `RESEND_FROM` (verified sender address), `MAX_EENDJES` (default 3000, seeds the DB on first run), `DATABASE` (default `eendjes.db`), `HTTPS` (set `true` in production), `SECRET_KEY`, `LOG_DIR` (default `logs`), `FLASK_DEBUG` (set `true` for debug mode).
@@ -74,7 +74,7 @@ An optional iDEAL transaction fee (`TRANSACTIEKOSTEN = 0.32`) can be added to th
 
 ### Admin
 
-`/admin` (protected by session login, timing-safe password check) shows order statistics (incl. openstaande/hangende bestellingen), lets admins resend confirmation emails for failed deliveries, filter orders by status, and offers a CSV export (`/admin/export-csv`) of all orders — semicolon-delimited with UTF-8 BOM for Excel compatibility, including `transactiekosten` column. Each order row has an edit button (`/admin/bestelling/<id>/wijzigen`) that allows updating naam, email, telefoon, status, and mail_verstuurd — **not** lotnummers.
+`/admin` (protected by session login, timing-safe password check, session expires after 4 hours) shows order statistics (incl. openstaande/hangende bestellingen), lets admins resend confirmation emails for failed deliveries, filter orders by status, and offers a CSV export (`/admin/export-csv`) of all orders — semicolon-delimited with UTF-8 BOM for Excel compatibility, including `transactiekosten` column. Orders are paginated at 50 per page (`PAGINA_GROOTTE = 50`). Each order row has an edit button (`/admin/bestelling/<id>/wijzigen`) that allows updating naam, email, telefoon, status, and mail_verstuurd — **not** lotnummers.
 
 Admin routes:
 - `POST /admin/instellingen` — update `max_eendjes` and/or `max_per_bestelling` in the `teller` table. Validates that `max_eendjes` cannot be set below the number of already sold tickets.
@@ -85,12 +85,12 @@ Admin routes:
 
 ## Testing Notes
 
-`tests/test_app.py` stubs out Mollie, Resend, Flask-WTF CSRF, and Flask-Limiter so tests run with only Flask installed. Tests cover pricing, input validation, database operations, atomic transactions, email sending, webhook processing, admin routes, `max_per_bestelling`/`max_eendjes` settings, and the opruimen route. The test database uses `/tmp/eendjes_test.db` (reset before each test class). `maak_db()` includes `max_eendjes` and `max_per_bestelling` in the teller table.
+`tests/test_app.py` stubs out Mollie, Resend, Flask-WTF CSRF, and Flask-Limiter so tests run with only Flask installed. Tests cover pricing, input validation, database operations, atomic transactions, email sending, webhook processing, admin routes, `max_per_bestelling`/`max_eendjes` settings, opruimen, paginering, CSP nonces, Permissions-Policy, session permanence, and `saniteer_log`. The test database uses `/tmp/eendjes_test.db` (reset before each test class). `maak_db()` includes `max_eendjes` and `max_per_bestelling` in the teller table. Total: 162 tests.
 
 ## Key Patterns
 
 - All comments and variable/function names are in Dutch (e.g., `bestelling` = order, `eendjes` = ducks/tickets, `lotnummer` = ticket number, `betaald` = paid)
-- Security headers, rate limiting, ProxyFix (for Railway deployment), and Mollie webhook IP whitelisting are all configured in `app.py`
+- Security headers (X-Frame-Options, CSP with per-request nonces, Permissions-Policy, etc.), rate limiting (5/min on admin login), ProxyFix (for Railway deployment), and Mollie webhook IP whitelisting are all configured in `app.py`. `saniteer_log()` strips newlines from user input before logging to prevent log injection.
 - The database is auto-initialized on module import (`init_db()` called at module level)
 
 ### Mollie API v3

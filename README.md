@@ -68,7 +68,7 @@ De app draait op http://localhost:5000. De SQLite-database (`eendjes.db`) wordt 
 | `MOLLIE_API_KEY` | Ja | Mollie API-sleutel (`test_…` of `live_…`) |
 | `BASE_URL` | Ja | Publieke URL van de app (bijv. `https://xxx.railway.app`) |
 | `RESEND_API_KEY` | Ja | Resend API-sleutel voor transactionele e-mail |
-| `ADMIN_PASS` | Ja | Wachtwoord voor de beheerpagina |
+| `ADMIN_PASS` | Ja | Wachtwoord voor de beheerpagina (minimaal 12 tekens) |
 | `SECRET_KEY` | Ja | Willekeurige geheime sleutel voor sessies (gebruik een lange random string) |
 | `RESEND_FROM` | Ja | Geverifieerd afzenderadres (bijv. `noreply@jouwdomein.nl`) |
 | `ADMIN_USER` | Nee | Gebruikersnaam admin (standaard: `admin`) |
