@@ -123,14 +123,16 @@ def maak_db():
         )""",
         """CREATE TABLE teller (
             id INTEGER PRIMARY KEY CHECK (id = 1),
-            volgend_lot INTEGER NOT NULL DEFAULT 1
+            volgend_lot INTEGER NOT NULL DEFAULT 1,
+            max_eendjes INTEGER NOT NULL DEFAULT 3000,
+            max_per_bestelling INTEGER NOT NULL DEFAULT 100
         )""",
         """CREATE TABLE webhook_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             mollie_id TEXT, status TEXT, ip TEXT,
             ontvangen TEXT DEFAULT (datetime('now','localtime'))
         )""",
-        "INSERT INTO teller (id, volgend_lot) VALUES (1, 1)",
+        f"INSERT INTO teller (id, volgend_lot, max_eendjes, max_per_bestelling) VALUES (1, 1, {MAX_EENDJES}, 100)",
     ]:
         conn.execute(ddl)
     return conn
@@ -469,8 +471,8 @@ class TestBestellen(unittest.TestCase):
         self.assertEqual(r.status_code, 503)
 
     def test_uitverkocht_geeft_409(self):
-        with patch("app.MAX_EENDJES", 0):
-            r = doe_bestelling(self.client, aantal=1)
+        App.get_db().execute("UPDATE teller SET max_eendjes=0 WHERE id=1")
+        r = doe_bestelling(self.client, aantal=1)
         self.assertEqual(r.status_code, 409)
 
 
@@ -1180,6 +1182,166 @@ class TestTransactiekosten(unittest.TestCase):
         with patch("resend.Emails.send", side_effect=nep_send):
             stuur_bevestigingsmail("Jan", "jan@t.nl", 2, 1, 2, 5.00, transactiekosten=False)
         self.assertNotIn("transactiekosten", verzonden.get("html", "").lower())
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 14. MAX_PER_BESTELLING (configureerbaar)
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestMaxPerBestelling(unittest.TestCase):
+
+    def setUp(self):
+        self.client, self.ctx = maak_flask_client()
+        self.client.post("/admin/login",
+                         data={"gebruiker": "admin", "wachtwoord": "testpass"})
+
+    def tearDown(self):
+        self.ctx.pop()
+
+    # ── valideer_invoer ───────────────────────────────────────────────────────
+
+    def test_valideer_invoer_standaard_max_100(self):
+        fouten = valideer_invoer("Jan Jansen", "0612345678", "jan@test.nl", 100)
+        self.assertEqual(fouten, [])
+
+    def test_valideer_invoer_101_met_standaard_geeft_fout(self):
+        fouten = valideer_invoer("Jan Jansen", "0612345678", "jan@test.nl", 101)
+        self.assertTrue(any("100" in f for f in fouten))
+
+    def test_valideer_invoer_aangepast_max_50(self):
+        fouten = valideer_invoer("Jan Jansen", "0612345678", "jan@test.nl", 50, max_per_bestelling=50)
+        self.assertEqual(fouten, [])
+
+    def test_valideer_invoer_51_met_max_50_geeft_fout(self):
+        fouten = valideer_invoer("Jan Jansen", "0612345678", "jan@test.nl", 51, max_per_bestelling=50)
+        self.assertTrue(any("50" in f for f in fouten))
+
+    def test_valideer_invoer_foutmelding_bevat_max(self):
+        fouten = valideer_invoer("Jan Jansen", "0612345678", "jan@test.nl", 25, max_per_bestelling=20)
+        self.assertTrue(any("20" in f for f in fouten))
+
+    # ── /api/prijs reageert op max_per_bestelling ─────────────────────────────
+
+    def test_api_prijs_101_geeft_400_bij_default(self):
+        self.assertEqual(self.client.get("/api/prijs?aantal=101").status_code, 400)
+
+    def test_api_prijs_50_geeft_200_na_verlagen_max(self):
+        App.get_db().execute("UPDATE teller SET max_per_bestelling=50 WHERE id=1")
+        self.assertEqual(self.client.get("/api/prijs?aantal=50").status_code, 200)
+
+    def test_api_prijs_51_geeft_400_na_verlagen_max(self):
+        App.get_db().execute("UPDATE teller SET max_per_bestelling=50 WHERE id=1")
+        self.assertEqual(self.client.get("/api/prijs?aantal=51").status_code, 400)
+
+    # ── /bestellen reageert op max_per_bestelling ─────────────────────────────
+
+    def test_bestellen_101_geeft_422_bij_default(self):
+        self.assertEqual(doe_bestelling(self.client, aantal=101).status_code, 422)
+
+    def test_bestellen_10_geeft_422_na_verlagen_max_naar_5(self):
+        App.get_db().execute("UPDATE teller SET max_per_bestelling=5 WHERE id=1")
+        self.assertEqual(doe_bestelling(self.client, aantal=10).status_code, 422)
+
+    def test_bestellen_5_geeft_302_na_verlagen_max_naar_5(self):
+        App.get_db().execute("UPDATE teller SET max_per_bestelling=5 WHERE id=1")
+        self.assertEqual(doe_bestelling(self.client, aantal=5).status_code, 302)
+
+    # ── admin instellingen-route ──────────────────────────────────────────────
+
+    def test_admin_instellingen_wijzigt_max_per_bestelling(self):
+        self.client.post("/admin/instellingen", data={"max_per_bestelling": "30"})
+        rij = App.get_db().execute("SELECT max_per_bestelling FROM teller WHERE id=1").fetchone()
+        self.assertEqual(rij["max_per_bestelling"], 30)
+
+    def test_admin_instellingen_wijzigt_max_eendjes(self):
+        self.client.post("/admin/instellingen", data={"max_eendjes": "500"})
+        rij = App.get_db().execute("SELECT max_eendjes FROM teller WHERE id=1").fetchone()
+        self.assertEqual(rij["max_eendjes"], 500)
+
+    def test_admin_instellingen_zonder_login_geeft_302(self):
+        self.client.get("/admin/logout")
+        r = self.client.post("/admin/instellingen", data={"max_per_bestelling": "10"})
+        self.assertEqual(r.status_code, 302)
+
+    def test_admin_instellingen_max_eendjes_lager_dan_verkocht_geeft_fout(self):
+        # Voeg een betaalde bestelling toe van 10 eendjes
+        doe_bestelling(self.client, aantal=10)
+        App.get_db().execute(
+            "UPDATE bestellingen SET status='betaald', lot_van=1, lot_tot=10 WHERE id=1"
+        )
+        r = self.client.post("/admin/instellingen", data={"max_eendjes": "5"})
+        self.assertEqual(r.status_code, 302)  # redirect terug
+        rij = App.get_db().execute("SELECT max_eendjes FROM teller WHERE id=1").fetchone()
+        self.assertGreater(rij["max_eendjes"], 5)  # niet verlaagd
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 15. OPRUIMEN & API BESCHIKBAAR
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestOpruimenEnApiBeschikbaar(unittest.TestCase):
+
+    def setUp(self):
+        self.client, self.ctx = maak_flask_client()
+        self.client.post("/admin/login",
+                         data={"gebruiker": "admin", "wachtwoord": "testpass"})
+
+    def tearDown(self):
+        self.ctx.pop()
+
+    # ── /api/beschikbaar ──────────────────────────────────────────────────────
+
+    def test_api_beschikbaar_geeft_200(self):
+        self.assertEqual(self.client.get("/api/beschikbaar").status_code, 200)
+
+    def test_api_beschikbaar_bevat_velden(self):
+        d = self.client.get("/api/beschikbaar").get_json()
+        self.assertIn("verkocht", d)
+        self.assertIn("beschikbaar", d)
+        self.assertIn("max_eendjes", d)
+        self.assertIn("max_per_bestelling", d)
+
+    def test_api_beschikbaar_na_betaalde_bestelling(self):
+        doe_bestelling(self.client, aantal=3)
+        App.get_db().execute(
+            "UPDATE bestellingen SET status='betaald', lot_van=1, lot_tot=3 WHERE id=1"
+        )
+        d = self.client.get("/api/beschikbaar").get_json()
+        self.assertEqual(d["verkocht"], 3)
+        self.assertEqual(d["beschikbaar"], d["max_eendjes"] - 3)
+
+    # ── /admin/opruimen ───────────────────────────────────────────────────────
+
+    def test_opruimen_verwijdert_verlopen_zonder_loten(self):
+        doe_bestelling(self.client, aantal=2)
+        App.get_db().execute("UPDATE bestellingen SET status='verlopen' WHERE id=1")
+        self.client.post("/admin/opruimen")
+        aantal = App.get_db().execute("SELECT COUNT(*) FROM bestellingen").fetchone()[0]
+        self.assertEqual(aantal, 0)
+
+    def test_opruimen_laat_betaalde_bestelling_staan(self):
+        doe_bestelling(self.client, aantal=2)
+        App.get_db().execute(
+            "UPDATE bestellingen SET status='betaald', lot_van=1, lot_tot=2 WHERE id=1"
+        )
+        self.client.post("/admin/opruimen")
+        aantal = App.get_db().execute("SELECT COUNT(*) FROM bestellingen").fetchone()[0]
+        self.assertEqual(aantal, 1)
+
+    def test_opruimen_laat_verlopen_met_loten_staan(self):
+        """Verlopen bestelling die toch lotnummers heeft (edge case) blijft staan."""
+        doe_bestelling(self.client, aantal=2)
+        App.get_db().execute(
+            "UPDATE bestellingen SET status='verlopen', lot_van=1, lot_tot=2 WHERE id=1"
+        )
+        self.client.post("/admin/opruimen")
+        aantal = App.get_db().execute("SELECT COUNT(*) FROM bestellingen").fetchone()[0]
+        self.assertEqual(aantal, 1)
+
+    def test_opruimen_zonder_login_geeft_302(self):
+        self.client.get("/admin/logout")
+        r = self.client.post("/admin/opruimen")
+        self.assertEqual(r.status_code, 302)
 
 
 # ══════════════════════════════════════════════════════════════════════════════

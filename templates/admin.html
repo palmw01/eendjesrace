@@ -23,6 +23,10 @@
       background: #FFF8E1; border: 2px solid #FFD700; border-radius: 12px;
       padding: 14px 18px; margin-bottom: 20px; color: #E65100; font-weight: 600;
     }
+    .bevestiging {
+      background: #E8F5E9; border: 2px solid #A5D6A7; border-radius: 12px;
+      padding: 14px 18px; margin-bottom: 20px; color: #2E7D32; font-weight: 600;
+    }
 
     .stats { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 28px; }
     .stat {
@@ -226,30 +230,59 @@
   <!-- Instellingen -->
   {% with berichten = get_flashed_messages(with_categories=true) %}
     {% for categorie, bericht in berichten %}
+    {% if categorie == 'info' %}
+    <div class="bevestiging" style="margin-top:20px">✓ {{ bericht }}</div>
+    {% else %}
     <div class="waarschuwing" style="margin-top:20px">⚠️ {{ bericht }}</div>
+    {% endif %}
     {% endfor %}
   {% endwith %}
 
   <div style="margin-top:40px;border:2px solid #B3E5FC;border-radius:14px;padding:22px 28px;background:#E1F5FE;">
-    <h2 style="color:#0277BD;font-family:'Fredoka One',cursive;font-size:1.4rem;margin-bottom:8px;">Instellingen</h2>
-    <form method="POST" action="/admin/instellingen" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <h2 style="color:#0277BD;font-family:'Fredoka One',cursive;font-size:1.4rem;margin-bottom:16px;">Instellingen</h2>
+    <form method="POST" action="/admin/instellingen">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <label for="max_per_bestelling" style="font-size:.95rem;font-weight:700;">Maximaal aantal eendjes per bestelling:</label>
-      <input type="number" id="max_per_bestelling" name="max_per_bestelling"
-             min="1" max="{{ max_eendjes }}" value="{{ max_per_bestelling }}"
-             style="width:90px;padding:9px 12px;border:2px solid #81D4FA;border-radius:10px;font-family:'Nunito',sans-serif;font-size:.95rem;">
-      <button type="submit"
-              style="padding:9px 20px;background:#0277BD;color:white;border:none;border-radius:10px;cursor:pointer;font-family:'Nunito',sans-serif;font-size:.95rem;font-weight:700;">
-        Opslaan
-      </button>
+      <table style="border-collapse:collapse;width:100%;max-width:520px;">
+        <tr>
+          <td style="padding:8px 0;font-weight:700;font-size:.95rem;">Totaal beschikbare eendjes:</td>
+          <td style="padding:8px 0 8px 12px;">
+            <input type="number" name="max_eendjes" min="1" value="{{ max_eendjes }}"
+                   style="width:100px;padding:8px 10px;border:2px solid #81D4FA;border-radius:10px;font-family:'Nunito',sans-serif;font-size:.95rem;">
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:8px 0;font-weight:700;font-size:.95rem;">Maximaal per bestelling:</td>
+          <td style="padding:8px 0 8px 12px;">
+            <input type="number" name="max_per_bestelling" min="1" max="{{ max_eendjes }}" value="{{ max_per_bestelling }}"
+                   style="width:100px;padding:8px 10px;border:2px solid #81D4FA;border-radius:10px;font-family:'Nunito',sans-serif;font-size:.95rem;">
+          </td>
+        </tr>
+        <tr>
+          <td></td>
+          <td style="padding:12px 0 0 12px;">
+            <button type="submit"
+                    style="padding:9px 20px;background:#0277BD;color:white;border:none;border-radius:10px;cursor:pointer;font-family:'Nunito',sans-serif;font-size:.95rem;font-weight:700;">
+              Opslaan
+            </button>
+          </td>
+        </tr>
+      </table>
     </form>
   </div>
 
   <!-- Gevaarzone: database resetten -->
   <div class="gevaarzone">
     <h2>⚠ Gevaarzone</h2>
+    <p style="margin-bottom:10px;">
+      <strong>Opruimen</strong> verwijdert verlopen, mislukte en geannuleerde bestellingen
+      <em>zonder lotnummers</em>. Betaalde bestellingen blijven onaangetast.
+    </p>
+    <form method="POST" action="/admin/opruimen" id="opruimenForm" style="margin-bottom:18px;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="knop-reset" style="background:#E65100;">Opruimen</button>
+    </form>
     <p>
-      Dit verwijdert <strong>alle bestellingen</strong> en reset de lotnummering naar 1.
+      <strong>Database resetten</strong> verwijdert <em>alle</em> bestellingen en reset de lotnummering naar 1.
       De webhook-log wordt ook gewist. Dit kan <strong>niet</strong> ongedaan worden gemaakt.
     </p>
     <form method="POST" action="/admin/reset" id="resetForm">
@@ -262,6 +295,11 @@
   <script>
     document.getElementById('resetForm').addEventListener('submit', function(e) {
       if (!confirm('Weet je zeker dat je de database wilt resetten? Dit kan niet ongedaan worden gemaakt.')) {
+        e.preventDefault();
+      }
+    });
+    document.getElementById('opruimenForm').addEventListener('submit', function(e) {
+      if (!confirm('Verlopen, mislukte en geannuleerde bestellingen zonder lotnummers verwijderen?')) {
         e.preventDefault();
       }
     });

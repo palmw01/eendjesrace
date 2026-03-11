@@ -424,11 +424,11 @@
   <!-- Voortgangsbalk -->
   <div class="voortgang-card">
     <div class="voortgang-header">
-      <span>🦆 {{ verkocht }} eendjes verkocht</span>
-      <span>{{ beschikbaar }} over</span>
+      <span id="tellerVerkocht">🦆 {{ verkocht }} eendjes verkocht</span>
+      <span id="tellerOver">{{ beschikbaar }} over</span>
     </div>
     <div class="voortgang-bar">
-      <div class="voortgang-fill" style="width: {{ ((verkocht / max_eendjes * 100)|round(1)) if max_eendjes else 0 }}%"></div>
+      <div class="voortgang-fill" id="voortgangFill" style="width: {{ ((verkocht / max_eendjes * 100)|round(1)) if max_eendjes else 0 }}%"></div>
     </div>
     <div class="voortgang-label">Maximaal {{ max_eendjes }} eendjes beschikbaar</div>
   </div>
@@ -550,6 +550,36 @@
     knop.disabled = true;
     knop.textContent = '⏳ Doorsturen naar betaalpagina…';
   });
+
+  // Auto-refresh beschikbaarheid elke 30 seconden
+  (function() {
+    const fillEl    = document.getElementById('voortgangFill');
+    const verkochtEl = document.getElementById('tellerVerkocht');
+    const overEl    = document.getElementById('tellerOver');
+    const aantalEl  = document.getElementById('aantal');
+    if (!fillEl) return;  // pagina toont uitverkocht-banner, niets te verversen
+
+    setInterval(function() {
+      fetch('/api/beschikbaar')
+        .then(function(r) { return r.ok ? r.json() : null; })
+        .then(function(d) {
+          if (!d || d.fout) return;
+          const pct = d.max_eendjes > 0 ? Math.min(100, d.verkocht / d.max_eendjes * 100) : 0;
+          fillEl.style.width = pct.toFixed(1) + '%';
+          verkochtEl.textContent = '🦆 ' + d.verkocht + ' eendjes verkocht';
+          overEl.textContent     = d.beschikbaar + ' over';
+          if (aantalEl) {
+            const nieuwMax = Math.min(d.beschikbaar, d.max_per_bestelling);
+            aantalEl.max = nieuwMax;
+            if (parseInt(aantalEl.value) > nieuwMax) {
+              aantalEl.value = nieuwMax;
+              updatePrijs();
+            }
+          }
+        })
+        .catch(function() {});  // stilzwijgend negeren bij netwerkproblemen
+    }, 30000);
+  })();
 </script>
 </body>
 </html>

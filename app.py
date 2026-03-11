@@ -168,7 +168,7 @@ def init_db():
             naam            TEXT NOT NULL,
             telefoon        TEXT NOT NULL,
             email           TEXT NOT NULL,
-            aantal          INTEGER NOT NULL CHECK (aantal >= 1 AND aantal <= 100),
+            aantal          INTEGER NOT NULL CHECK (aantal >= 1),
             bedrag          REAL NOT NULL,
             mollie_id       TEXT UNIQUE,
             status          TEXT NOT NULL DEFAULT 'aangemaakt'
@@ -178,14 +178,17 @@ def init_db():
             lot_tot         INTEGER,
             mail_verstuurd  INTEGER NOT NULL DEFAULT 0,
             pogingen        INTEGER NOT NULL DEFAULT 0,
+            transactiekosten INTEGER NOT NULL DEFAULT 0,
             aangemaakt_op   TEXT NOT NULL DEFAULT (datetime('now','localtime')),
             bijgewerkt_op   TEXT NOT NULL DEFAULT (datetime('now','localtime'))
         )
     """)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS teller (
-            id          INTEGER PRIMARY KEY CHECK (id = 1),
-            volgend_lot INTEGER NOT NULL DEFAULT 1
+            id                  INTEGER PRIMARY KEY CHECK (id = 1),
+            volgend_lot         INTEGER NOT NULL DEFAULT 1,
+            max_eendjes         INTEGER NOT NULL DEFAULT 3000,
+            max_per_bestelling  INTEGER NOT NULL DEFAULT 100
         )
     """)
     conn.execute("""
@@ -197,19 +200,68 @@ def init_db():
             ontvangen   TEXT DEFAULT (datetime('now','localtime'))
         )
     """)
-    conn.execute("INSERT OR IGNORE INTO teller (id, volgend_lot) VALUES (1, 1)")
-    # Migratie: voeg transactiekosten toe aan bestaande databases
+    # Migraties eerst — zodat kolommen bestaan vóór de INSERT
     try:
         conn.execute("ALTER TABLE bestellingen ADD COLUMN transactiekosten INTEGER NOT NULL DEFAULT 0")
     except sqlite3.OperationalError:
         pass  # kolom bestaat al
-    # Migratie: voeg max_per_bestelling toe aan teller
+    try:
+        conn.execute(f"ALTER TABLE teller ADD COLUMN max_eendjes INTEGER NOT NULL DEFAULT {MAX_EENDJES}")
+    except sqlite3.OperationalError:
+        pass  # kolom bestaat al
     try:
         conn.execute("ALTER TABLE teller ADD COLUMN max_per_bestelling INTEGER NOT NULL DEFAULT 100")
     except sqlite3.OperationalError:
         pass  # kolom bestaat al
+    # Seed-rij: alleen aanmaken als nog niet bestaat (alle kolommen zijn nu gegarandeerd aanwezig)
+    conn.execute(
+        "INSERT OR IGNORE INTO teller (id, volgend_lot, max_eendjes, max_per_bestelling) VALUES (1, 1, ?, 100)",
+        (MAX_EENDJES,)
+    )
+    # Migratie: verwijder hardcoded CHECK (aantal <= 100) uit bestellingen-tabel
+    schema = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='bestellingen'"
+    ).fetchone()
+    if schema and "aantal <= 100" in (schema["sql"] or ""):
+        conn.commit()  # sluit eventuele impliciete transactie vóór EXCLUSIVE BEGIN
+        conn.execute("BEGIN")
+        try:
+            conn.execute("ALTER TABLE bestellingen RENAME TO _bestellingen_oud")
+            conn.execute("""
+                CREATE TABLE bestellingen (
+                    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                    naam            TEXT NOT NULL,
+                    telefoon        TEXT NOT NULL,
+                    email           TEXT NOT NULL,
+                    aantal          INTEGER NOT NULL CHECK (aantal >= 1),
+                    bedrag          REAL NOT NULL,
+                    mollie_id       TEXT UNIQUE,
+                    status          TEXT NOT NULL DEFAULT 'aangemaakt'
+                                    CHECK (status IN
+                                      ('aangemaakt','betaald','mislukt','geannuleerd','verlopen')),
+                    lot_van         INTEGER,
+                    lot_tot         INTEGER,
+                    mail_verstuurd  INTEGER NOT NULL DEFAULT 0,
+                    pogingen        INTEGER NOT NULL DEFAULT 0,
+                    transactiekosten INTEGER NOT NULL DEFAULT 0,
+                    aangemaakt_op   TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+                    bijgewerkt_op   TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+                )
+            """)
+            conn.execute("INSERT INTO bestellingen SELECT * FROM _bestellingen_oud")
+            conn.execute("DROP TABLE _bestellingen_oud")
+            conn.execute("COMMIT")
+        except Exception:
+            conn.execute("ROLLBACK")
+            raise
     conn.commit()
     conn.close()
+
+def get_max_eendjes():
+    """Leest het totale maximum aantal beschikbare eendjes uit de database."""
+    row = get_db().execute("SELECT max_eendjes FROM teller WHERE id = 1").fetchone()
+    return row["max_eendjes"] if row else MAX_EENDJES
+
 
 def get_max_per_bestelling():
     """Leest het maximaal toegestane aantal eendjes per bestelling uit de database."""
@@ -242,16 +294,17 @@ def wijs_lotnummers_toe(db, bestelling_id, aantal):
             db.execute("ROLLBACK")
             return bestaand["lot_van"], bestaand["lot_tot"]
 
-        teller = db.execute("SELECT volgend_lot FROM teller WHERE id = 1").fetchone()
-        start  = teller["volgend_lot"]
-        einde  = start + aantal - 1
+        teller     = db.execute("SELECT volgend_lot, max_eendjes FROM teller WHERE id = 1").fetchone()
+        start      = teller["volgend_lot"]
+        max_eendjes = teller["max_eendjes"]
+        einde      = start + aantal - 1
 
         # BUG-FIX: controleer oversell vóór de UPDATE; zonder deze check konden
-        # lotnummers boven MAX_EENDJES worden uitgedeeld.
-        if einde > MAX_EENDJES:
+        # lotnummers boven max_eendjes worden uitgedeeld.
+        if einde > max_eendjes:
             db.execute("ROLLBACK")
             raise ValueError(
-                f"Onvoldoende lotnummers: gevraagd t/m {einde}, max={MAX_EENDJES}"
+                f"Onvoldoende lotnummers: gevraagd t/m {einde}, max={max_eendjes}"
             )
 
         db.execute("UPDATE teller SET volgend_lot = ? WHERE id = 1", (einde + 1,))
@@ -388,10 +441,11 @@ def index():
         betaald = db.execute(
             "SELECT COALESCE(SUM(aantal),0) AS n FROM bestellingen WHERE status='betaald'"
         ).fetchone()["n"]
+        max_eendjes = get_max_eendjes()
         return render_template("index.html",
                                verkocht=betaald,
-                               beschikbaar=max(0, MAX_EENDJES - betaald),
-                               max_eendjes=MAX_EENDJES,
+                               beschikbaar=max(0, max_eendjes - betaald),
+                               max_eendjes=max_eendjes,
                                max_per_bestelling=get_max_per_bestelling())
     except sqlite3.Error as e:
         app.logger.error(f"DB-fout index: {e}")
@@ -414,6 +468,29 @@ def api_prijs():
         return jsonify({"fout": "Ongeldig aantal."}), 400
 
 
+@app.route("/api/beschikbaar")
+@limiter.limit("60 per minute")
+def api_beschikbaar():
+    """Geeft actueel aantal verkochte en beschikbare eendjes terug."""
+    try:
+        db          = get_db()
+        betaald     = db.execute(
+            "SELECT COALESCE(SUM(aantal),0) AS n FROM bestellingen WHERE status='betaald'"
+        ).fetchone()["n"]
+        max_eendjes        = get_max_eendjes()
+        max_per_bestelling = get_max_per_bestelling()
+        beschikbaar        = max(0, max_eendjes - betaald)
+        return jsonify({
+            "verkocht":           betaald,
+            "beschikbaar":        beschikbaar,
+            "max_eendjes":        max_eendjes,
+            "max_per_bestelling": max_per_bestelling,
+        })
+    except sqlite3.Error as e:
+        app.logger.error(f"DB-fout api_beschikbaar: {e}")
+        return jsonify({"fout": "Databasefout"}), 500
+
+
 @app.route("/bestellen", methods=["POST"])
 @limiter.limit("10 per minute")
 def bestellen():
@@ -433,15 +510,16 @@ def bestellen():
 
     # Validatie
     max_per_bestelling = get_max_per_bestelling()
+    max_eendjes        = get_max_eendjes()
     fouten = valideer_invoer(naam, telefoon, email, aantal, max_per_bestelling)
     if fouten:
         db          = get_db()
         betaald     = db.execute("SELECT COALESCE(SUM(aantal),0) AS n FROM bestellingen WHERE status='betaald'").fetchone()["n"]
-        beschikbaar = max(0, MAX_EENDJES - betaald)
+        beschikbaar = max(0, max_eendjes - betaald)
         return render_template("index.html",
                                verkocht=betaald,
                                beschikbaar=beschikbaar,
-                               max_eendjes=MAX_EENDJES,
+                               max_eendjes=max_eendjes,
                                max_per_bestelling=max_per_bestelling,
                                fouten=fouten,
                                vorig=vorig), 422
@@ -456,13 +534,13 @@ def bestellen():
             "SELECT COALESCE(SUM(aantal),0) AS n FROM bestellingen WHERE status='betaald'"
         ).fetchone()["n"]
 
-        if betaald + aantal > MAX_EENDJES:
+        if betaald + aantal > max_eendjes:
             db.execute("ROLLBACK")
-            beschikbaar = max(0, MAX_EENDJES - betaald)
+            beschikbaar = max(0, max_eendjes - betaald)
             return render_template("index.html",
                                    verkocht=betaald,
                                    beschikbaar=beschikbaar,
-                                   max_eendjes=MAX_EENDJES,
+                                   max_eendjes=max_eendjes,
                                    max_per_bestelling=max_per_bestelling,
                                    fouten=[f"Er zijn nog maar {beschikbaar} eendjes beschikbaar."],
                                    vorig=vorig), 409
@@ -731,7 +809,7 @@ def admin():
         return render_template("admin.html",
                                bestellingen=bestellingen,
                                stats=stats,
-                               max_eendjes=MAX_EENDJES,
+                               max_eendjes=get_max_eendjes(),
                                max_per_bestelling=get_max_per_bestelling())
     except sqlite3.Error as e:
         app.logger.error(f"DB-fout admin: {e}")
@@ -742,14 +820,42 @@ def admin():
 @login_vereist
 def admin_instellingen():
     try:
-        waarde = int(request.form.get("max_per_bestelling", 100))
-        if not (1 <= waarde <= MAX_EENDJES):
-            flash(f"Ongeldig getal: kies een waarde tussen 1 en {MAX_EENDJES}.", "fout")
-        else:
-            get_db().execute(
-                "UPDATE teller SET max_per_bestelling = ? WHERE id = 1", (waarde,)
-            )
-            flash(f"Maximum per bestelling bijgewerkt naar {waarde}.", "info")
+        db   = get_db()
+        meldingen = []
+        fouten    = []
+
+        # max_eendjes
+        max_e_str = request.form.get("max_eendjes", "").strip()
+        if max_e_str:
+            max_e = int(max_e_str)
+            huidig_verkocht = db.execute(
+                "SELECT COALESCE(SUM(aantal),0) AS n FROM bestellingen WHERE status='betaald'"
+            ).fetchone()["n"]
+            if max_e < huidig_verkocht:
+                fouten.append(f"Totaal maximum kan niet lager dan het aantal al verkochte eendjes ({huidig_verkocht}) worden.")
+            elif max_e < 1:
+                fouten.append("Totaal maximum moet minimaal 1 zijn.")
+            else:
+                db.execute("UPDATE teller SET max_eendjes = ? WHERE id = 1", (max_e,))
+                meldingen.append(f"Totaal maximum bijgewerkt naar {max_e}.")
+
+        # max_per_bestelling
+        max_p_str = request.form.get("max_per_bestelling", "").strip()
+        if max_p_str:
+            max_p      = int(max_p_str)
+            max_eendjes = int(max_e_str) if max_e_str and not fouten else get_max_eendjes()
+            if not (1 <= max_p <= max_eendjes):
+                fouten.append(f"Maximum per bestelling moet tussen 1 en {max_eendjes} liggen.")
+            else:
+                db.execute("UPDATE teller SET max_per_bestelling = ? WHERE id = 1", (max_p,))
+                meldingen.append(f"Maximum per bestelling bijgewerkt naar {max_p}.")
+
+        if fouten:
+            for f in fouten:
+                flash(f, "fout")
+        if meldingen:
+            flash(" ".join(meldingen), "info")
+
     except (ValueError, TypeError):
         flash("Ongeldig getal opgegeven.", "fout")
     return redirect(url_for("admin"))
@@ -855,6 +961,29 @@ def wijzig_bestelling(bestelling_id):
             return redirect(url_for("admin"))
 
     return render_template("wijzigen.html", bestelling=rij, fouten=fouten)
+
+
+@app.route("/admin/opruimen", methods=["POST"])
+@login_vereist
+def admin_opruimen():
+    """Verwijder verlopen/mislukte/geannuleerde bestellingen zonder lotnummers."""
+    try:
+        db      = get_db()
+        aantal  = db.execute(
+            "SELECT COUNT(*) AS n FROM bestellingen "
+            "WHERE status IN ('verlopen','mislukt','geannuleerd') AND lot_van IS NULL"
+        ).fetchone()["n"]
+        db.execute(
+            "DELETE FROM bestellingen "
+            "WHERE status IN ('verlopen','mislukt','geannuleerd') AND lot_van IS NULL"
+        )
+        db.commit()
+        flash(f"{aantal} ongeldige bestelling(en) verwijderd.", "info")
+        app.logger.info(f"Admin opruimen: {aantal} bestellingen verwijderd.")
+    except sqlite3.Error as e:
+        app.logger.error(f"DB-fout admin_opruimen: {e}")
+        abort(500)
+    return redirect(url_for("admin"))
 
 
 @app.route("/admin/reset", methods=["POST"])
