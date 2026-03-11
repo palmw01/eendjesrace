@@ -10,7 +10,7 @@ import io
 import json
 import re
 import sqlite3
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 # ─── Laad config.json als omgevingsvariabelen (overschrijft geen bestaande vars)
 _config_pad = os.path.join(os.path.dirname(__file__), "config.json")
@@ -404,7 +404,7 @@ def security_headers(response):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"]        = "DENY"
     response.headers["X-XSS-Protection"]       = "1; mode=block"
-    response.headers["Referrer-Policy"]        = "strict-origin-when-cross-origin"
+    response.headers["Referrer-Policy"]        = "no-referrer"
     response.headers["Permissions-Policy"]     = "camera=(), microphone=(), geolocation=()"
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
@@ -426,8 +426,10 @@ SECURITY_CONTACT = os.environ.get("SECURITY_CONTACT", "")
 @app.route("/.well-known/security.txt")
 def security_txt():
     contact = SECURITY_CONTACT or f"mailto:{os.environ.get('RESEND_FROM', 'admin@example.com')}"
+    expires = (datetime.now(timezone.utc) + timedelta(days=365)).strftime("%Y-%m-%dT%H:%M:%SZ")
     inhoud = (
         f"Contact: {contact}\n"
+        f"Expires: {expires}\n"
         f"Preferred-Languages: nl, en\n"
         f"Canonical: {BASE_URL}/.well-known/security.txt\n"
     )
