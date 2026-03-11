@@ -252,7 +252,7 @@
       Dit verwijdert <strong>alle bestellingen</strong> en reset de lotnummering naar 1.
       De webhook-log wordt ook gewist. Dit kan <strong>niet</strong> ongedaan worden gemaakt.
     </p>
-    <form method="POST" action="/admin/reset">
+    <form method="POST" action="/admin/reset" id="resetForm">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="text" name="bevestiging" placeholder="Typ RESET" autocomplete="off">
       <button type="submit" class="knop-reset">Database resetten</button>
@@ -260,6 +260,12 @@
   </div>
 
   <script>
+    document.getElementById('resetForm').addEventListener('submit', function(e) {
+      if (!confirm('Weet je zeker dat je de database wilt resetten? Dit kan niet ongedaan worden gemaakt.')) {
+        e.preventDefault();
+      }
+    });
+
     function filterTabel() {
       const zoekterm = document.getElementById('zoek').value.toLowerCase();
       const rijen    = document.querySelectorAll('#tabel tbody tr');
