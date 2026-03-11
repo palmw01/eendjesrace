@@ -74,18 +74,18 @@ An optional iDEAL transaction fee (`TRANSACTIEKOSTEN = 0.32`) can be added to th
 
 ### Admin
 
-`/admin` (protected by session login, timing-safe password check, session expires after 4 hours) shows order statistics (incl. openstaande/hangende bestellingen), lets admins resend confirmation emails for failed deliveries, filter orders by status, and offers a CSV export (`/admin/export-csv`) of all orders — semicolon-delimited with UTF-8 BOM for Excel compatibility, including `transactiekosten` column. Orders are paginated at 50 per page (`PAGINA_GROOTTE = 50`). Each order row has an edit button (`/admin/bestelling/<id>/wijzigen`) that allows updating naam, email, telefoon, status, and mail_verstuurd — **not** lotnummers.
+`/admin` (protected by session login, timing-safe password check, session expires after 4 hours) shows order statistics (incl. openstaande/hangende bestellingen), lets admins resend confirmation emails for failed deliveries, filter orders by status, search orders by naam/e-mail/lotnummer (server-side, works across all pages), and offers a CSV export (`/admin/export-csv`) — semicolon-delimited with UTF-8 BOM for Excel compatibility. Orders are paginated at 50 per page (`PAGINA_GROOTTE = 50`). Status filter and search term are preserved across pagination. Each order row has an edit button (`/admin/bestelling/<id>/wijzigen`) that allows updating naam, email, telefoon, status, and mail_verstuurd — **not** lotnummers.
 
 Admin routes:
 - `POST /admin/instellingen` — update `max_eendjes` and/or `max_per_bestelling` in the `teller` table. Validates that `max_eendjes` cannot be set below the number of already sold tickets.
 - `POST /admin/opruimen` — deletes orders with status `verlopen`/`mislukt`/`geannuleerd` where `lot_van IS NULL` (no tickets assigned). Safe to run at any time.
-- `POST /admin/reset` — full database reset (wipes all orders + webhook_log, resets `volgend_lot` to 1). Requires typing `RESET` as confirmation. Has a JS confirm dialog as second safeguard.
+- `POST /admin/reset` — full database reset (wipes all orders + webhook_log, resets `volgend_lot` to 1, resets SQLite autoincrement so IDs start at 1 again). Requires typing `RESET` as confirmation. Has a JS confirm dialog as second safeguard.
 
 `GET /api/beschikbaar` — public JSON endpoint returning `verkocht`, `beschikbaar`, `max_eendjes`, `max_per_bestelling`. Used by the homepage auto-refresh (every 30s).
 
 ## Testing Notes
 
-`tests/test_app.py` stubs out Mollie, Resend, Flask-WTF CSRF, and Flask-Limiter so tests run with only Flask installed. Tests cover pricing, input validation, database operations, atomic transactions, email sending, webhook processing, admin routes, `max_per_bestelling`/`max_eendjes` settings, opruimen, paginering, CSP nonces, Permissions-Policy, session permanence, and `saniteer_log`. The test database uses `/tmp/eendjes_test.db` (reset before each test class). `maak_db()` includes `max_eendjes` and `max_per_bestelling` in the teller table. Total: 162 tests.
+`tests/test_app.py` stubs out Mollie, Resend, Flask-WTF CSRF, and Flask-Limiter so tests run with only Flask installed. Tests cover pricing, input validation, database operations, atomic transactions, email sending, webhook processing, admin routes, `max_per_bestelling`/`max_eendjes` settings, opruimen, paginering, server-side statusfilter, CSP nonces, Permissions-Policy, session permanence, and `saniteer_log`. The test database uses `/tmp/eendjes_test.db` (reset before each test class). `maak_db()` includes `max_eendjes` and `max_per_bestelling` in the teller table. Total: 166 tests.
 
 ## Key Patterns
 
