@@ -210,17 +210,20 @@
   </div>
 
   <!-- Zoekbalk + statusfilter -->
-  <div class="zoek" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
-    <input type="text" id="zoek" placeholder="🔍 Zoek op naam, e-mail of lotnummer…" oninput="filterTabel()" style="flex:1;min-width:200px;">
+  <form method="GET" action="/admin" class="zoek" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+    {% if status_filter %}<input type="hidden" name="status" value="{{ status_filter }}">{% endif %}
+    <input type="text" name="zoek" value="{{ zoekterm }}" placeholder="🔍 Zoek op naam, e-mail of lotnummer…" style="flex:1;min-width:200px;">
+    <button type="submit" class="filter-knop actief">Zoeken</button>
+    {% if zoekterm %}<a href="/admin{% if status_filter %}?status={{ status_filter }}{% endif %}" class="filter-knop">✕ Wissen</a>{% endif %}
     <div class="statusfilter">
-      <a href="/admin" class="filter-knop {% if not status_filter %}actief{% endif %}">Alles</a>
-      <a href="/admin?status=betaald" class="filter-knop {% if status_filter == 'betaald' %}actief{% endif %}">Betaald</a>
-      <a href="/admin?status=aangemaakt" class="filter-knop {% if status_filter == 'aangemaakt' %}actief{% endif %}">Openstaand</a>
-      <a href="/admin?status=mislukt" class="filter-knop {% if status_filter == 'mislukt' %}actief{% endif %}">Mislukt</a>
-      <a href="/admin?status=verlopen" class="filter-knop {% if status_filter == 'verlopen' %}actief{% endif %}">Verlopen</a>
-      <a href="/admin?status=geannuleerd" class="filter-knop {% if status_filter == 'geannuleerd' %}actief{% endif %}">Geannuleerd</a>
+      <a href="/admin{% if zoekterm %}?zoek={{ zoekterm }}{% endif %}" class="filter-knop {% if not status_filter %}actief{% endif %}">Alles</a>
+      <a href="/admin?status=betaald{% if zoekterm %}&zoek={{ zoekterm }}{% endif %}" class="filter-knop {% if status_filter == 'betaald' %}actief{% endif %}">Betaald</a>
+      <a href="/admin?status=aangemaakt{% if zoekterm %}&zoek={{ zoekterm }}{% endif %}" class="filter-knop {% if status_filter == 'aangemaakt' %}actief{% endif %}">Openstaand</a>
+      <a href="/admin?status=mislukt{% if zoekterm %}&zoek={{ zoekterm }}{% endif %}" class="filter-knop {% if status_filter == 'mislukt' %}actief{% endif %}">Mislukt</a>
+      <a href="/admin?status=verlopen{% if zoekterm %}&zoek={{ zoekterm }}{% endif %}" class="filter-knop {% if status_filter == 'verlopen' %}actief{% endif %}">Verlopen</a>
+      <a href="/admin?status=geannuleerd{% if zoekterm %}&zoek={{ zoekterm }}{% endif %}" class="filter-knop {% if status_filter == 'geannuleerd' %}actief{% endif %}">Geannuleerd</a>
     </div>
-  </div>
+  </form>
 
   <!-- Bestellingen tabel -->
   <table id="tabel">
@@ -286,15 +289,16 @@
       Pagina {{ pagina }} van {{ totaal_paginas }} &nbsp;({{ totaal }} bestellingen totaal)
     </span>
     {% set sf = ('&status=' ~ status_filter) if status_filter else '' %}
+    {% set zf = ('&zoek=' ~ zoekterm) if zoekterm else '' %}
     {% if pagina > 1 %}
-    <a href="/admin?pagina={{ pagina - 1 }}{{ sf }}" class="filter-knop">← Vorige</a>
+    <a href="/admin?pagina={{ pagina - 1 }}{{ sf }}{{ zf }}" class="filter-knop">← Vorige</a>
     {% endif %}
     {% for p in range(1, totaal_paginas + 1) %}
-    <a href="/admin?pagina={{ p }}{{ sf }}"
+    <a href="/admin?pagina={{ p }}{{ sf }}{{ zf }}"
        class="filter-knop {% if p == pagina %}actief{% endif %}">{{ p }}</a>
     {% endfor %}
     {% if pagina < totaal_paginas %}
-    <a href="/admin?pagina={{ pagina + 1 }}{{ sf }}" class="filter-knop">Volgende →</a>
+    <a href="/admin?pagina={{ pagina + 1 }}{{ sf }}{{ zf }}" class="filter-knop">Volgende →</a>
     {% endif %}
   </div>
   {% endif %}
@@ -360,14 +364,6 @@
       }
     });
 
-    function filterTabel() {
-      const zoekterm = document.getElementById('zoek').value.toLowerCase();
-      const rijen    = document.querySelectorAll('#tabel tbody tr');
-      rijen.forEach(rij => {
-        const zoekOk = !zoekterm || rij.textContent.toLowerCase().includes(zoekterm);
-        rij.style.display = zoekOk ? '' : 'none';
-      });
-    }
   </script>
 </body>
 </html>

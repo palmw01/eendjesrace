@@ -824,26 +824,33 @@ def admin():
         status_filter = request.args.get("status", "")
         if status_filter not in GELDIGE_STATUSSEN:
             status_filter = ""
+        zoekterm = request.args.get("zoek", "").strip()[:100]
+
+        # Bouw WHERE-clausule op basis van actieve filters
+        where_delen = []
+        params = []
         if status_filter:
-            totaal = db.execute(
-                "SELECT COUNT(*) FROM bestellingen WHERE status=?", (status_filter,)
-            ).fetchone()[0]
-        else:
-            totaal = db.execute("SELECT COUNT(*) FROM bestellingen").fetchone()[0]
+            where_delen.append("status=?")
+            params.append(status_filter)
+        if zoekterm:
+            where_delen.append(
+                "(naam LIKE ? OR email LIKE ? OR CAST(lot_van AS TEXT) LIKE ? OR CAST(lot_tot AS TEXT) LIKE ?)"
+            )
+            p = f"%{zoekterm}%"
+            params.extend([p, p, p, p])
+        where_sql = ("WHERE " + " AND ".join(where_delen)) if where_delen else ""
+
+        totaal = db.execute(
+            f"SELECT COUNT(*) FROM bestellingen {where_sql}", params
+        ).fetchone()[0]
         pagina       = max(1, request.args.get("pagina", 1, type=int))
         totaal_paginas = max(1, (totaal + PAGINA_GROOTTE - 1) // PAGINA_GROOTTE)
         pagina       = min(pagina, totaal_paginas)
         offset       = (pagina - 1) * PAGINA_GROOTTE
-        if status_filter:
-            bestellingen = db.execute(
-                "SELECT * FROM bestellingen WHERE status=? ORDER BY id DESC LIMIT ? OFFSET ?",
-                (status_filter, PAGINA_GROOTTE, offset)
-            ).fetchall()
-        else:
-            bestellingen = db.execute(
-                "SELECT * FROM bestellingen ORDER BY id DESC LIMIT ? OFFSET ?",
-                (PAGINA_GROOTTE, offset)
-            ).fetchall()
+        bestellingen = db.execute(
+            f"SELECT * FROM bestellingen {where_sql} ORDER BY id DESC LIMIT ? OFFSET ?",
+            params + [PAGINA_GROOTTE, offset]
+        ).fetchall()
         stats = db.execute("""
             SELECT
                 COUNT(*)                                                          AS totaal_bestellingen,
@@ -862,7 +869,8 @@ def admin():
                                pagina=pagina,
                                totaal_paginas=totaal_paginas,
                                totaal=totaal,
-                               status_filter=status_filter)
+                               status_filter=status_filter,
+                               zoekterm=zoekterm)
     except sqlite3.Error as e:
         app.logger.error(f"DB-fout admin: {e}")
         abort(500)
