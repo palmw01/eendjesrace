@@ -334,7 +334,7 @@ def stuur_bevestigingsmail(naam, email, aantal, lot_van, lot_tot, bedrag, transa
     mail_html = f"""
     <html><body style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#333;">
       <div style="background:#FFD700;padding:24px;border-radius:12px 12px 0 0;text-align:center;">
-        <h1 style="margin:0;color:#1a1a1a;">🦆 Eendjesrace!</h1>
+        <h1 style="margin:0;color:#1a1a1a;">🦆 Badeendjesrace!</h1>
         <p style="margin:4px 0 0;color:#444;">{AFZENDER_NAAM}</p>
       </div>
       <div style="background:#fffdf0;padding:32px;border:1px solid #eee;border-radius:0 0 12px 12px;">
@@ -360,7 +360,7 @@ def stuur_bevestigingsmail(naam, email, aantal, lot_van, lot_tot, bedrag, transa
         resend.Emails.send({
             "from":    f"{AFZENDER_NAAM} <{RESEND_FROM}>",
             "to":      [email],
-            "subject": "🦆 Jouw lotnummers – Eendjesrace!",
+            "subject": "🦆 Jouw lotnummers – Badeendjesrace!",
             "html":    mail_html,
         })
         app.logger.info(f"Mail verstuurd → {saniteer_log(email)}")
@@ -598,7 +598,7 @@ def bestellen():
         mollie   = maak_mollie_client()
         betaling = mollie.payments.create({
             "amount":      {"currency": "EUR", "value": f"{bedrag:.2f}"},
-            "description": f"Eendjesrace – {aantal} eend{'je' if aantal==1 else 'jes'} ({naam})",
+            "description": f"Badeendjesrace – {aantal} eend{'je' if aantal==1 else 'jes'} ({naam})",
             "redirectUrl": f"{BASE_URL}/betaald/{bestelling_id}",
             "webhookUrl":  f"{BASE_URL}/webhook",
             "metadata":    {"bestelling_id": str(bestelling_id)},

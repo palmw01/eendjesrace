@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{% if status_klasse == 'succes' %}✅ Betaald{% else %}Betaalstatus{% endif %} – Eendjesrace</title>
+  <title>{% if status_klasse == 'succes' %}✅ Betaald{% else %}Betaalstatus{% endif %} – Badeendjesrace</title>
   <link rel="icon" href="{{ url_for('static', filename='img/eend-favicon.png') }}">
   <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
   <style>
@@ -57,7 +57,7 @@
     {% if status_klasse == 'succes' %}
       <span class="icoon">🎉</span>
       <h1>Gelukt, {{ bestelling['naam'].split()[0] }}!</h1>
-      <p class="sub">Bedankt voor je deelname aan de Eendjesrace.</p>
+      <p class="sub">Bedankt voor je deelname aan de Badeendjesrace.</p>
       <div class="status-box succes">
         <h2>{{ status_label }}</h2>
         <p>Je hebt <strong>{{ bestelling['aantal'] }} eend{{ 'je' if bestelling['aantal'] == 1 else 'jes' }}</strong> gekocht.</p>
@@ -131,7 +131,7 @@
     {% endif %}
 
     <br>
-    <a href="/" class="terug">← Terug naar de Eendjesrace</a>
+    <a href="/" class="terug">← Terug naar de Badeendjesrace</a>
   </div>
 </body>
 </html>

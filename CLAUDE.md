@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-**Eendjesrace** is a Dutch-language Flask web app for selling raffle tickets (lotnummers) for a duck race, built for Hervormde Gemeente Wapenveld. It handles order entry, iDEAL payment processing via Mollie, atomic ticket number assignment, and confirmation emails.
+**Badeendjesrace** is a Dutch-language Flask web app for selling raffle tickets (lotnummers) for a duck race, built for Hervormde Gemeente Wapenveld. It handles order entry, iDEAL payment processing via Mollie, atomic ticket number assignment, and confirmation emails.
 
 ## Commands
 

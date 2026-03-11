@@ -1,4 +1,4 @@
-# Eendjesrace – Lotenverkoop applicatie
+# Badeendjesrace – Lotenverkoop applicatie
 
 Een webapplicatie voor de lotenverkoop van de **Badeendjesrace Wapenveld** (30 mei 2026).
 Gebouwd met **Python/Flask**, **Mollie** (iDEAL-betalingen), **SQLite** en **Resend** (e-mail).
