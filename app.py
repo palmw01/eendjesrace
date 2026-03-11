@@ -103,19 +103,11 @@ def maak_mollie_client() -> Client:
     return mollie
 
 
-# Bekende Mollie webhook IP's (zie docs.mollie.com/overview/ip-addresses)
-MOLLIE_WEBHOOK_IPS = {
-    # Mollie reeks 1
-    "87.233.217.240", "87.233.217.241", "87.233.217.242", "87.233.217.243",
-    "87.233.217.244", "87.233.217.245", "87.233.217.246", "87.233.217.247",
-    "87.233.217.248", "87.233.217.249", "87.233.217.250", "87.233.217.251",
-    "87.233.217.252", "87.233.217.253", "87.233.217.254", "87.233.217.255",
-    # Mollie reeks 2
-    "213.148.130.195", "213.148.130.196",
-    # Mollie reeks 3 (157.52.108.0/24 — waargenomen in productie)
-    *[f"157.52.108.{i}" for i in range(256)],
-    "127.0.0.1",  # lokaal testen
-}
+# IP-allowlisting voor Mollie webhooks is bewust weggelaten.
+# Mollie raadt dit zelf af (zie ip-ranges.mollie.com): IP-reeksen wijzigen zonder
+# aankondiging. De beveiliging zit in het protocol zelf: de webhook levert alleen
+# een betaal-ID (tr_…), en de app verifieert de status altijd via een
+# geauthenticeerde API-aanroep naar Mollie — nooit op basis van de POST-data alleen.
 
 # ─── Validatie ───────────────────────────────────────────────────────────────
 EMAIL_RE    = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -636,13 +628,7 @@ def bestellen():
 @app.route("/webhook", methods=["POST"])
 @csrf.exempt
 def webhook():
-    # BUG-FIX: ProxyFix zorgt er voor dat request.remote_addr de echte client-IP
-    # bevat. Handmatig X-Forwarded-For parsen was kwetsbaar voor header-spoofing.
     client_ip = request.remote_addr
-    if client_ip not in MOLLIE_WEBHOOK_IPS:
-        app.logger.warning(f"Webhook geblokkeerd: onbekend IP {client_ip}")
-        abort(403)
-
     mollie_id = request.form.get("id", "").strip()
     if not mollie_id or not mollie_id.startswith("tr_"):
         app.logger.warning(f"Webhook: ongeldig mollie_id '{saniteer_log(mollie_id)}'")

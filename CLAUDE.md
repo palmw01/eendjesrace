@@ -90,7 +90,8 @@ Admin routes:
 ## Key Patterns
 
 - All comments and variable/function names are in Dutch (e.g., `bestelling` = order, `eendjes` = ducks/tickets, `lotnummer` = ticket number, `betaald` = paid)
-- Security headers (X-Frame-Options, CSP with per-request nonces + `base-uri`/`form-action 'self'`, Permissions-Policy, suppressed `Server` header, etc.), rate limiting (5/min on admin login), ProxyFix (for Railway deployment), and Mollie webhook IP whitelisting are all configured in `app.py`. `saniteer_log()` strips newlines from user input before logging to prevent log injection. `GET /.well-known/security.txt` serves an RFC 9116-compliant security contact file.
+- Security headers (X-Frame-Options, CSP with per-request nonces + `base-uri`/`form-action 'self'`, Permissions-Policy, suppressed `Server` header, etc.), rate limiting (5/min on admin login), and ProxyFix (for Railway deployment) are all configured in `app.py`. `saniteer_log()` strips newlines from user input before logging to prevent log injection. `GET /.well-known/security.txt` serves an RFC 9116-compliant security contact file.
+- Mollie webhook IP allowlisting is deliberately **not used** (Mollie advises against it — IP ranges change without notice). Security relies on the protocol: the webhook only delivers a payment ID (`tr_…`), and the app always retrieves the payment status via an authenticated Mollie API call.
 - The database is auto-initialized on module import (`init_db()` called at module level)
 
 ### Mollie API v3

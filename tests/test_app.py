@@ -594,9 +594,11 @@ class TestWebhookStatussen(unittest.TestCase):
 
     # ── security ──────────────────────────────────────────────────────────────
 
-    def test_onbekend_ip_geeft_403(self):
+    def test_onbekend_ip_wordt_niet_geblokkeerd(self):
+        # IP-allowlisting is verwijderd op advies van Mollie; elk IP mag webhook sturen.
+        # Beveiliging zit in het ophalen van de betaalstatus via geauthenticeerde API.
         r = doe_webhook(self.client, "tr_test001", "paid", ip="1.2.3.4")
-        self.assertEqual(r.status_code, 403)
+        self.assertEqual(r.status_code, 200)
 
     def test_ongeldig_mollie_id_geeft_400(self):
         r = self.client.post("/webhook", data={"id": "ongeldig"},
