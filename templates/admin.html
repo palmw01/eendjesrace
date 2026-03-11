@@ -312,7 +312,9 @@
             {% if b['mail_verstuurd' ] %}
               <form method="POST" action="/admin/mail-opnieuw/{{ b['id'] }}" style="display:inline">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <button type="submit" class="knop-mail-herstuur" title="Mail nogmaals versturen">📧 Opnieuw</button>
+                <button type="submit" class="knop-mail-herstuur" title="Mail nogmaals versturen"
+                  data-email="{{ b['email'] }}"
+                  onclick="return confirm('Weet je zeker dat je de bevestigingsmail opnieuw wilt versturen naar ' + this.dataset.email + '?')">📧 Opnieuw</button>
               </form>
             {% else %}
               <form method="POST" action="/admin/mail-opnieuw/{{ b['id'] }}" style="display:inline">
