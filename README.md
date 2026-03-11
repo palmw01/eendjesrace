@@ -118,7 +118,7 @@ eendjesrace/
     ├── betaald.html        # Bevestigingspagina
     ├── admin.html          # Beheerpagina
     ├── wijzigen.html       # Bestelling bewerken
-    ├── login.html          # Admin-login
+    ├── admin_login.html    # Admin-login
     └── fout.html           # Foutpagina's (404, 500, …)
 ```
 

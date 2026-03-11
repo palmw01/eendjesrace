@@ -216,12 +216,12 @@
     <button type="submit" class="filter-knop actief">Zoeken</button>
     {% if zoekterm %}<a href="/admin{% if status_filter %}?status={{ status_filter }}{% endif %}" class="filter-knop">✕ Wissen</a>{% endif %}
     <div class="statusfilter">
-      <a href="/admin{% if zoekterm %}?zoek={{ zoekterm }}{% endif %}" class="filter-knop {% if not status_filter %}actief{% endif %}">Alles</a>
-      <a href="/admin?status=betaald{% if zoekterm %}&zoek={{ zoekterm }}{% endif %}" class="filter-knop {% if status_filter == 'betaald' %}actief{% endif %}">Betaald</a>
-      <a href="/admin?status=aangemaakt{% if zoekterm %}&zoek={{ zoekterm }}{% endif %}" class="filter-knop {% if status_filter == 'aangemaakt' %}actief{% endif %}">Openstaand</a>
-      <a href="/admin?status=mislukt{% if zoekterm %}&zoek={{ zoekterm }}{% endif %}" class="filter-knop {% if status_filter == 'mislukt' %}actief{% endif %}">Mislukt</a>
-      <a href="/admin?status=verlopen{% if zoekterm %}&zoek={{ zoekterm }}{% endif %}" class="filter-knop {% if status_filter == 'verlopen' %}actief{% endif %}">Verlopen</a>
-      <a href="/admin?status=geannuleerd{% if zoekterm %}&zoek={{ zoekterm }}{% endif %}" class="filter-knop {% if status_filter == 'geannuleerd' %}actief{% endif %}">Geannuleerd</a>
+      <a href="/admin{% if zoekterm %}?zoek={{ zoekterm | urlencode }}{% endif %}" class="filter-knop {% if not status_filter %}actief{% endif %}">Alles</a>
+      <a href="/admin?status=betaald{% if zoekterm %}&zoek={{ zoekterm | urlencode }}{% endif %}" class="filter-knop {% if status_filter == 'betaald' %}actief{% endif %}">Betaald</a>
+      <a href="/admin?status=aangemaakt{% if zoekterm %}&zoek={{ zoekterm | urlencode }}{% endif %}" class="filter-knop {% if status_filter == 'aangemaakt' %}actief{% endif %}">Openstaand</a>
+      <a href="/admin?status=mislukt{% if zoekterm %}&zoek={{ zoekterm | urlencode }}{% endif %}" class="filter-knop {% if status_filter == 'mislukt' %}actief{% endif %}">Mislukt</a>
+      <a href="/admin?status=verlopen{% if zoekterm %}&zoek={{ zoekterm | urlencode }}{% endif %}" class="filter-knop {% if status_filter == 'verlopen' %}actief{% endif %}">Verlopen</a>
+      <a href="/admin?status=geannuleerd{% if zoekterm %}&zoek={{ zoekterm | urlencode }}{% endif %}" class="filter-knop {% if status_filter == 'geannuleerd' %}actief{% endif %}">Geannuleerd</a>
     </div>
   </form>
 
@@ -289,7 +289,7 @@
       Pagina {{ pagina }} van {{ totaal_paginas }} &nbsp;({{ totaal }} bestellingen totaal)
     </span>
     {% set sf = ('&status=' ~ status_filter) if status_filter else '' %}
-    {% set zf = ('&zoek=' ~ zoekterm) if zoekterm else '' %}
+    {% set zf = ('&zoek=' ~ (zoekterm | urlencode)) if zoekterm else '' %}
     {% if pagina > 1 %}
     <a href="/admin?pagina={{ pagina - 1 }}{{ sf }}{{ zf }}" class="filter-knop">← Vorige</a>
     {% endif %}
