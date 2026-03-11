@@ -1437,6 +1437,53 @@ class TestBeveiligingsVerbeteringen(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertIn(b"Pagina", r.data)
 
+    # ── Statusfilter ──────────────────────────────────────────────────────────
+
+    def _vul_bestellingen(self):
+        db = App.get_db()
+        statussen = ["betaald", "betaald", "aangemaakt", "mislukt", "verlopen", "geannuleerd"]
+        for i, status in enumerate(statussen):
+            db.execute(
+                "INSERT INTO bestellingen (naam, telefoon, email, aantal, bedrag, status) "
+                "VALUES (?,?,?,?,?,?)",
+                (f"Koper {i}", "0600000000", f"k{i}@test.nl", 1, 2.50, status)
+            )
+
+    def test_statusfilter_betaald_toont_alleen_betaald(self):
+        self._login()
+        self._vul_bestellingen()
+        r = self.client.get("/admin?status=betaald")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(b'data-status="betaald"', r.data)
+        self.assertNotIn(b'data-status="aangemaakt"', r.data)
+        self.assertNotIn(b'data-status="mislukt"', r.data)
+
+    def test_statusfilter_aangemaakt_toont_alleen_openstaand(self):
+        self._login()
+        self._vul_bestellingen()
+        r = self.client.get("/admin?status=aangemaakt")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(b'data-status="aangemaakt"', r.data)
+        self.assertNotIn(b'data-status="betaald"', r.data)
+        self.assertNotIn(b'data-status="mislukt"', r.data)
+
+    def test_statusfilter_ongeldig_valt_terug_op_alles(self):
+        """Een ongeldige statuswaarde wordt genegeerd — alle bestellingen worden getoond."""
+        self._login()
+        self._vul_bestellingen()
+        r = self.client.get("/admin?status=onzin")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(b'data-status="betaald"', r.data)
+        self.assertIn(b'data-status="mislukt"', r.data)
+
+    def test_statusfilter_leeg_toont_alles(self):
+        self._login()
+        self._vul_bestellingen()
+        r = self.client.get("/admin")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(b'data-status="betaald"', r.data)
+        self.assertIn(b'data-status="mislukt"', r.data)
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Uitvoeren als script
