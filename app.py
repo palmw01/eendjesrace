@@ -78,7 +78,7 @@ BASE_URL         = os.environ.get("BASE_URL", "http://localhost:5000")
 MAX_EENDJES      = int(os.environ.get("MAX_EENDJES", 3000))
 PRIJS_PER_STUK   = 2.50
 PRIJS_VIJF_STUKS = 10.00
-TRANSACTIEKOSTEN = 0.32  # iDEAL-transactiekosten Mollie
+TRANSACTIEKOSTEN = float(os.environ.get("TRANSACTIEKOSTEN", "0.32"))  # iDEAL-transactiekosten Mollie
 
 RESEND_API_KEY   = os.environ.get("RESEND_API_KEY", "")
 RESEND_FROM      = os.environ.get("RESEND_FROM", "")
@@ -111,7 +111,7 @@ def maak_mollie_client() -> Client:
 
 # ─── Validatie ───────────────────────────────────────────────────────────────
 EMAIL_RE    = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
-TELEFOON_RE = re.compile(r"^[\d\s\+\-\(\)]{6,20}$")
+TELEFOON_RE = re.compile(r"^(?=.*\d)[\d\s\+\-\(\)]{6,20}$")
 
 def valideer_invoer(naam, telefoon, email, aantal, max_per_bestelling=100):
     fouten = []
@@ -339,7 +339,7 @@ def stuur_bevestigingsmail(naam, email, aantal, lot_van, lot_tot, bedrag, transa
       </div>
       <div style="background:#fffdf0;padding:32px;border:1px solid #eee;border-radius:0 0 12px 12px;">
         <p>Beste <strong>{naam}</strong>,</p>
-        <p>Bedankt voor je bestelling! Je betaling van <strong>&euro;&nbsp;{bedrag:.2f}</strong> is ontvangen{' (incl. &euro;&nbsp;0,32 iDEAL-transactiekosten)' if transactiekosten else ''}.</p>
+        <p>Bedankt voor je bestelling! Je betaling van <strong>&euro;&nbsp;{bedrag:.2f}</strong> is ontvangen{f' (incl. &euro;&nbsp;{TRANSACTIEKOSTEN:.2f} iDEAL-transactiekosten)'.replace(".", ",") if transactiekosten else ''}.</p>
         <div style="background:#fff;border:2px solid #FFD700;border-radius:10px;padding:24px;margin:24px 0;text-align:center;">
           <p style="font-size:17px;margin:0 0 8px;">
             Je hebt <strong>{aantal}&nbsp;eend{'je' if aantal==1 else 'jes'}</strong> en ontvangt:
@@ -473,7 +473,8 @@ def index():
                                verkocht=betaald,
                                beschikbaar=max(0, max_eendjes - betaald),
                                max_eendjes=max_eendjes,
-                               max_per_bestelling=get_max_per_bestelling())
+                               max_per_bestelling=get_max_per_bestelling(),
+                               transactiekosten=TRANSACTIEKOSTEN)
     except sqlite3.Error as e:
         app.logger.error(f"DB-fout index: {e}")
         abort(500)
@@ -548,6 +549,7 @@ def bestellen():
                                beschikbaar=beschikbaar,
                                max_eendjes=max_eendjes,
                                max_per_bestelling=max_per_bestelling,
+                               transactiekosten=TRANSACTIEKOSTEN,
                                fouten=fouten,
                                vorig=vorig), 422
 
@@ -569,6 +571,7 @@ def bestellen():
                                    beschikbaar=beschikbaar,
                                    max_eendjes=max_eendjes,
                                    max_per_bestelling=max_per_bestelling,
+                                   transactiekosten=TRANSACTIEKOSTEN,
                                    fouten=[f"Er zijn nog maar {beschikbaar} eendjes beschikbaar."],
                                    vorig=vorig), 409
 
@@ -962,15 +965,22 @@ def export_csv():
         app.logger.error(f"DB-fout export-csv: {e}")
         abort(500)
 
+    def csv_escape(waarde):
+        """Voorkom CSV/formula-injectie: prefixeer gevaarlijke starttekens met een apostrof."""
+        tekst = str(waarde) if waarde is not None else ""
+        if tekst and tekst[0] in ("=", "+", "-", "@", "\t", "\r"):
+            return "'" + tekst
+        return tekst
+
     uitvoer = io.StringIO()
-    schrijver = csv.writer(uitvoer, delimiter=";")
+    schrijver = csv.writer(uitvoer, delimiter=";", quoting=csv.QUOTE_ALL)
     schrijver.writerow([
         "ID", "Naam", "E-mail", "Telefoon", "Aantal", "Bedrag (€)", "iDEAL-kosten",
         "Lot van", "Lot tot", "Status", "Mail verstuurd", "Aangemaakt op"
     ])
     for b in bestellingen:
         schrijver.writerow([
-            b["id"], b["naam"], b["email"], b["telefoon"],
+            b["id"], csv_escape(b["naam"]), csv_escape(b["email"]), csv_escape(b["telefoon"]),
             b["aantal"], f"{b['bedrag']:.2f}", "ja" if b["transactiekosten"] else "nee",
             b["lot_van"] or "", b["lot_tot"] or "",
             b["status"], "ja" if b["mail_verstuurd"] else "nee",
@@ -1004,6 +1014,8 @@ def wijzig_bestelling(bestelling_id):
         geldige_statussen = ("aangemaakt", "betaald", "mislukt", "geannuleerd", "verlopen")
         if len(naam) < 2:
             fouten.append("Naam is verplicht (minimaal 2 tekens).")
+        if email and not EMAIL_RE.match(email):
+            fouten.append("Vul een geldig e-mailadres in.")
         if status not in geldige_statussen:
             fouten.append("Ongeldige status.")
 

@@ -509,7 +509,7 @@
                {% if vorig and vorig.transactiekosten %}checked{% endif %}
                onclick="event.stopPropagation(); updatePrijs()">
         <label for="transactiekosten" onclick="event.preventDefault()">
-          Ik betaal de iDEAL-transactiekosten (€&nbsp;0,32)
+          Ik betaal de iDEAL-transactiekosten (€&nbsp;{{ "%.2f"|format(transactiekosten)|replace(".", ",") }})
           <span>— zo gaat het volledige lotbedrag naar het goede doel.</span>
         </label>
       </div>
@@ -558,7 +558,7 @@
     const n = parseInt(aantalInput.value) || 0;
     if (n < 1) { prijsWaarde.textContent = '—'; prijsTip.textContent = ''; return; }
     const basisBedrag = berekenPrijs(n);
-    const tk          = tkCheckbox?.checked ? 0.32 : 0;
+    const tk          = tkCheckbox?.checked ? {{ transactiekosten }} : 0;
     const bedrag      = basisBedrag + tk;
     prijsWaarde.textContent = '€ ' + bedrag.toFixed(2).replace('.', ',');
     const vijftallen = Math.floor(n / 5);
