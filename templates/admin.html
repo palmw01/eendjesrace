@@ -299,26 +299,28 @@
         <td>
           <span class="badge badge-{{ b['status'] }}">{{ b['status'] }}</span>
         </td>
-        <td>
+        <td style="text-align:center">
           {% if b['status'] == 'betaald' %}
-            {% if b['mail_verstuurd'] %}
-              <span class="mail-ok">✅</span>
-              <form method="POST" action="/admin/mail-opnieuw/{{ b['id'] }}" style="display:inline">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <button type="submit" class="knop-mail-herstuur" title="Mail nogmaals versturen">↺</button>
-              </form>
-            {% else %}
-              <span class="mail-fout">❌</span>
-              <form method="POST" action="/admin/mail-opnieuw/{{ b['id'] }}" style="display:inline">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <button type="submit" class="knop-mail" title="Mail opnieuw versturen">↺ Mail</button>
-              </form>
-            {% endif %}
+            {% if b['mail_verstuurd'] %}<span class="mail-ok">✅</span>
+            {% else %}<span class="mail-fout">❌</span>{% endif %}
           {% else %}—{% endif %}
         </td>
         <td style="white-space:nowrap;color:#888;font-size:.8rem">{{ b['aangemaakt_op'][:16] }}</td>
         <td style="white-space:nowrap;">
           <a href="/admin/bestelling/{{ b['id'] }}/wijzigen" class="knop-wijzig">✏ Wijzig</a>
+          {% if b['status'] == 'betaald' %}
+            {% if b['mail_verstuurd' ] %}
+              <form method="POST" action="/admin/mail-opnieuw/{{ b['id'] }}" style="display:inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="knop-mail-herstuur" title="Mail nogmaals versturen">📧 Opnieuw</button>
+              </form>
+            {% else %}
+              <form method="POST" action="/admin/mail-opnieuw/{{ b['id'] }}" style="display:inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="knop-mail" title="Bevestigingsmail versturen">📧 Mail versturen</button>
+              </form>
+            {% endif %}
+          {% endif %}
         </td>
       </tr>
       {% endfor %}
