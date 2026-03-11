@@ -277,6 +277,25 @@
     </tbody>
   </table>
 
+  <!-- Paginering -->
+  {% if totaal_paginas > 1 %}
+  <div style="display:flex;align-items:center;gap:8px;margin-top:16px;flex-wrap:wrap;">
+    <span style="font-size:.9rem;color:#555;">
+      Pagina {{ pagina }} van {{ totaal_paginas }} &nbsp;({{ totaal }} bestellingen totaal)
+    </span>
+    {% if pagina > 1 %}
+    <a href="/admin?pagina={{ pagina - 1 }}" class="filter-knop">← Vorige</a>
+    {% endif %}
+    {% for p in range(1, totaal_paginas + 1) %}
+    <a href="/admin?pagina={{ p }}"
+       class="filter-knop {% if p == pagina %}actief{% endif %}">{{ p }}</a>
+    {% endfor %}
+    {% if pagina < totaal_paginas %}
+    <a href="/admin?pagina={{ pagina + 1 }}" class="filter-knop">Volgende →</a>
+    {% endif %}
+  </div>
+  {% endif %}
+
   <!-- Instellingen -->
   {% with berichten = get_flashed_messages(with_categories=true) %}
     {% for categorie, bericht in berichten %}

@@ -1345,6 +1345,98 @@ class TestOpruimenEnApiBeschikbaar(unittest.TestCase):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# 16. BEVEILIGINGSVERBETERINGEN
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestBeveiligingsVerbeteringen(unittest.TestCase):
+
+    def setUp(self):
+        self.client, self.ctx = maak_flask_client()
+
+    def tearDown(self):
+        self.ctx.pop()
+
+    def _login(self):
+        self.client.post("/admin/login",
+                         data={"gebruiker": "admin", "wachtwoord": "testpass"})
+
+    # ── CSP nonce ─────────────────────────────────────────────────────────────
+
+    def test_csp_bevat_nonce(self):
+        """CSP script-src moet een nonce bevatten, geen unsafe-inline."""
+        csp = self.client.get("/").headers.get("Content-Security-Policy", "")
+        self.assertIn("nonce-", csp)
+        self.assertNotIn("'unsafe-inline'", csp.split("script-src")[1].split(";")[0])
+
+    def test_csp_nonce_verschilt_per_request(self):
+        """Elke request krijgt een unieke nonce."""
+        csp1 = self.client.get("/").headers.get("Content-Security-Policy", "")
+        csp2 = self.client.get("/").headers.get("Content-Security-Policy", "")
+        nonce1 = [part for part in csp1.split() if part.startswith("'nonce-")][0]
+        nonce2 = [part for part in csp2.split() if part.startswith("'nonce-")][0]
+        self.assertNotEqual(nonce1, nonce2)
+
+    # ── Permissions-Policy ────────────────────────────────────────────────────
+
+    def test_permissions_policy_aanwezig(self):
+        pp = self.client.get("/").headers.get("Permissions-Policy", "")
+        self.assertIn("camera=()", pp)
+        self.assertIn("microphone=()", pp)
+        self.assertIn("geolocation=()", pp)
+
+    # ── Sessie permanent na login ─────────────────────────────────────────────
+
+    def test_sessie_is_permanent_na_login(self):
+        """Na succesvol inloggen moet session.permanent True zijn."""
+        with self.client.session_transaction() as sess:
+            self.assertFalse(sess.get("admin_ingelogd", False))
+        self.client.post("/admin/login",
+                         data={"gebruiker": "admin", "wachtwoord": "testpass"})
+        with self.client.session_transaction() as sess:
+            self.assertTrue(sess.get("admin_ingelogd", False))
+            self.assertTrue(sess.permanent)
+
+    # ── saniteer_log ──────────────────────────────────────────────────────────
+
+    def test_saniteer_log_verwijdert_newline(self):
+        from app import saniteer_log
+        self.assertEqual(saniteer_log("jan\nnep@log.nl"), "jan nep@log.nl")
+
+    def test_saniteer_log_verwijdert_carriage_return(self):
+        from app import saniteer_log
+        self.assertEqual(saniteer_log("jan\rnep@log.nl"), "jan nep@log.nl")
+
+    def test_saniteer_log_laat_normale_tekst_ongewijzigd(self):
+        from app import saniteer_log
+        self.assertEqual(saniteer_log("jan@test.nl"), "jan@test.nl")
+
+    # ── Paginering admin ──────────────────────────────────────────────────────
+
+    def test_admin_pagina_1_geeft_200(self):
+        self._login()
+        self.assertEqual(self.client.get("/admin?pagina=1").status_code, 200)
+
+    def test_admin_ongeldige_pagina_wordt_geklampt(self):
+        """Pagina 999 bij lege DB → pagina 1 (totaal_paginas=1)."""
+        self._login()
+        self.assertEqual(self.client.get("/admin?pagina=999").status_code, 200)
+
+    def test_admin_paginering_laadt_juiste_rijen(self):
+        """Met 51 bestellingen moet pagina 2 zichtbaar zijn."""
+        self._login()
+        db = App.get_db()
+        for i in range(51):
+            db.execute(
+                "INSERT INTO bestellingen (naam, telefoon, email, aantal, bedrag) "
+                "VALUES (?,?,?,?,?)",
+                (f"Koper {i}", "0600000000", f"k{i}@test.nl", 1, 2.50)
+            )
+        r = self.client.get("/admin?pagina=2")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(b"Pagina", r.data)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # Uitvoeren als script
 # ══════════════════════════════════════════════════════════════════════════════
 

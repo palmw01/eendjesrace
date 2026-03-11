@@ -404,6 +404,7 @@ def security_headers(response):
     response.headers["X-Frame-Options"]        = "DENY"
     response.headers["X-XSS-Protection"]       = "1; mode=block"
     response.headers["Referrer-Policy"]        = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"]     = "camera=(), microphone=(), geolocation=()"
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
@@ -780,7 +781,7 @@ def betaald(bestelling_id):
 
 # ─── Admin routes ─────────────────────────────────────────────────────────────
 @app.route("/admin/login", methods=["GET", "POST"])
-@limiter.limit("10 per minute")
+@limiter.limit("5 per minute")
 def admin_login():
     fout = None
     if request.method == "POST":
@@ -806,12 +807,24 @@ def admin_logout():
     return redirect(url_for("admin_login"))
 
 
+PAGINA_GROOTTE = 50
+
+
 @app.route("/admin")
 @login_vereist
 def admin():
     try:
         db = get_db()
-        bestellingen = db.execute("SELECT * FROM bestellingen ORDER BY id DESC").fetchall()
+        pagina       = max(1, request.args.get("pagina", 1, type=int))
+        offset       = (pagina - 1) * PAGINA_GROOTTE
+        totaal       = db.execute("SELECT COUNT(*) FROM bestellingen").fetchone()[0]
+        totaal_paginas = max(1, (totaal + PAGINA_GROOTTE - 1) // PAGINA_GROOTTE)
+        pagina       = min(pagina, totaal_paginas)
+        offset       = (pagina - 1) * PAGINA_GROOTTE
+        bestellingen = db.execute(
+            "SELECT * FROM bestellingen ORDER BY id DESC LIMIT ? OFFSET ?",
+            (PAGINA_GROOTTE, offset)
+        ).fetchall()
         stats = db.execute("""
             SELECT
                 COUNT(*)                                                          AS totaal_bestellingen,
@@ -826,7 +839,10 @@ def admin():
                                bestellingen=bestellingen,
                                stats=stats,
                                max_eendjes=get_max_eendjes(),
-                               max_per_bestelling=get_max_per_bestelling())
+                               max_per_bestelling=get_max_per_bestelling(),
+                               pagina=pagina,
+                               totaal_paginas=totaal_paginas,
+                               totaal=totaal)
     except sqlite3.Error as e:
         app.logger.error(f"DB-fout admin: {e}")
         abort(500)
