@@ -400,6 +400,7 @@ def genereer_csp_nonce():
 @app.after_request
 def security_headers(response):
     nonce = getattr(g, "csp_nonce", "")
+    response.headers["Server"]                 = ""
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"]        = "DENY"
     response.headers["X-XSS-Protection"]       = "1; mode=block"
