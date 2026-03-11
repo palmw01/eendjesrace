@@ -8,6 +8,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { overflow-x: hidden; }
     body { font-family: 'Nunito', sans-serif; background: #F0F4F8; color: #1A1A2E; padding: 24px; }
 
     .topbar {
@@ -158,7 +159,7 @@
     .tabel-wrapper table { border-radius: 0; box-shadow: none; }
 
     @media (max-width: 700px) {
-      body { padding: 14px; }
+      body { padding: 14px; max-width: 100%; }
       h1 { font-size: 1.4rem; }
 
       .stat { padding: 14px 16px; min-width: 110px; }
@@ -166,6 +167,12 @@
 
       table { font-size: .78rem; }
       th, td { padding: 7px 8px; }
+
+      /* Zoekbalk: stapel alles verticaal zodat statusfilter niet de pagina verbreedt */
+      .zoek { display: flex !important; flex-direction: column !important; align-items: stretch !important; }
+      .zoek input[type="text"] { max-width: 100%; min-width: 0; flex: none !important; }
+      .zoek button { width: 100%; }
+      .statusfilter { width: 100%; }
 
       .instelling-kaart { padding: 16px; margin-top: 28px; }
       .instelling-rij { flex-direction: column; align-items: flex-start; gap: 6px; }
