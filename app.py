@@ -412,11 +412,27 @@ def security_headers(response):
         "font-src https://fonts.gstatic.com; "
         f"script-src 'self' 'nonce-{nonce}'; "
         "img-src 'self' data:; "
+        "base-uri 'self'; "
+        "form-action 'self'; "
         "frame-ancestors 'none';"
     )
     if app.config["SESSION_COOKIE_SECURE"]:
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     return response
+
+# ─── security.txt (RFC 9116) ──────────────────────────────────────────────────
+SECURITY_CONTACT = os.environ.get("SECURITY_CONTACT", "")
+
+@app.route("/.well-known/security.txt")
+def security_txt():
+    contact = SECURITY_CONTACT or f"mailto:{os.environ.get('RESEND_FROM', 'admin@example.com')}"
+    inhoud = (
+        f"Contact: {contact}\n"
+        f"Preferred-Languages: nl, en\n"
+        f"Canonical: {BASE_URL}/.well-known/security.txt\n"
+    )
+    return Response(inhoud, mimetype="text/plain")
+
 
 # ─── Foutpagina's ─────────────────────────────────────────────────────────────
 @app.errorhandler(400)
