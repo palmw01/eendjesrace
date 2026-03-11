@@ -76,8 +76,8 @@ app.logger.addHandler(console_handler)
 MOLLIE_API_KEY   = os.environ.get("MOLLIE_API_KEY", "")
 BASE_URL         = os.environ.get("BASE_URL", "http://localhost:5000")
 MAX_EENDJES      = int(os.environ.get("MAX_EENDJES", 3000))
-PRIJS_PER_STUK   = 2.50
-PRIJS_VIJF_STUKS = 10.00
+PRIJS_PER_STUK   = float(os.environ.get("PRIJS_PER_STUK",   "2.50"))
+PRIJS_VIJF_STUKS = float(os.environ.get("PRIJS_VIJF_STUKS", "10.00"))
 TRANSACTIEKOSTEN = float(os.environ.get("TRANSACTIEKOSTEN", "0.32"))  # iDEAL-transactiekosten Mollie
 
 RESEND_API_KEY   = os.environ.get("RESEND_API_KEY", "")
@@ -474,7 +474,9 @@ def index():
                                beschikbaar=max(0, max_eendjes - betaald),
                                max_eendjes=max_eendjes,
                                max_per_bestelling=get_max_per_bestelling(),
-                               transactiekosten=TRANSACTIEKOSTEN)
+                               transactiekosten=TRANSACTIEKOSTEN,
+                               prijs_per_stuk=PRIJS_PER_STUK,
+                               prijs_vijf_stuks=PRIJS_VIJF_STUKS)
     except sqlite3.Error as e:
         app.logger.error(f"DB-fout index: {e}")
         abort(500)
@@ -550,6 +552,8 @@ def bestellen():
                                max_eendjes=max_eendjes,
                                max_per_bestelling=max_per_bestelling,
                                transactiekosten=TRANSACTIEKOSTEN,
+                               prijs_per_stuk=PRIJS_PER_STUK,
+                               prijs_vijf_stuks=PRIJS_VIJF_STUKS,
                                fouten=fouten,
                                vorig=vorig), 422
 
@@ -572,6 +576,8 @@ def bestellen():
                                    max_eendjes=max_eendjes,
                                    max_per_bestelling=max_per_bestelling,
                                    transactiekosten=TRANSACTIEKOSTEN,
+                                   prijs_per_stuk=PRIJS_PER_STUK,
+                                   prijs_vijf_stuks=PRIJS_VIJF_STUKS,
                                    fouten=[f"Er zijn nog maar {beschikbaar} eendjes beschikbaar."],
                                    vorig=vorig), 409
 

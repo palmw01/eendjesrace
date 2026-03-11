@@ -454,11 +454,11 @@
     <!-- Prijsinfo -->
     <div class="prijsinfo">
       <div class="prijs-badge">
-        <div class="bedrag">€ 2,50</div>
+        <div class="bedrag">€ {{ "%.2f"|format(prijs_per_stuk)|replace(".", ",") }}</div>
         <div class="omschr">per eendje</div>
       </div>
       <div class="prijs-badge aanbieding">
-        <div class="bedrag">€ 10,-</div>
+        <div class="bedrag">€ {{ "%.2f"|format(prijs_vijf_stuks)|replace(".00", ",-")|replace(",00", ",-") }}</div>
         <div class="omschr">🎉 5 voor de prijs van 4!</div>
       </div>
     </div>
@@ -499,7 +499,7 @@
         </div>
         <div class="prijs-live" id="prijsLive">
           <div class="label">Te betalen</div>
-          <div class="waarde" id="prijsWaarde">€ 2,50</div>
+          <div class="waarde" id="prijsWaarde">€ {{ "%.2f"|format(prijs_per_stuk)|replace(".", ",") }}</div>
           <div class="tip" id="prijsTip"></div>
         </div>
       </div>
@@ -548,10 +548,13 @@
   const knop        = document.getElementById('bestelKnop');
   const tkCheckbox  = document.getElementById('transactiekosten');
 
+  const PRIJS_PER_STUK   = {{ prijs_per_stuk }};
+  const PRIJS_VIJF_STUKS = {{ prijs_vijf_stuks }};
+
   function berekenPrijs(n) {
     const vijftallen = Math.floor(n / 5);
     const rest       = n % 5;
-    return vijftallen * 10 + rest * 2.5;
+    return vijftallen * PRIJS_VIJF_STUKS + rest * PRIJS_PER_STUK;
   }
 
   function updatePrijs() {
@@ -566,7 +569,7 @@
       const besparing = (n * 2.5 - basisBedrag).toFixed(2).replace('.', ',');
       prijsTip.textContent = `Je bespaart € ${besparing}!`;
     } else {
-      prijsTip.textContent = n >= 3 ? 'Tip: 5 stuks = € 10,-' : '';
+      prijsTip.textContent = n >= 3 ? `Tip: 5 stuks = € ${PRIJS_VIJF_STUKS.toFixed(2).replace('.', ',')}` : '';
     }
   }
 
