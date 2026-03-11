@@ -344,6 +344,19 @@
       color: rgba(255,255,255,0.9);
     }
 
+    /* Foutmelding */
+    .foutmelding {
+      background: #FFEBEE;
+      border: 2px solid #EF9A9A;
+      border-radius: 12px;
+      color: #C62828;
+      padding: 14px 18px;
+      margin-top: 16px;
+      font-weight: 600;
+    }
+    .foutmelding p { margin: 0; }
+    .foutmelding p + p { margin-top: 6px; }
+
     /* Uitverkocht banner */
     .uitverkocht {
       text-align: center;
@@ -442,26 +455,34 @@
       😢 Alle eendjes zijn verkocht! Bedankt voor de geweldige opkomst.
     </div>
     {% else %}
+    {% if fouten %}
+    <div class="foutmelding">
+      {% for fout in fouten %}<p>{{ fout }}</p>{% endfor %}
+    </div>
+    {% endif %}
     <form method="POST" action="/bestellen" id="bestelForm">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="form-groep">
         <label for="naam">Naam</label>
-        <input type="text" id="naam" name="naam" placeholder="Jan Jansen" required autocomplete="name">
+        <input type="text" id="naam" name="naam" placeholder="Jan Jansen" required autocomplete="name"
+               value="{{ vorig.naam if vorig else '' }}">
       </div>
       <div class="form-groep">
         <label for="email">E-mailadres</label>
-        <input type="email" id="email" name="email" placeholder="jan@voorbeeld.nl" required autocomplete="email">
+        <input type="email" id="email" name="email" placeholder="jan@voorbeeld.nl" required autocomplete="email"
+               value="{{ vorig.email if vorig else '' }}">
       </div>
       <div class="form-groep">
         <label for="telefoon">Telefoonnummer</label>
-        <input type="tel" id="telefoon" name="telefoon" placeholder="06-12345678" required autocomplete="tel">
+        <input type="tel" id="telefoon" name="telefoon" placeholder="06-12345678" required autocomplete="tel"
+               value="{{ vorig.telefoon if vorig else '' }}">
       </div>
 
       <div class="aantal-rij">
         <div class="form-groep">
           <label for="aantal">Aantal eendjes</label>
           <input type="number" id="aantal" name="aantal"
-                 min="1" max="{{ beschikbaar }}" value="1" required>
+                 min="1" max="{{ [beschikbaar, 100] | min }}" value="{{ vorig.aantal if vorig else 1 }}" required>
         </div>
         <div class="prijs-live" id="prijsLive">
           <div class="label">Te betalen</div>
