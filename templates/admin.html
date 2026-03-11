@@ -360,6 +360,18 @@
         <label class="instelling-label" for="max_per_bestelling">Maximaal per bestelling</label>
         <input class="instelling-input" type="number" id="max_per_bestelling" name="max_per_bestelling" min="1" max="{{ max_eendjes }}" value="{{ max_per_bestelling }}">
       </div>
+      <div class="instelling-rij">
+        <label class="instelling-label" for="prijs_per_stuk">Prijs per eendje (€)</label>
+        <input class="instelling-input" type="number" id="prijs_per_stuk" name="prijs_per_stuk" min="0.01" step="0.01" value="{{ '%.2f'|format(prijs_per_stuk) }}">
+      </div>
+      <div class="instelling-rij">
+        <label class="instelling-label" for="prijs_vijf_stuks">Prijs voor 5 eendjes (€)</label>
+        <input class="instelling-input" type="number" id="prijs_vijf_stuks" name="prijs_vijf_stuks" min="0.01" step="0.01" value="{{ '%.2f'|format(prijs_vijf_stuks) }}">
+      </div>
+      <div class="instelling-rij">
+        <label class="instelling-label" for="transactiekosten">iDEAL-transactiekosten (€)</label>
+        <input class="instelling-input" type="number" id="transactiekosten" name="transactiekosten" min="0" step="0.01" value="{{ '%.2f'|format(transactiekosten) }}">
+      </div>
       <button type="submit" class="instelling-knop">Opslaan</button>
     </form>
   </div>

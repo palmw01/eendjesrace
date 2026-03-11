@@ -182,7 +182,10 @@ def init_db():
             id                  INTEGER PRIMARY KEY CHECK (id = 1),
             volgend_lot         INTEGER NOT NULL DEFAULT 1,
             max_eendjes         INTEGER NOT NULL DEFAULT 3000,
-            max_per_bestelling  INTEGER NOT NULL DEFAULT 100
+            max_per_bestelling  INTEGER NOT NULL DEFAULT 100,
+            prijs_per_stuk      REAL NOT NULL DEFAULT 2.50,
+            prijs_vijf_stuks    REAL NOT NULL DEFAULT 10.00,
+            transactiekosten    REAL NOT NULL DEFAULT 0.32
         )
     """)
     conn.execute("""
@@ -207,10 +210,23 @@ def init_db():
         conn.execute("ALTER TABLE teller ADD COLUMN max_per_bestelling INTEGER NOT NULL DEFAULT 100")
     except sqlite3.OperationalError:
         pass  # kolom bestaat al
+    try:
+        conn.execute(f"ALTER TABLE teller ADD COLUMN prijs_per_stuk REAL NOT NULL DEFAULT {PRIJS_PER_STUK}")
+    except sqlite3.OperationalError:
+        pass  # kolom bestaat al
+    try:
+        conn.execute(f"ALTER TABLE teller ADD COLUMN prijs_vijf_stuks REAL NOT NULL DEFAULT {PRIJS_VIJF_STUKS}")
+    except sqlite3.OperationalError:
+        pass  # kolom bestaat al
+    try:
+        conn.execute(f"ALTER TABLE teller ADD COLUMN transactiekosten REAL NOT NULL DEFAULT {TRANSACTIEKOSTEN}")
+    except sqlite3.OperationalError:
+        pass  # kolom bestaat al
     # Seed-rij: alleen aanmaken als nog niet bestaat (alle kolommen zijn nu gegarandeerd aanwezig)
     conn.execute(
-        "INSERT OR IGNORE INTO teller (id, volgend_lot, max_eendjes, max_per_bestelling) VALUES (1, 1, ?, 100)",
-        (MAX_EENDJES,)
+        "INSERT OR IGNORE INTO teller (id, volgend_lot, max_eendjes, max_per_bestelling, "
+        "prijs_per_stuk, prijs_vijf_stuks, transactiekosten) VALUES (1, 1, ?, 100, ?, ?, ?)",
+        (MAX_EENDJES, PRIJS_PER_STUK, PRIJS_VIJF_STUKS, TRANSACTIEKOSTEN)
     )
     # Migratie: verwijder hardcoded CHECK (aantal <= 100) uit bestellingen-tabel
     schema = conn.execute(
@@ -263,11 +279,28 @@ def get_max_per_bestelling():
     return row["max_per_bestelling"] if row else 100
 
 
+def get_prijs_per_stuk():
+    row = get_db().execute("SELECT prijs_per_stuk FROM teller WHERE id = 1").fetchone()
+    return row["prijs_per_stuk"] if row else PRIJS_PER_STUK
+
+
+def get_prijs_vijf_stuks():
+    row = get_db().execute("SELECT prijs_vijf_stuks FROM teller WHERE id = 1").fetchone()
+    return row["prijs_vijf_stuks"] if row else PRIJS_VIJF_STUKS
+
+
+def get_transactiekosten():
+    row = get_db().execute("SELECT transactiekosten FROM teller WHERE id = 1").fetchone()
+    return row["transactiekosten"] if row else TRANSACTIEKOSTEN
+
+
 # ─── Business logica ──────────────────────────────────────────────────────────
-def bereken_bedrag(aantal):
+def bereken_bedrag(aantal, prijs_per_stuk=None, prijs_vijf_stuks=None):
+    p_stuk = prijs_per_stuk   if prijs_per_stuk   is not None else PRIJS_PER_STUK
+    p_vijf = prijs_vijf_stuks if prijs_vijf_stuks is not None else PRIJS_VIJF_STUKS
     vijftallen = aantal // 5
     rest       = aantal % 5
-    return round(vijftallen * PRIJS_VIJF_STUKS + rest * PRIJS_PER_STUK, 2)
+    return round(vijftallen * p_vijf + rest * p_stuk, 2)
 
 
 def wijs_lotnummers_toe(db, bestelling_id, aantal):
@@ -339,7 +372,7 @@ def stuur_bevestigingsmail(naam, email, aantal, lot_van, lot_tot, bedrag, transa
       </div>
       <div style="background:#fffdf0;padding:32px;border:1px solid #eee;border-radius:0 0 12px 12px;">
         <p>Beste <strong>{naam}</strong>,</p>
-        <p>Bedankt voor je bestelling! Je betaling van <strong>&euro;&nbsp;{bedrag:.2f}</strong> is ontvangen{f' (incl. &euro;&nbsp;{TRANSACTIEKOSTEN:.2f} iDEAL-transactiekosten)'.replace(".", ",") if transactiekosten else ''}.</p>
+        <p>Bedankt voor je bestelling! Je betaling van <strong>&euro;&nbsp;{bedrag:.2f}</strong> is ontvangen{f' (incl. &euro;&nbsp;{get_transactiekosten():.2f} iDEAL-transactiekosten)'.replace(".", ",") if transactiekosten else ''}.</p>
         <div style="background:#fff;border:2px solid #FFD700;border-radius:10px;padding:24px;margin:24px 0;text-align:center;">
           <p style="font-size:17px;margin:0 0 8px;">
             Je hebt <strong>{aantal}&nbsp;eend{'je' if aantal==1 else 'jes'}</strong> en ontvangt:
@@ -474,9 +507,9 @@ def index():
                                beschikbaar=max(0, max_eendjes - betaald),
                                max_eendjes=max_eendjes,
                                max_per_bestelling=get_max_per_bestelling(),
-                               transactiekosten=TRANSACTIEKOSTEN,
-                               prijs_per_stuk=PRIJS_PER_STUK,
-                               prijs_vijf_stuks=PRIJS_VIJF_STUKS)
+                               transactiekosten=get_transactiekosten(),
+                               prijs_per_stuk=get_prijs_per_stuk(),
+                               prijs_vijf_stuks=get_prijs_vijf_stuks())
     except sqlite3.Error as e:
         app.logger.error(f"DB-fout index: {e}")
         abort(500)
@@ -491,7 +524,7 @@ def api_prijs():
         if not (1 <= aantal <= max_per_bestelling):
             return jsonify({"fout": f"Aantal moet tussen 1 en {max_per_bestelling} liggen."}), 400
         incl_tk = request.args.get("transactiekosten", "0") == "1"
-        bedrag  = bereken_bedrag(aantal) + (TRANSACTIEKOSTEN if incl_tk else 0)
+        bedrag  = bereken_bedrag(aantal, get_prijs_per_stuk(), get_prijs_vijf_stuks()) + (get_transactiekosten() if incl_tk else 0)
         return jsonify({"bedrag": round(bedrag, 2),
                         "bedrag_tekst": f"€ {bedrag:.2f}".replace(".", ",")})
     except (ValueError, TypeError):
@@ -551,13 +584,13 @@ def bestellen():
                                beschikbaar=beschikbaar,
                                max_eendjes=max_eendjes,
                                max_per_bestelling=max_per_bestelling,
-                               transactiekosten=TRANSACTIEKOSTEN,
-                               prijs_per_stuk=PRIJS_PER_STUK,
-                               prijs_vijf_stuks=PRIJS_VIJF_STUKS,
+                               transactiekosten=get_transactiekosten(),
+                               prijs_per_stuk=get_prijs_per_stuk(),
+                               prijs_vijf_stuks=get_prijs_vijf_stuks(),
                                fouten=fouten,
                                vorig=vorig), 422
 
-    bedrag = round(bereken_bedrag(aantal) + (TRANSACTIEKOSTEN if incl_tk else 0), 2)
+    bedrag = round(bereken_bedrag(aantal, get_prijs_per_stuk(), get_prijs_vijf_stuks()) + (get_transactiekosten() if incl_tk else 0), 2)
 
     # Controleer beschikbaarheid en sla op — atomisch
     try:
@@ -875,6 +908,9 @@ def admin():
                                stats=stats,
                                max_eendjes=get_max_eendjes(),
                                max_per_bestelling=get_max_per_bestelling(),
+                               prijs_per_stuk=get_prijs_per_stuk(),
+                               prijs_vijf_stuks=get_prijs_vijf_stuks(),
+                               transactiekosten=get_transactiekosten(),
                                pagina=pagina,
                                totaal_paginas=totaal_paginas,
                                totaal=totaal,
@@ -918,6 +954,36 @@ def admin_instellingen():
             else:
                 db.execute("UPDATE teller SET max_per_bestelling = ? WHERE id = 1", (max_p,))
                 meldingen.append(f"Maximum per bestelling bijgewerkt naar {max_p}.")
+
+        # prijs_per_stuk
+        prijs_stuk_str = request.form.get("prijs_per_stuk", "").strip()
+        if prijs_stuk_str:
+            prijs_stuk = float(prijs_stuk_str)
+            if prijs_stuk <= 0:
+                fouten.append("Prijs per eendje moet groter dan 0 zijn.")
+            else:
+                db.execute("UPDATE teller SET prijs_per_stuk = ? WHERE id = 1", (prijs_stuk,))
+                meldingen.append(f"Prijs per eendje bijgewerkt naar € {prijs_stuk:.2f}.")
+
+        # prijs_vijf_stuks
+        prijs_vijf_str = request.form.get("prijs_vijf_stuks", "").strip()
+        if prijs_vijf_str:
+            prijs_vijf = float(prijs_vijf_str)
+            if prijs_vijf <= 0:
+                fouten.append("Prijs voor 5 eendjes moet groter dan 0 zijn.")
+            else:
+                db.execute("UPDATE teller SET prijs_vijf_stuks = ? WHERE id = 1", (prijs_vijf,))
+                meldingen.append(f"Prijs voor 5 eendjes bijgewerkt naar € {prijs_vijf:.2f}.")
+
+        # transactiekosten
+        tk_str = request.form.get("transactiekosten", "").strip()
+        if tk_str:
+            tk = float(tk_str)
+            if tk < 0:
+                fouten.append("Transactiekosten mogen niet negatief zijn.")
+            else:
+                db.execute("UPDATE teller SET transactiekosten = ? WHERE id = 1", (tk,))
+                meldingen.append(f"Transactiekosten bijgewerkt naar € {tk:.2f}.")
 
         if fouten:
             for f in fouten:
