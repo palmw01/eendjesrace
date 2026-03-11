@@ -211,12 +211,12 @@
   <div class="zoek" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
     <input type="text" id="zoek" placeholder="🔍 Zoek op naam, e-mail of lotnummer…" oninput="filterTabel()" style="flex:1;min-width:200px;">
     <div class="statusfilter">
-      <button class="filter-knop actief" onclick="setFilter('', this)">Alles</button>
-      <button class="filter-knop" onclick="setFilter('betaald', this)">Betaald</button>
-      <button class="filter-knop" onclick="setFilter('aangemaakt', this)">Openstaand</button>
-      <button class="filter-knop" onclick="setFilter('mislukt', this)">Mislukt</button>
-      <button class="filter-knop" onclick="setFilter('verlopen', this)">Verlopen</button>
-      <button class="filter-knop" onclick="setFilter('geannuleerd', this)">Geannuleerd</button>
+      <a href="/admin" class="filter-knop {% if not status_filter %}actief{% endif %}">Alles</a>
+      <a href="/admin?status=betaald" class="filter-knop {% if status_filter == 'betaald' %}actief{% endif %}">Betaald</a>
+      <a href="/admin?status=aangemaakt" class="filter-knop {% if status_filter == 'aangemaakt' %}actief{% endif %}">Openstaand</a>
+      <a href="/admin?status=mislukt" class="filter-knop {% if status_filter == 'mislukt' %}actief{% endif %}">Mislukt</a>
+      <a href="/admin?status=verlopen" class="filter-knop {% if status_filter == 'verlopen' %}actief{% endif %}">Verlopen</a>
+      <a href="/admin?status=geannuleerd" class="filter-knop {% if status_filter == 'geannuleerd' %}actief{% endif %}">Geannuleerd</a>
     </div>
   </div>
 
@@ -283,15 +283,16 @@
     <span style="font-size:.9rem;color:#555;">
       Pagina {{ pagina }} van {{ totaal_paginas }} &nbsp;({{ totaal }} bestellingen totaal)
     </span>
+    {% set sf = ('&status=' ~ status_filter) if status_filter else '' %}
     {% if pagina > 1 %}
-    <a href="/admin?pagina={{ pagina - 1 }}" class="filter-knop">← Vorige</a>
+    <a href="/admin?pagina={{ pagina - 1 }}{{ sf }}" class="filter-knop">← Vorige</a>
     {% endif %}
     {% for p in range(1, totaal_paginas + 1) %}
-    <a href="/admin?pagina={{ p }}"
+    <a href="/admin?pagina={{ p }}{{ sf }}"
        class="filter-knop {% if p == pagina %}actief{% endif %}">{{ p }}</a>
     {% endfor %}
     {% if pagina < totaal_paginas %}
-    <a href="/admin?pagina={{ pagina + 1 }}" class="filter-knop">Volgende →</a>
+    <a href="/admin?pagina={{ pagina + 1 }}{{ sf }}" class="filter-knop">Volgende →</a>
     {% endif %}
   </div>
   {% endif %}
@@ -357,22 +358,12 @@
       }
     });
 
-    let actieveFilter = '';
-
-    function setFilter(status, knop) {
-      actieveFilter = status;
-      document.querySelectorAll('.filter-knop').forEach(k => k.classList.remove('actief'));
-      knop.classList.add('actief');
-      filterTabel();
-    }
-
     function filterTabel() {
       const zoekterm = document.getElementById('zoek').value.toLowerCase();
       const rijen    = document.querySelectorAll('#tabel tbody tr');
       rijen.forEach(rij => {
-        const statusOk = !actieveFilter || rij.dataset.status === actieveFilter;
-        const zoekOk   = !zoekterm || rij.textContent.toLowerCase().includes(zoekterm);
-        rij.style.display = (statusOk && zoekOk) ? '' : 'none';
+        const zoekOk = !zoekterm || rij.textContent.toLowerCase().includes(zoekterm);
+        rij.style.display = zoekOk ? '' : 'none';
       });
     }
   </script>

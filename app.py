@@ -818,18 +818,32 @@ PAGINA_GROOTTE = 50
 @app.route("/admin")
 @login_vereist
 def admin():
+    GELDIGE_STATUSSEN = {"betaald", "aangemaakt", "mislukt", "verlopen", "geannuleerd"}
     try:
         db = get_db()
+        status_filter = request.args.get("status", "")
+        if status_filter not in GELDIGE_STATUSSEN:
+            status_filter = ""
+        if status_filter:
+            totaal = db.execute(
+                "SELECT COUNT(*) FROM bestellingen WHERE status=?", (status_filter,)
+            ).fetchone()[0]
+        else:
+            totaal = db.execute("SELECT COUNT(*) FROM bestellingen").fetchone()[0]
         pagina       = max(1, request.args.get("pagina", 1, type=int))
-        offset       = (pagina - 1) * PAGINA_GROOTTE
-        totaal       = db.execute("SELECT COUNT(*) FROM bestellingen").fetchone()[0]
         totaal_paginas = max(1, (totaal + PAGINA_GROOTTE - 1) // PAGINA_GROOTTE)
         pagina       = min(pagina, totaal_paginas)
         offset       = (pagina - 1) * PAGINA_GROOTTE
-        bestellingen = db.execute(
-            "SELECT * FROM bestellingen ORDER BY id DESC LIMIT ? OFFSET ?",
-            (PAGINA_GROOTTE, offset)
-        ).fetchall()
+        if status_filter:
+            bestellingen = db.execute(
+                "SELECT * FROM bestellingen WHERE status=? ORDER BY id DESC LIMIT ? OFFSET ?",
+                (status_filter, PAGINA_GROOTTE, offset)
+            ).fetchall()
+        else:
+            bestellingen = db.execute(
+                "SELECT * FROM bestellingen ORDER BY id DESC LIMIT ? OFFSET ?",
+                (PAGINA_GROOTTE, offset)
+            ).fetchall()
         stats = db.execute("""
             SELECT
                 COUNT(*)                                                          AS totaal_bestellingen,
@@ -847,7 +861,8 @@ def admin():
                                max_per_bestelling=get_max_per_bestelling(),
                                pagina=pagina,
                                totaal_paginas=totaal_paginas,
-                               totaal=totaal)
+                               totaal=totaal,
+                               status_filter=status_filter)
     except sqlite3.Error as e:
         app.logger.error(f"DB-fout admin: {e}")
         abort(500)
@@ -1034,7 +1049,9 @@ def reset_database():
     try:
         db = get_db()
         db.execute("DELETE FROM bestellingen")
+        db.execute("DELETE FROM sqlite_sequence WHERE name='bestellingen'")
         db.execute("DELETE FROM webhook_log")
+        db.execute("DELETE FROM sqlite_sequence WHERE name='webhook_log'")
         db.execute("UPDATE teller SET volgend_lot=1")
         db.commit()
         app.logger.warning("Database volledig gereset door admin.")
