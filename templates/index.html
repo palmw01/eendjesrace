@@ -406,7 +406,7 @@
     <img class="eend-groot" src="{{ url_for('static', filename='img/eend.png') }}" alt="badeend">
     <h1>Badeendjesrace!</h1>
     <p>Hervormde Gemeente Wapenveld</p>
-    <p><span class="datum-badge">📅 zaterdag 30 mei 2026</span></p>
+    <p><span class="datum-badge">📅 Zaterdag 30 mei 2026</span></p>
   </header>
 
   <!-- Evenementinformatie -->
@@ -431,17 +431,6 @@
       📍 <strong>Locatie:</strong> Het Apeldoorns Kanaal, bij de Manenbergerbrug / de Loswal in Wapenveld
     </div>
 
-    <div class="hoe-werkt-het">
-      <h3>Hoe werkt de race?</h3>
-      <ol>
-        <li>Er gaan maximaal {{ max_eendjes }} badeendjes tegelijk het water in.</li>
-        <li>Elk badeendje heeft een uniek nummer van 1 t/m {{ max_eendjes }}.</li>
-        <li>Wanneer je een lot koopt, krijg je een nummer dat overeenkomt met een specifiek badeendje.</li>
-        <li>Na de start drijven alle eendjes richting de finishlijn. De wind of hulp van de brandweer zorgt ervoor dat de eendjes in beweging blijven.</li>
-        <li>Het eendje dat als eerste de finishgeul binnenkomt, wint de hoofdprijs.</li>
-        <li>Daarna worden de overige prijzen verdeeld op basis van de volgorde van binnenkomst.</li>
-      </ol>
-    </div>
   </div>
 
   <!-- Voortgangsbalk -->
@@ -533,6 +522,21 @@
       Na betaling ontvang je direct je lotnummers per e-mail.
     </p>
     {% endif %}
+  </div>
+
+  <!-- Hoe werkt de race -->
+  <div class="info-kaart">
+    <div class="hoe-werkt-het">
+      <h3>Hoe werkt de race?</h3>
+      <ol>
+        <li>Er gaan maximaal {{ max_eendjes }} badeendjes tegelijk het water in.</li>
+        <li>Elk badeendje heeft een uniek nummer van 1 t/m {{ max_eendjes }}.</li>
+        <li>Wanneer je een lot koopt, krijg je een nummer dat overeenkomt met een specifiek badeendje.</li>
+        <li>Na de start drijven alle eendjes richting de finishlijn. De wind of hulp van de brandweer zorgt ervoor dat de eendjes in beweging blijven.</li>
+        <li>Het eendje dat als eerste de finishgeul binnenkomt, wint de hoofdprijs.</li>
+        <li>Daarna worden de overige prijzen verdeeld op basis van de volgorde van binnenkomst.</li>
+      </ol>
+    </div>
   </div>
 </div>
 
