@@ -58,8 +58,9 @@ De app draait op http://localhost:5000. De SQLite-database (`eendjes.db`) wordt 
 
 1. Maak een account op [railway.app](https://railway.app)
 2. Nieuw project → **Deploy from GitHub** → selecteer deze repository
-3. Stel onderstaande omgevingsvariabelen in via **Settings → Variables**
-4. Kopieer de publieke Railway-URL en zet die als `BASE_URL`
+3. Voeg een **Volume** toe via **Add Service → Volume** en koppel dit aan het pad `/app` (of het pad waar `eendjes.db` staat). Zonder Volume wordt de database bij elke redeploy gewist.
+4. Stel onderstaande omgevingsvariabelen in via **Settings → Variables**
+5. Kopieer de publieke Railway-URL en zet die als `BASE_URL`
 
 ### Omgevingsvariabelen
 
