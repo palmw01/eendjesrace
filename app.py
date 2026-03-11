@@ -119,7 +119,7 @@ MOLLIE_WEBHOOK_IPS = {
 EMAIL_RE    = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 TELEFOON_RE = re.compile(r"^[\d\s\+\-\(\)]{6,20}$")
 
-def valideer_invoer(naam, telefoon, email, aantal):
+def valideer_invoer(naam, telefoon, email, aantal, max_per_bestelling=100):
     fouten = []
     if not naam or len(naam.strip()) < 2:
         fouten.append("Vul een geldige naam in (minimaal 2 tekens).")
@@ -131,8 +131,8 @@ def valideer_invoer(naam, telefoon, email, aantal):
         fouten.append("Vul een geldig telefoonnummer in.")
     if aantal < 1:
         fouten.append("Bestel minimaal 1 eendje.")
-    if aantal > 100:
-        fouten.append("Maximaal 100 eendjes per bestelling.")
+    if aantal > max_per_bestelling:
+        fouten.append(f"Maximaal {max_per_bestelling} eendjes per bestelling.")
     return fouten
 
 # ─── Database ─────────────────────────────────────────────────────────────────
@@ -203,8 +203,19 @@ def init_db():
         conn.execute("ALTER TABLE bestellingen ADD COLUMN transactiekosten INTEGER NOT NULL DEFAULT 0")
     except sqlite3.OperationalError:
         pass  # kolom bestaat al
+    # Migratie: voeg max_per_bestelling toe aan teller
+    try:
+        conn.execute("ALTER TABLE teller ADD COLUMN max_per_bestelling INTEGER NOT NULL DEFAULT 100")
+    except sqlite3.OperationalError:
+        pass  # kolom bestaat al
     conn.commit()
     conn.close()
+
+def get_max_per_bestelling():
+    """Leest het maximaal toegestane aantal eendjes per bestelling uit de database."""
+    row = get_db().execute("SELECT max_per_bestelling FROM teller WHERE id = 1").fetchone()
+    return row["max_per_bestelling"] if row else 100
+
 
 # ─── Business logica ──────────────────────────────────────────────────────────
 def bereken_bedrag(aantal):
@@ -380,7 +391,8 @@ def index():
         return render_template("index.html",
                                verkocht=betaald,
                                beschikbaar=max(0, MAX_EENDJES - betaald),
-                               max_eendjes=MAX_EENDJES)
+                               max_eendjes=MAX_EENDJES,
+                               max_per_bestelling=get_max_per_bestelling())
     except sqlite3.Error as e:
         app.logger.error(f"DB-fout index: {e}")
         abort(500)
@@ -391,8 +403,9 @@ def index():
 def api_prijs():
     try:
         aantal = int(request.args.get("aantal", 0))
-        if not (1 <= aantal <= 100):
-            return jsonify({"fout": "Aantal moet tussen 1 en 100 liggen."}), 400
+        max_per_bestelling = get_max_per_bestelling()
+        if not (1 <= aantal <= max_per_bestelling):
+            return jsonify({"fout": f"Aantal moet tussen 1 en {max_per_bestelling} liggen."}), 400
         incl_tk = request.args.get("transactiekosten", "0") == "1"
         bedrag  = bereken_bedrag(aantal) + (TRANSACTIEKOSTEN if incl_tk else 0)
         return jsonify({"bedrag": round(bedrag, 2),
@@ -419,7 +432,8 @@ def bestellen():
             bericht="Het opgegeven aantal is niet geldig."), 400
 
     # Validatie
-    fouten = valideer_invoer(naam, telefoon, email, aantal)
+    max_per_bestelling = get_max_per_bestelling()
+    fouten = valideer_invoer(naam, telefoon, email, aantal, max_per_bestelling)
     if fouten:
         db          = get_db()
         betaald     = db.execute("SELECT COALESCE(SUM(aantal),0) AS n FROM bestellingen WHERE status='betaald'").fetchone()["n"]
@@ -428,6 +442,7 @@ def bestellen():
                                verkocht=betaald,
                                beschikbaar=beschikbaar,
                                max_eendjes=MAX_EENDJES,
+                               max_per_bestelling=max_per_bestelling,
                                fouten=fouten,
                                vorig=vorig), 422
 
@@ -448,6 +463,7 @@ def bestellen():
                                    verkocht=betaald,
                                    beschikbaar=beschikbaar,
                                    max_eendjes=MAX_EENDJES,
+                                   max_per_bestelling=max_per_bestelling,
                                    fouten=[f"Er zijn nog maar {beschikbaar} eendjes beschikbaar."],
                                    vorig=vorig), 409
 
@@ -715,10 +731,28 @@ def admin():
         return render_template("admin.html",
                                bestellingen=bestellingen,
                                stats=stats,
-                               max_eendjes=MAX_EENDJES)
+                               max_eendjes=MAX_EENDJES,
+                               max_per_bestelling=get_max_per_bestelling())
     except sqlite3.Error as e:
         app.logger.error(f"DB-fout admin: {e}")
         abort(500)
+
+
+@app.route("/admin/instellingen", methods=["POST"])
+@login_vereist
+def admin_instellingen():
+    try:
+        waarde = int(request.form.get("max_per_bestelling", 100))
+        if not (1 <= waarde <= MAX_EENDJES):
+            flash(f"Ongeldig getal: kies een waarde tussen 1 en {MAX_EENDJES}.", "fout")
+        else:
+            get_db().execute(
+                "UPDATE teller SET max_per_bestelling = ? WHERE id = 1", (waarde,)
+            )
+            flash(f"Maximum per bestelling bijgewerkt naar {waarde}.", "info")
+    except (ValueError, TypeError):
+        flash("Ongeldig getal opgegeven.", "fout")
+    return redirect(url_for("admin"))
 
 
 @app.route("/admin/mail-opnieuw/<int:bestelling_id>", methods=["POST"])

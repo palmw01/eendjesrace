@@ -223,13 +223,29 @@
     </tbody>
   </table>
 
-  <!-- Gevaarzone: database resetten -->
+  <!-- Instellingen -->
   {% with berichten = get_flashed_messages(with_categories=true) %}
     {% for categorie, bericht in berichten %}
     <div class="waarschuwing" style="margin-top:20px">⚠️ {{ bericht }}</div>
     {% endfor %}
   {% endwith %}
 
+  <div style="margin-top:40px;border:2px solid #B3E5FC;border-radius:14px;padding:22px 28px;background:#E1F5FE;">
+    <h2 style="color:#0277BD;font-family:'Fredoka One',cursive;font-size:1.4rem;margin-bottom:8px;">Instellingen</h2>
+    <form method="POST" action="/admin/instellingen" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label for="max_per_bestelling" style="font-size:.95rem;font-weight:700;">Maximaal aantal eendjes per bestelling:</label>
+      <input type="number" id="max_per_bestelling" name="max_per_bestelling"
+             min="1" max="{{ max_eendjes }}" value="{{ max_per_bestelling }}"
+             style="width:90px;padding:9px 12px;border:2px solid #81D4FA;border-radius:10px;font-family:'Nunito',sans-serif;font-size:.95rem;">
+      <button type="submit"
+              style="padding:9px 20px;background:#0277BD;color:white;border:none;border-radius:10px;cursor:pointer;font-family:'Nunito',sans-serif;font-size:.95rem;font-weight:700;">
+        Opslaan
+      </button>
+    </form>
+  </div>
+
+  <!-- Gevaarzone: database resetten -->
   <div class="gevaarzone">
     <h2>⚠ Gevaarzone</h2>
     <p>

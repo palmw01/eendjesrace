@@ -482,7 +482,7 @@
         <div class="form-groep">
           <label for="aantal">Aantal eendjes</label>
           <input type="number" id="aantal" name="aantal"
-                 min="1" max="{{ [beschikbaar, 100] | min }}" value="{{ vorig.aantal if vorig else 1 }}" required>
+                 min="1" max="{{ [beschikbaar, max_per_bestelling] | min }}" value="{{ vorig.aantal if vorig else 1 }}" required>
         </div>
         <div class="prijs-live" id="prijsLive">
           <div class="label">Te betalen</div>
