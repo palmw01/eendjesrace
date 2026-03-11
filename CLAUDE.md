@@ -38,7 +38,7 @@ gunicorn app:app
 | `ADMIN_PASS` | Admin password — minimum 12 characters (app refuses to start otherwise) |
 | `ADMIN_USER` | Admin username (default: `admin`) |
 
-Key optional variables: `RESEND_FROM` (verified sender address), `MAX_EENDJES` (default 3000, seeds the DB on first run), `DATABASE` (default `eendjes.db`), `HTTPS` (set `true` in production), `SECRET_KEY`, `LOG_DIR` (default `logs`), `FLASK_DEBUG` (set `true` for debug mode).
+Key optional variables: `RESEND_FROM` (verified sender address), `MAX_EENDJES` (default 3000, seeds the DB on first run), `DATABASE` (default `eendjes.db`), `HTTPS` (set `true` in production), `SECRET_KEY`, `LOG_DIR` (default `logs`), `FLASK_DEBUG` (set `true` for debug mode), `SECURITY_CONTACT` (e.g. `mailto:admin@example.com`, used in `/.well-known/security.txt`; falls back to `RESEND_FROM`).
 
 ## Architecture
 
@@ -90,7 +90,7 @@ Admin routes:
 ## Key Patterns
 
 - All comments and variable/function names are in Dutch (e.g., `bestelling` = order, `eendjes` = ducks/tickets, `lotnummer` = ticket number, `betaald` = paid)
-- Security headers (X-Frame-Options, CSP with per-request nonces, Permissions-Policy, etc.), rate limiting (5/min on admin login), ProxyFix (for Railway deployment), and Mollie webhook IP whitelisting are all configured in `app.py`. `saniteer_log()` strips newlines from user input before logging to prevent log injection.
+- Security headers (X-Frame-Options, CSP with per-request nonces + `base-uri`/`form-action 'self'`, Permissions-Policy, suppressed `Server` header, etc.), rate limiting (5/min on admin login), ProxyFix (for Railway deployment), and Mollie webhook IP whitelisting are all configured in `app.py`. `saniteer_log()` strips newlines from user input before logging to prevent log injection. `GET /.well-known/security.txt` serves an RFC 9116-compliant security contact file.
 - The database is auto-initialized on module import (`init_db()` called at module level)
 
 ### Mollie API v3

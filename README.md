@@ -76,6 +76,7 @@ De app draait op http://localhost:5000. De SQLite-database (`eendjes.db`) wordt 
 | `HTTPS` | Nee | Zet op `true` in productie — beveiligt sessie-cookies |
 | `TZ` | Nee | Tijdzone voor juiste timestamps (bijv. `Europe/Amsterdam`) |
 | `MAX_EENDJES` | Nee | Beginstaat totaal beschikbare eendjes (standaard: `3000`). Alleen relevant bij de allereerste start — daarna via de admin te wijzigen. |
+| `SECURITY_CONTACT` | Nee | Contactadres voor `/.well-known/security.txt` (bijv. `mailto:admin@jouwdomein.nl`). Valt terug op `RESEND_FROM`. |
 
 > **Mollie webhook:** Railway geeft automatisch een publieke URL. Zet deze als `BASE_URL` zodat Mollie betalingsstatussen kan terugsturen. Gebruik de `live_`-sleutel pas zodra de app live staat.
 
@@ -97,6 +98,7 @@ De app draait op http://localhost:5000. De SQLite-database (`eendjes.db`) wordt 
 | `/admin/instellingen` | Wijzig totaal beschikbare eendjes en maximum per bestelling |
 | `/admin/opruimen` | Verwijder verlopen/mislukte/geannuleerde bestellingen zonder lotnummers |
 | `/admin/reset` | Reset volledige database (vereist 'RESET'-bevestiging) |
+| `/.well-known/security.txt` | Beveiligingscontactinformatie (RFC 9116) |
 
 ---
 
