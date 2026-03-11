@@ -131,6 +131,17 @@
     }
     .knop-reset:hover { background: #b71c1c; }
 
+    .stat.waarschuwing-stat .getal { color: #E65100; }
+
+    .statusfilter { display: flex; gap: 6px; flex-wrap: wrap; }
+    .filter-knop {
+      padding: 7px 14px; border: 2px solid #E0E0E0; border-radius: 99px;
+      background: white; cursor: pointer; font-family: 'Nunito', sans-serif;
+      font-size: .82rem; font-weight: 700; color: #555; transition: all .15s;
+    }
+    .filter-knop:hover { border-color: #0077B6; color: #0077B6; }
+    .filter-knop.actief { background: #0077B6; border-color: #0077B6; color: white; }
+
     .zoek { margin-bottom: 16px; }
     .zoek input {
       padding: 10px 14px; border: 2px solid #E0E0E0; border-radius: 10px;
@@ -178,6 +189,10 @@
       <div class="getal">{{ stats['mails_mislukt'] }}</div>
       <div class="label">Mails mislukt</div>
     </div>
+    <div class="stat {% if stats['openstaand'] > 0 %}waarschuwing-stat{% endif %}">
+      <div class="getal">{{ stats['openstaand'] }}</div>
+      <div class="label">Openstaand (nog niet betaald)</div>
+    </div>
   </div>
 
   <!-- Voortgangsbalk -->
@@ -192,9 +207,17 @@
     </div>
   </div>
 
-  <!-- Zoekbalk -->
-  <div class="zoek">
-    <input type="text" id="zoek" placeholder="🔍 Zoek op naam, e-mail of lotnummer…" oninput="filterTabel()">
+  <!-- Zoekbalk + statusfilter -->
+  <div class="zoek" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+    <input type="text" id="zoek" placeholder="🔍 Zoek op naam, e-mail of lotnummer…" oninput="filterTabel()" style="flex:1;min-width:200px;">
+    <div class="statusfilter">
+      <button class="filter-knop actief" onclick="setFilter('', this)">Alles</button>
+      <button class="filter-knop" onclick="setFilter('betaald', this)">Betaald</button>
+      <button class="filter-knop" onclick="setFilter('aangemaakt', this)">Openstaand</button>
+      <button class="filter-knop" onclick="setFilter('mislukt', this)">Mislukt</button>
+      <button class="filter-knop" onclick="setFilter('verlopen', this)">Verlopen</button>
+      <button class="filter-knop" onclick="setFilter('geannuleerd', this)">Geannuleerd</button>
+    </div>
   </div>
 
   <!-- Bestellingen tabel -->
@@ -216,7 +239,7 @@
     </thead>
     <tbody>
       {% for b in bestellingen %}
-      <tr>
+      <tr data-status="{{ b['status'] }}">
         <td>{{ b['id'] }}</td>
         <td>{{ b['naam'] }}</td>
         <td>{{ b['email'] }}</td>
@@ -315,11 +338,22 @@
       }
     });
 
+    let actieveFilter = '';
+
+    function setFilter(status, knop) {
+      actieveFilter = status;
+      document.querySelectorAll('.filter-knop').forEach(k => k.classList.remove('actief'));
+      knop.classList.add('actief');
+      filterTabel();
+    }
+
     function filterTabel() {
       const zoekterm = document.getElementById('zoek').value.toLowerCase();
       const rijen    = document.querySelectorAll('#tabel tbody tr');
       rijen.forEach(rij => {
-        rij.style.display = rij.textContent.toLowerCase().includes(zoekterm) ? '' : 'none';
+        const statusOk = !actieveFilter || rij.dataset.status === actieveFilter;
+        const zoekOk   = !zoekterm || rij.textContent.toLowerCase().includes(zoekterm);
+        rij.style.display = (statusOk && zoekOk) ? '' : 'none';
       });
     }
   </script>

@@ -38,7 +38,7 @@ gunicorn app:app
 | `ADMIN_PASS` | Admin password (app refuses to start without this) |
 | `ADMIN_USER` | Admin username (default: `admin`) |
 
-Key optional variables: `RESEND_FROM` (verified sender address), `MAX_EENDJES` (default 3000), `DATABASE` (default `eendjes.db`), `HTTPS` (set `true` in production), `SECRET_KEY`, `LOG_DIR` (default `logs`), `FLASK_DEBUG` (set `true` for debug mode).
+Key optional variables: `RESEND_FROM` (verified sender address), `MAX_EENDJES` (default 3000, seeds the DB on first run), `DATABASE` (default `eendjes.db`), `HTTPS` (set `true` in production), `SECRET_KEY`, `LOG_DIR` (default `logs`), `FLASK_DEBUG` (set `true` for debug mode).
 
 ## Architecture
 
@@ -54,7 +54,7 @@ The entire backend lives in `app.py` (single file). Templates are in `templates/
 ### Database (SQLite, `eendjes.db`, 3 tables)
 
 - **`bestellingen`**: orders — `naam`, `email`, `telefoon`, `aantal`, `bedrag`, `transactiekosten` (0/1), `mollie_id`, `status` (aangemaakt/betaald/mislukt/geannuleerd/verlopen), `lot_van`/`lot_tot` (ticket range), `mail_verstuurd`, `pogingen`
-- **`teller`**: single row tracking `volgend_lot` (next ticket number, starts at 1)
+- **`teller`**: single row with `volgend_lot` (next ticket number), `max_eendjes` (total available, editable via admin), `max_per_bestelling` (per-order limit, editable via admin)
 - **`webhook_log`**: audit log of webhook calls
 
 ### Atomic Ticket Assignment
@@ -74,11 +74,18 @@ An optional iDEAL transaction fee (`TRANSACTIEKOSTEN = 0.32`) can be added to th
 
 ### Admin
 
-`/admin` (protected by session login, timing-safe password check) shows order statistics, lets admins resend confirmation emails for failed deliveries, and offers a CSV export (`/admin/export-csv`) of all orders — semicolon-delimited with UTF-8 BOM for Excel compatibility. Each order row has an edit button (`/admin/bestelling/<id>/wijzigen`) that allows updating naam, email, telefoon, status, and mail_verstuurd — **not** lotnummers. A "Gevaarzone" section at the bottom of the admin page offers a full database reset (`POST /admin/reset`) that wipes all orders and webhook_log and resets `volgend_lot` to 1; the user must type `RESET` in a text field as confirmation.
+`/admin` (protected by session login, timing-safe password check) shows order statistics (incl. openstaande/hangende bestellingen), lets admins resend confirmation emails for failed deliveries, filter orders by status, and offers a CSV export (`/admin/export-csv`) of all orders — semicolon-delimited with UTF-8 BOM for Excel compatibility, including `transactiekosten` column. Each order row has an edit button (`/admin/bestelling/<id>/wijzigen`) that allows updating naam, email, telefoon, status, and mail_verstuurd — **not** lotnummers.
+
+Admin routes:
+- `POST /admin/instellingen` — update `max_eendjes` and/or `max_per_bestelling` in the `teller` table. Validates that `max_eendjes` cannot be set below the number of already sold tickets.
+- `POST /admin/opruimen` — deletes orders with status `verlopen`/`mislukt`/`geannuleerd` where `lot_van IS NULL` (no tickets assigned). Safe to run at any time.
+- `POST /admin/reset` — full database reset (wipes all orders + webhook_log, resets `volgend_lot` to 1). Requires typing `RESET` as confirmation. Has a JS confirm dialog as second safeguard.
+
+`GET /api/beschikbaar` — public JSON endpoint returning `verkocht`, `beschikbaar`, `max_eendjes`, `max_per_bestelling`. Used by the homepage auto-refresh (every 30s).
 
 ## Testing Notes
 
-`tests/test_app.py` stubs out Mollie, Resend, Flask-WTF CSRF, and Flask-Limiter so tests run with only Flask installed. Tests cover pricing, input validation, database operations, atomic transactions, email sending, and webhook processing. The test database uses `/tmp/eendjes_test.db` (reset before each test class).
+`tests/test_app.py` stubs out Mollie, Resend, Flask-WTF CSRF, and Flask-Limiter so tests run with only Flask installed. Tests cover pricing, input validation, database operations, atomic transactions, email sending, webhook processing, admin routes, `max_per_bestelling`/`max_eendjes` settings, and the opruimen route. The test database uses `/tmp/eendjes_test.db` (reset before each test class). `maak_db()` includes `max_eendjes` and `max_per_bestelling` in the teller table.
 
 ## Key Patterns
 

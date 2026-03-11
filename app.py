@@ -331,9 +331,11 @@ def stuur_bevestigingsmail(naam, email, aantal, lot_van, lot_tot, bedrag, transa
     naam = html.escape(naam)  # voorkom XSS via naam in HTML e-mail
     if lot_van == lot_tot:
         lotnr_tekst = f"lotnummer <strong>#{lot_van}</strong>"
-    else:
+    elif lot_tot - lot_van < 5:
         nummers = " &middot; ".join(f"#{n}" for n in range(lot_van, lot_tot + 1))
         lotnr_tekst = f"lotnummers <strong>{nummers}</strong>"
+    else:
+        lotnr_tekst = f"lotnummers <strong>#{lot_van} t/m #{lot_tot}</strong>"
 
     mail_html = f"""
     <html><body style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#333;">
@@ -803,7 +805,8 @@ def admin():
                 COALESCE(SUM(CASE WHEN status='betaald' THEN aantal END), 0)     AS verkochte_eendjes,
                 COALESCE(SUM(CASE WHEN status='betaald' THEN bedrag END), 0)     AS totaal_omzet,
                 COALESCE(SUM(CASE WHEN status='betaald'
-                                   AND mail_verstuurd=0 THEN 1 END), 0)          AS mails_mislukt
+                                   AND mail_verstuurd=0 THEN 1 END), 0)          AS mails_mislukt,
+                COALESCE(SUM(CASE WHEN status='aangemaakt' THEN 1 END), 0)       AS openstaand
             FROM bestellingen
         """).fetchone()
         return render_template("admin.html",
@@ -894,7 +897,7 @@ def export_csv():
     try:
         db = get_db()
         bestellingen = db.execute(
-            "SELECT id, naam, email, telefoon, aantal, bedrag, "
+            "SELECT id, naam, email, telefoon, aantal, bedrag, transactiekosten, "
             "lot_van, lot_tot, status, mail_verstuurd, aangemaakt_op "
             "FROM bestellingen ORDER BY id ASC"
         ).fetchall()
@@ -905,13 +908,13 @@ def export_csv():
     uitvoer = io.StringIO()
     schrijver = csv.writer(uitvoer, delimiter=";")
     schrijver.writerow([
-        "ID", "Naam", "E-mail", "Telefoon", "Aantal", "Bedrag (€)",
+        "ID", "Naam", "E-mail", "Telefoon", "Aantal", "Bedrag (€)", "iDEAL-kosten",
         "Lot van", "Lot tot", "Status", "Mail verstuurd", "Aangemaakt op"
     ])
     for b in bestellingen:
         schrijver.writerow([
             b["id"], b["naam"], b["email"], b["telefoon"],
-            b["aantal"], f"{b['bedrag']:.2f}",
+            b["aantal"], f"{b['bedrag']:.2f}", "ja" if b["transactiekosten"] else "nee",
             b["lot_van"] or "", b["lot_tot"] or "",
             b["status"], "ja" if b["mail_verstuurd"] else "nee",
             b["aangemaakt_op"],
