@@ -118,6 +118,7 @@ def maak_db():
             mail_verstuurd INTEGER NOT NULL DEFAULT 0,
             pogingen INTEGER NOT NULL DEFAULT 0,
             transactiekosten INTEGER NOT NULL DEFAULT 0,
+            transactiekosten_bedrag REAL NOT NULL DEFAULT 0,
             aangemaakt_op TEXT NOT NULL DEFAULT (datetime('now','localtime')),
             bijgewerkt_op TEXT NOT NULL DEFAULT (datetime('now','localtime'))
         )""",
@@ -1170,6 +1171,20 @@ class TestTransactiekosten(unittest.TestCase):
         ).fetchone()
         self.assertAlmostEqual(rij["bedrag"], 5.32, places=2)
 
+    def test_bestelling_met_tk_slaat_bedrag_op_in_kolom(self):
+        doe_bestelling(self.client, transactiekosten=True)
+        rij = App.get_db().execute(
+            "SELECT transactiekosten_bedrag FROM bestellingen WHERE id=1"
+        ).fetchone()
+        self.assertAlmostEqual(rij["transactiekosten_bedrag"], 0.32, places=2)
+
+    def test_bestelling_zonder_tk_slaat_nul_op_in_kolom(self):
+        doe_bestelling(self.client, transactiekosten=False)
+        rij = App.get_db().execute(
+            "SELECT transactiekosten_bedrag FROM bestellingen WHERE id=1"
+        ).fetchone()
+        self.assertAlmostEqual(rij["transactiekosten_bedrag"], 0.0, places=2)
+
     def test_bestelling_zonder_tk_normaal_bedrag_opgeslagen(self):
         doe_bestelling(self.client, aantal=2, transactiekosten=False)
         rij = App.get_db().execute(
@@ -1498,7 +1513,64 @@ class TestBeveiligingsVerbeteringen(unittest.TestCase):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 17. Admin prijsinstellingen
+# 17. Mail opnieuw versturen
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestMailOpnieuw(unittest.TestCase):
+
+    def setUp(self):
+        self.client, self.ctx = maak_flask_client()
+        # Maak een betaalde bestelling aan
+        doe_bestelling(self.client, transactiekosten=True)
+        with patch("app.maak_mollie_client") as mc:
+            mc.return_value.payments.get.return_value = simuleer_mollie_betaling("paid")
+            self.client.post("/webhook", data={"id": "tr_test001"})
+        self.client.post("/admin/login",
+                         data={"gebruiker": "admin", "wachtwoord": "testpass"})
+
+    def tearDown(self):
+        self.ctx.pop()
+
+    def test_resend_betaalde_bestelling_geeft_redirect(self):
+        with patch("resend.Emails.send", return_value={"id": "ok"}):
+            r = self.client.post("/admin/mail-opnieuw/1")
+        self.assertEqual(r.status_code, 302)
+
+    def test_resend_al_verstuurd_werkt_ook(self):
+        """Resend moet ook werken als mail al eerder verstuurd was."""
+        App.get_db().execute("UPDATE bestellingen SET mail_verstuurd=1 WHERE id=1")
+        with patch("resend.Emails.send", return_value={"id": "ok"}):
+            r = self.client.post("/admin/mail-opnieuw/1")
+        self.assertEqual(r.status_code, 302)
+
+    def test_resend_gebruikt_opgeslagen_tk_bedrag(self):
+        """De mail gebruikt het destijds opgeslagen transactiekosten-bedrag."""
+        verzonden = {}
+        def nep_send(params):
+            verzonden["html"] = params.get("html", "")
+            return {"id": "ok"}
+        with patch("resend.Emails.send", side_effect=nep_send):
+            self.client.post("/admin/mail-opnieuw/1")
+        self.assertIn("transactiekosten", verzonden.get("html", "").lower())
+        self.assertIn("0,32", verzonden.get("html", ""))
+
+    def test_resend_niet_betaald_geeft_404(self):
+        App.get_db().execute("UPDATE bestellingen SET status='aangemaakt' WHERE id=1")
+        r = self.client.post("/admin/mail-opnieuw/1")
+        self.assertEqual(r.status_code, 404)
+
+    def test_resend_onbekend_id_geeft_404(self):
+        r = self.client.post("/admin/mail-opnieuw/99999")
+        self.assertEqual(r.status_code, 404)
+
+    def test_resend_zonder_login_geeft_302(self):
+        self.client.get("/admin/logout")
+        r = self.client.post("/admin/mail-opnieuw/1")
+        self.assertEqual(r.status_code, 302)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 18. Admin prijsinstellingen
 # ══════════════════════════════════════════════════════════════════════════════
 
 class TestAdminPrijsInstellingen(unittest.TestCase):

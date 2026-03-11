@@ -172,7 +172,8 @@ def init_db():
             lot_tot         INTEGER,
             mail_verstuurd  INTEGER NOT NULL DEFAULT 0,
             pogingen        INTEGER NOT NULL DEFAULT 0,
-            transactiekosten INTEGER NOT NULL DEFAULT 0,
+            transactiekosten         INTEGER NOT NULL DEFAULT 0,
+            transactiekosten_bedrag  REAL    NOT NULL DEFAULT 0,
             aangemaakt_op   TEXT NOT NULL DEFAULT (datetime('now','localtime')),
             bijgewerkt_op   TEXT NOT NULL DEFAULT (datetime('now','localtime'))
         )
@@ -200,6 +201,10 @@ def init_db():
     # Migraties eerst — zodat kolommen bestaan vóór de INSERT
     try:
         conn.execute("ALTER TABLE bestellingen ADD COLUMN transactiekosten INTEGER NOT NULL DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass  # kolom bestaat al
+    try:
+        conn.execute("ALTER TABLE bestellingen ADD COLUMN transactiekosten_bedrag REAL NOT NULL DEFAULT 0")
     except sqlite3.OperationalError:
         pass  # kolom bestaat al
     try:
@@ -353,7 +358,7 @@ def wijs_lotnummers_toe(db, bestelling_id, aantal):
     return start, einde
 
 
-def stuur_bevestigingsmail(naam, email, aantal, lot_van, lot_tot, bedrag, transactiekosten=False):
+def stuur_bevestigingsmail(naam, email, aantal, lot_van, lot_tot, bedrag, transactiekosten=False, tk_bedrag=0.0):
     """Geeft True bij succes, False bij fout — gooit nooit een exception."""
     naam = html.escape(naam)  # voorkom XSS via naam in HTML e-mail
     if lot_van == lot_tot:
@@ -372,7 +377,7 @@ def stuur_bevestigingsmail(naam, email, aantal, lot_van, lot_tot, bedrag, transa
       </div>
       <div style="background:#fffdf0;padding:32px;border:1px solid #eee;border-radius:0 0 12px 12px;">
         <p>Beste <strong>{naam}</strong>,</p>
-        <p>Bedankt voor je bestelling! Je betaling van <strong>&euro;&nbsp;{bedrag:.2f}</strong> is ontvangen{f' (incl. &euro;&nbsp;{get_transactiekosten():.2f} iDEAL-transactiekosten)'.replace(".", ",") if transactiekosten else ''}.</p>
+        <p>Bedankt voor je bestelling! Je betaling van <strong>&euro;&nbsp;{bedrag:.2f}</strong> is ontvangen{f' (incl. &euro;&nbsp;{tk_bedrag:.2f} iDEAL-transactiekosten)'.replace(".", ",") if transactiekosten else ''}.</p>
         <div style="background:#fff;border:2px solid #FFD700;border-radius:10px;padding:24px;margin:24px 0;text-align:center;">
           <p style="font-size:17px;margin:0 0 8px;">
             Je hebt <strong>{aantal}&nbsp;eend{'je' if aantal==1 else 'jes'}</strong> en ontvangt:
@@ -614,9 +619,10 @@ def bestellen():
                                    fouten=[f"Er zijn nog maar {beschikbaar} eendjes beschikbaar."],
                                    vorig=vorig), 409
 
+        tk_bedrag = get_transactiekosten() if incl_tk else 0
         cursor = db.execute(
-            "INSERT INTO bestellingen (naam, telefoon, email, aantal, bedrag, transactiekosten) VALUES (?,?,?,?,?,?)",
-            (naam, telefoon, email, aantal, bedrag, 1 if incl_tk else 0),
+            "INSERT INTO bestellingen (naam, telefoon, email, aantal, bedrag, transactiekosten, transactiekosten_bedrag) VALUES (?,?,?,?,?,?,?)",
+            (naam, telefoon, email, aantal, bedrag, 1 if incl_tk else 0, tk_bedrag),
         )
         bestelling_id = cursor.lastrowid
         db.commit()
@@ -732,6 +738,7 @@ def webhook():
             mail_ok = stuur_bevestigingsmail(
                 rij["naam"], rij["email"], rij["aantal"],
                 lot_van, lot_tot, rij["bedrag"], bool(rij["transactiekosten"]),
+                tk_bedrag=rij["transactiekosten_bedrag"],
             )
             db.execute(
                 "UPDATE bestellingen SET mail_verstuurd=?, pogingen=pogingen+1 WHERE id=?",
@@ -999,7 +1006,7 @@ def admin_instellingen():
 @app.route("/admin/mail-opnieuw/<int:bestelling_id>", methods=["POST"])
 @login_vereist
 def mail_opnieuw(bestelling_id):
-    """Stuur bevestigingsmail opnieuw — voor gevallen waarbij de mail eerder mislukte."""
+    """Stuur bevestigingsmail opnieuw — werkt voor alle betaalde bestellingen."""
     try:
         db  = get_db()
         rij = db.execute(
@@ -1010,12 +1017,15 @@ def mail_opnieuw(bestelling_id):
         ok = stuur_bevestigingsmail(
             rij["naam"], rij["email"], rij["aantal"],
             rij["lot_van"], rij["lot_tot"], rij["bedrag"],
+            bool(rij["transactiekosten"]),
+            tk_bedrag=rij["transactiekosten_bedrag"],
         )
         db.execute(
             "UPDATE bestellingen SET mail_verstuurd=?, pogingen=pogingen+1 WHERE id=?",
             (1 if ok else 0, bestelling_id),
         )
         db.commit()
+        app.logger.info(f"Mail opnieuw verstuurd voor bestelling {bestelling_id}: {'ok' if ok else 'mislukt'}")
     except sqlite3.Error as e:
         app.logger.error(f"DB-fout mail-opnieuw: {e}")
         abort(500)

@@ -101,6 +101,12 @@
       font-family: 'Nunito', sans-serif; font-size: .78rem; font-weight: 700;
     }
     .knop-mail:hover { background: #BBDEFB; }
+    .knop-mail-herstuur {
+      padding: 4px 10px; background: white; color: #888;
+      border: 1px solid #E0E0E0; border-radius: 6px; cursor: pointer;
+      font-family: 'Nunito', sans-serif; font-size: .78rem; font-weight: 700;
+    }
+    .knop-mail-herstuur:hover { background: #F5F5F5; color: #555; }
 
     .knop-csv {
       padding: 8px 18px; background: #E8F5E9; color: #2E7D32;
@@ -297,6 +303,10 @@
           {% if b['status'] == 'betaald' %}
             {% if b['mail_verstuurd'] %}
               <span class="mail-ok">✅</span>
+              <form method="POST" action="/admin/mail-opnieuw/{{ b['id'] }}" style="display:inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="knop-mail-herstuur" title="Mail nogmaals versturen">↺</button>
+              </form>
             {% else %}
               <span class="mail-fout">❌</span>
               <form method="POST" action="/admin/mail-opnieuw/{{ b['id'] }}" style="display:inline">
