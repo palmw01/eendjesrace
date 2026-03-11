@@ -1,132 +1,142 @@
-# 🦆 Eendjesrace – Lotenverkoop applicatie
+# Eendjesrace – Lotenverkoop applicatie
 
-Een complete webapplicatie voor de lotenverkoop van de **Badeendjesrace Wapenveld** (30 mei 2026).
-Gebouwd met **Python/Flask** + **Mollie** (iDEAL) + **SQLite** + **Resend** (e-mail).
-
----
-
-## ✅ Wat doet de app automatisch?
-
-| Stap | |
-|------|-|
-| Bestelling ontvangen | ✅ Ingebouwd formulier |
-| Prijs berekenen | ✅ Live in de browser |
-| iDEAL-transactiekosten | ✅ Optioneel door koper te betalen (€0,32) |
-| Betaalverzoek sturen | ✅ Directe iDEAL-betaling |
-| Lotnummers toewijzen | ✅ Direct na betaling |
-| Bevestiging sturen | ✅ Automatische e-mail via Resend |
-| Overzicht bijhouden | ✅ Admin-pagina (/admin) |
+Een webapplicatie voor de lotenverkoop van de **Badeendjesrace Wapenveld** (30 mei 2026).
+Gebouwd met **Python/Flask**, **Mollie** (iDEAL-betalingen), **SQLite** en **Resend** (e-mail).
 
 ---
 
-## 🚀 Installatie & starten
+## Wat doet de app?
 
-### 1. Python-pakketten installeren
+| Functie | |
+|---|---|
+| Bestelformulier voor kopers | ✅ |
+| Live prijsberekening in de browser | ✅ |
+| Optionele iDEAL-transactiekosten (€0,32) door koper | ✅ |
+| iDEAL-betaling via Mollie | ✅ |
+| Automatische lotnummer-toewijzing na betaling | ✅ |
+| Bevestigingsmail met lotnummers via Resend | ✅ |
+| Beheerpagina met statistieken, filter en CSV-export | ✅ |
+| Instellingen beheren via admin (max. eendjes, max. per bestelling) | ✅ |
+
+---
+
+## Lokaal draaien
+
+### 1. Pakketten installeren
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. Omgevingsvariabelen instellen
+### 2. Configuratie
 
-Maak een `.env`-bestand aan (of zet ze als omgevingsvariabele):
+Maak een `config.json` aan in de projectmap (wordt automatisch ingelezen):
 
-```env
-# Mollie API-sleutel (haal op via mollie.com → Dashboard → API-sleutels)
-# Begin met 'test_' om te testen, gebruik 'live_' voor echte betalingen
-MOLLIE_API_KEY=test_xxxxxxxxxxxxxxxxxxxx
-
-# De publieke URL van jouw server (belangrijk voor Mollie webhook!)
-BASE_URL=https://jouwdomein.nl
-
-# Resend e-mail (haal op via resend.com → API Keys)
-RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxx
-RESEND_FROM=noreply@jouwdomein.nl
+```json
+{
+  "MOLLIE_API_KEY": "test_xxxxxxxxxxxxxxxxxxxx",
+  "BASE_URL": "http://localhost:5000",
+  "RESEND_API_KEY": "re_xxxxxxxxxxxxxxxxxxxx",
+  "RESEND_FROM": "noreply@jouwdomein.nl",
+  "ADMIN_USER": "admin",
+  "ADMIN_PASS": "kieseen sterk wachtwoord",
+  "SECRET_KEY": "willekeurige lange string"
+}
 ```
 
-> **Resend instellen:**
-> Maak een gratis account op [resend.com](https://resend.com), verifieer je domein en maak een API key aan.
-> Zonder geverifieerd domein kun je tijdelijk `onboarding@resend.dev` gebruiken als `RESEND_FROM` (mails gaan dan alleen naar je eigen Resend-account e-mailadres).
-
-### 3. App starten
+### 3. Starten
 
 ```bash
 python app.py
 ```
 
-De app draait nu op http://localhost:5000
+De app draait op http://localhost:5000. De SQLite-database (`eendjes.db`) wordt automatisch aangemaakt.
 
 ---
 
-## 🌐 Online zetten (voor iDEAL)
+## Deployen op Railway
 
-Voor echte betalingen moet de app bereikbaar zijn via internet  
-zodat Mollie de webhook kan aanroepen.
+1. Maak een account op [railway.app](https://railway.app)
+2. Nieuw project → **Deploy from GitHub** → selecteer deze repository
+3. Stel onderstaande omgevingsvariabelen in via **Settings → Variables**
+4. Kopieer de publieke Railway-URL en zet die als `BASE_URL`
 
-**Goedkope opties:**
-- **Railway.app** – gratis tier, heel eenvoudig deployen
-- **Render.com** – gratis tier, Python/Flask support
-- **PythonAnywhere** – €5/maand, speciaal voor Python
+### Omgevingsvariabelen
 
-**Stappenplan Railway:**
-1. Maak account op railway.app
-2. Nieuw project → Deploy from GitHub
-3. Stel omgevingsvariabelen in via het dashboard
-4. Kopieer de publieke URL → zet die als `BASE_URL`
+| Variabele | Verplicht | Omschrijving |
+|---|---|---|
+| `MOLLIE_API_KEY` | Ja | Mollie API-sleutel (`test_…` of `live_…`) |
+| `BASE_URL` | Ja | Publieke URL van de app (bijv. `https://xxx.railway.app`) |
+| `RESEND_API_KEY` | Ja | Resend API-sleutel voor transactionele e-mail |
+| `ADMIN_PASS` | Ja | Wachtwoord voor de beheerpagina |
+| `SECRET_KEY` | Ja | Willekeurige geheime sleutel voor sessies (gebruik een lange random string) |
+| `RESEND_FROM` | Ja | Geverifieerd afzenderadres (bijv. `noreply@jouwdomein.nl`) |
+| `ADMIN_USER` | Nee | Gebruikersnaam admin (standaard: `admin`) |
+| `DATABASE` | Nee | Pad naar de SQLite-database (standaard: `eendjes.db`) |
+| `HTTPS` | Nee | Zet op `true` in productie — beveiligt sessie-cookies |
+| `TZ` | Nee | Tijdzone voor juiste timestamps (bijv. `Europe/Amsterdam`) |
+| `MAX_EENDJES` | Nee | Beginstaat totaal beschikbare eendjes (standaard: `3000`). Alleen relevant bij de allereerste start — daarna via de admin te wijzigen. |
+
+> **Mollie webhook:** Railway geeft automatisch een publieke URL. Zet deze als `BASE_URL` zodat Mollie betalingsstatussen kan terugsturen. Gebruik de `live_`-sleutel pas zodra de app live staat.
+
+> **Resend:** Verifieer je domein in het Resend-dashboard. Zonder geverifieerd domein werkt `onboarding@resend.dev` tijdelijk als afzender, maar dan gaan mails alleen naar je eigen Resend-accountadres.
 
 ---
 
-## 📄 Pagina's
+## Pagina's en routes
 
 | URL | Omschrijving |
-|-----|-------------|
+|---|---|
 | `/` | Bestelformulier voor kopers |
-| `/admin` | Overzicht van alle bestellingen en omzet |
-| `/admin/export-csv` | Download alle bestellingen als CSV (via admin-knop) |
-| `/admin/bestelling/<id>/wijzigen` | Bewerk een bestelling (naam, e-mail, telefoon, status, mailstatus) |
-| `/admin/reset` | Reset de volledige database incl. lotnummering (vereist 'RESET'-bevestiging) |
 | `/betaald/<id>` | Bevestigingspagina na betaling |
-
-> ⚠️ **Beveilig `/admin`** in productie met een wachtwoord!  
-> Voeg Flask-Login of een simpele HTTP Basic Auth toe.
-
----
-
-## 💰 Mollie-account aanmaken
-
-1. Ga naar [mollie.com](https://mollie.com) en maak een gratis account
-2. Verificeer je organisatie (KvK-nummer)
-3. Ga naar **Dashboard → Ontwikkelaars → API-sleutels**
-4. Gebruik eerst `test_` sleutel om te testen
-5. Schakel over naar `live_` sleutel voor echte betalingen
-
-**Kosten:** €0,29 per succesvolle iDEAL-transactie, geen maandelijkse kosten.
+| `/api/prijs` | Live prijsberekening (JSON) |
+| `/api/beschikbaar` | Actueel aantal beschikbare eendjes (JSON, elke 30s door homepage gebruikt) |
+| `/admin` | Beheerpagina — statistieken, bestellingen, filter op status |
+| `/admin/export-csv` | Download alle bestellingen als CSV |
+| `/admin/bestelling/<id>/wijzigen` | Bewerk naam, e-mail, telefoon, status of mailstatus |
+| `/admin/instellingen` | Wijzig totaal beschikbare eendjes en maximum per bestelling |
+| `/admin/opruimen` | Verwijder verlopen/mislukte/geannuleerde bestellingen zonder lotnummers |
+| `/admin/reset` | Reset volledige database (vereist 'RESET'-bevestiging) |
 
 ---
 
-## 🔧 Aanpassen
-
-In `app.py` bovenaan staan alle instellingen:
-
-```python
-MAX_EENDJES      = 3000      # Maximaal aantal te verkopen eendjes
-PRIJS_PER_STUK   = 2.50      # Prijs per los eendje
-PRIJS_VIJF_STUKS = 10.00     # Prijs voor 5 eendjes
-TRANSACTIEKOSTEN = 0.32      # iDEAL-transactiekosten (optioneel door koper te betalen)
-```
-
----
-
-## 📁 Projectstructuur
+## Projectstructuur
 
 ```
-eendjes/
+eendjesrace/
 ├── app.py                  # Flask backend (alle logica)
 ├── requirements.txt        # Python-pakketten
-├── eendjes.db              # SQLite database (wordt automatisch aangemaakt)
-├── README.md               # Dit bestand
+├── Procfile                # Railway/gunicorn startcommando
+├── eendjes.db              # SQLite database (automatisch aangemaakt)
+├── README.md
+├── CLAUDE.md               # Instructies voor Claude Code
 └── templates/
     ├── index.html          # Bestelformulier
     ├── betaald.html        # Bevestigingspagina
-    └── admin.html          # Beheerpagina
+    ├── admin.html          # Beheerpagina
+    ├── wijzigen.html       # Bestelling bewerken
+    ├── login.html          # Admin-login
+    └── fout.html           # Foutpagina's (404, 500, …)
 ```
+
+---
+
+## Prijsberekening
+
+| Aantal | Prijs |
+|---|---|
+| 1–4 stuks | €2,50 per stuk |
+| 5 stuks | €10,00 (bundel) |
+| Meer dan 5 | Combinatie van bundels en losse stuks |
+
+Optioneel kan de koper de iDEAL-transactiekosten (€0,32) zelf betalen, zodat het volledige bedrag naar het goede doel gaat.
+
+---
+
+## Tests uitvoeren
+
+```bash
+python -m pytest tests/test_app.py -v
+```
+
+De testsuite stubt Mollie, Resend, Flask-WTF en Flask-Limiter — alleen Flask hoeft geïnstalleerd te zijn.
