@@ -411,8 +411,8 @@
     <div class="hoe-werkt-het">
       <h3>Hoe werkt de race?</h3>
       <ol>
-        <li>Er gaan maximaal 3000 badeendjes tegelijk het water in.</li>
-        <li>Elk badeendje heeft een uniek nummer van 1 t/m 3000.</li>
+        <li>Er gaan maximaal {{ max_eendjes }} badeendjes tegelijk het water in.</li>
+        <li>Elk badeendje heeft een uniek nummer van 1 t/m {{ max_eendjes }}.</li>
         <li>Wanneer je een lot koopt, krijg je een nummer dat overeenkomt met een specifiek badeendje.</li>
         <li>Na de start drijven alle eendjes richting de finishlijn. De wind of hulp van de brandweer zorgt ervoor dat de eendjes in beweging blijven.</li>
         <li>Het eendje dat als eerste de finishgeul binnenkomt, wint de hoofdprijs.</li>
@@ -430,7 +430,7 @@
     <div class="voortgang-bar">
       <div class="voortgang-fill" id="voortgangFill" style="width: {{ ((verkocht / max_eendjes * 100)|round(1)) if max_eendjes else 0 }}%"></div>
     </div>
-    <div class="voortgang-label">Maximaal {{ max_eendjes }} eendjes beschikbaar</div>
+    <div class="voortgang-label" id="voortgangLabel">Maximaal {{ max_eendjes }} eendjes beschikbaar</div>
   </div>
 
   <!-- Bestelformulier -->
@@ -553,10 +553,11 @@
 
   // Auto-refresh beschikbaarheid elke 30 seconden
   (function() {
-    const fillEl    = document.getElementById('voortgangFill');
+    const fillEl     = document.getElementById('voortgangFill');
     const verkochtEl = document.getElementById('tellerVerkocht');
-    const overEl    = document.getElementById('tellerOver');
-    const aantalEl  = document.getElementById('aantal');
+    const overEl     = document.getElementById('tellerOver');
+    const labelEl    = document.getElementById('voortgangLabel');
+    const aantalEl   = document.getElementById('aantal');
     if (!fillEl) return;  // pagina toont uitverkocht-banner, niets te verversen
 
     setInterval(function() {
@@ -568,6 +569,7 @@
           fillEl.style.width = pct.toFixed(1) + '%';
           verkochtEl.textContent = '🦆 ' + d.verkocht + ' eendjes verkocht';
           overEl.textContent     = d.beschikbaar + ' over';
+          if (labelEl) labelEl.textContent = 'Maximaal ' + d.max_eendjes + ' eendjes beschikbaar';
           if (aantalEl) {
             const nieuwMax = Math.min(d.beschikbaar, d.max_per_bestelling);
             aantalEl.max = nieuwMax;
