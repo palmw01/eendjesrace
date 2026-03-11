@@ -108,6 +108,17 @@
       font-size: 1.05rem;
       margin-top: 6px;
     }
+    .datum-badge {
+      display: inline-block;
+      margin-top: 10px;
+      padding: 4px 16px;
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 99px;
+      font-size: 0.88rem;
+      color: white;
+      letter-spacing: 0.5px;
+    }
 
     /* Voortgangsbalk */
     .voortgang-card {
@@ -395,6 +406,7 @@
     <img class="eend-groot" src="{{ url_for('static', filename='img/eend.png') }}" alt="badeend">
     <h1>Badeendjesrace!</h1>
     <p>Hervormde Gemeente Wapenveld</p>
+    <p><span class="datum-badge">📅 zaterdag 30 mei 2026</span></p>
   </header>
 
   <!-- Evenementinformatie -->
@@ -402,7 +414,7 @@
     <h2>Badeendjesrace Wapenveld</h2>
     <p>
       Op zaterdag 30 mei 2026 organiseert de HGJB-commissie van de Hervormde Kerk Wapenveld
-      een bijzonder en gezellig evenement: de Badeendjesrace Wapenveld.
+      een bijzonder en gezellig evenement: Badeendjesrace Wapenveld.
     </p>
     <p>
       Tijdens dit vrolijke spektakel nemen honderden gele badeendjes het tegen elkaar op in een
