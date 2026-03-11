@@ -125,14 +125,17 @@ def maak_db():
             id INTEGER PRIMARY KEY CHECK (id = 1),
             volgend_lot INTEGER NOT NULL DEFAULT 1,
             max_eendjes INTEGER NOT NULL DEFAULT 3000,
-            max_per_bestelling INTEGER NOT NULL DEFAULT 100
+            max_per_bestelling INTEGER NOT NULL DEFAULT 100,
+            prijs_per_stuk REAL NOT NULL DEFAULT 2.50,
+            prijs_vijf_stuks REAL NOT NULL DEFAULT 10.00,
+            transactiekosten REAL NOT NULL DEFAULT 0.32
         )""",
         """CREATE TABLE webhook_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             mollie_id TEXT, status TEXT, ip TEXT,
             ontvangen TEXT DEFAULT (datetime('now','localtime'))
         )""",
-        f"INSERT INTO teller (id, volgend_lot, max_eendjes, max_per_bestelling) VALUES (1, 1, {MAX_EENDJES}, 100)",
+        f"INSERT INTO teller (id, volgend_lot, max_eendjes, max_per_bestelling, prijs_per_stuk, prijs_vijf_stuks, transactiekosten) VALUES (1, 1, {MAX_EENDJES}, 100, 2.50, 10.00, 0.32)",
     ]:
         conn.execute(ddl)
     return conn
@@ -267,6 +270,10 @@ class TestValideerInvoer(unittest.TestCase):
 
     def test_telefoon_te_kort(self):
         self.assertGreater(len(self._ok(tel="123")), 0)
+
+    def test_telefoon_alleen_spaties_geeft_fout(self):
+        fouten = self._ok(tel="       ")
+        self.assertTrue(any("telefoon" in f.lower() for f in fouten))
 
     def test_aantal_nul(self):
         fouten = self._ok(aantal=0)
@@ -1074,6 +1081,11 @@ class TestWijzigenVerwijderen(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertIn(b"status", r.data.lower())
 
+    def test_wijzigen_ongeldig_email_geeft_fout(self):
+        r = self._wijzig(email="geen-at-teken")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(b"e-mail", r.data.lower())
+
     def test_wijzigen_onbekend_id_geeft_404(self):
         r = self._wijzig(bestelling_id=99999)
         self.assertEqual(r.status_code, 404)
@@ -1483,6 +1495,122 @@ class TestBeveiligingsVerbeteringen(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertIn(b'data-status="betaald"', r.data)
         self.assertIn(b'data-status="mislukt"', r.data)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 17. Admin prijsinstellingen
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestAdminPrijsInstellingen(unittest.TestCase):
+
+    def setUp(self):
+        self.client, self.ctx = maak_flask_client()
+        self.client.post("/admin/login",
+                         data={"gebruiker": "admin", "wachtwoord": "testpass"})
+
+    def tearDown(self):
+        self.ctx.pop()
+
+    def _stel_in(self, **kwargs):
+        data = {
+            "max_eendjes": "3000", "max_per_bestelling": "100",
+            "prijs_per_stuk": "2.50", "prijs_vijf_stuks": "10.00",
+            "transactiekosten": "0.32",
+        }
+        data.update(kwargs)
+        return self.client.post("/admin/instellingen", data=data,
+                                follow_redirects=True)
+
+    def test_prijs_per_stuk_wordt_opgeslagen(self):
+        self._stel_in(prijs_per_stuk="3.00")
+        self.assertAlmostEqual(App.get_prijs_per_stuk(), 3.00, places=2)
+
+    def test_prijs_vijf_stuks_wordt_opgeslagen(self):
+        self._stel_in(prijs_vijf_stuks="12.00")
+        self.assertAlmostEqual(App.get_prijs_vijf_stuks(), 12.00, places=2)
+
+    def test_transactiekosten_wordt_opgeslagen(self):
+        self._stel_in(transactiekosten="0.45")
+        self.assertAlmostEqual(App.get_transactiekosten(), 0.45, places=2)
+
+    def test_prijs_per_stuk_nul_geeft_fout(self):
+        r = self._stel_in(prijs_per_stuk="0")
+        self.assertIn(b"groter dan 0", r.data)
+
+    def test_prijs_vijf_stuks_negatief_geeft_fout(self):
+        r = self._stel_in(prijs_vijf_stuks="-1")
+        self.assertIn(b"groter dan 0", r.data)
+
+    def test_transactiekosten_nul_is_geldig(self):
+        """Transactiekosten mogen 0 zijn (geen iDEAL-toeslag)."""
+        self._stel_in(transactiekosten="0")
+        self.assertAlmostEqual(App.get_transactiekosten(), 0.0, places=2)
+
+    def test_nieuwe_prijs_gebruikt_in_berekening(self):
+        self._stel_in(prijs_per_stuk="3.00", prijs_vijf_stuks="12.00")
+        r = self.client.get("/api/prijs?aantal=1")
+        self.assertAlmostEqual(r.get_json()["bedrag"], 3.00, places=2)
+
+    def test_nieuwe_prijs_vijf_gebruikt_in_berekening(self):
+        self._stel_in(prijs_vijf_stuks="12.00")
+        r = self.client.get("/api/prijs?aantal=5")
+        self.assertAlmostEqual(r.get_json()["bedrag"], 12.00, places=2)
+
+    def test_nieuwe_transactiekosten_gebruikt_in_api(self):
+        self._stel_in(transactiekosten="0.50")
+        r = self.client.get("/api/prijs?aantal=1&transactiekosten=1")
+        self.assertAlmostEqual(r.get_json()["bedrag"], 2.50 + 0.50, places=2)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 18. CSV-injectie beveiliging
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestCsvInjectie(unittest.TestCase):
+
+    def setUp(self):
+        self.client, self.ctx = maak_flask_client()
+        self.client.post("/admin/login",
+                         data={"gebruiker": "admin", "wachtwoord": "testpass"})
+
+    def tearDown(self):
+        self.ctx.pop()
+
+    def _download_csv(self):
+        r = self.client.get("/admin/export-csv")
+        self.assertEqual(r.status_code, 200)
+        # Sla BOM over en decodeer
+        return r.data.decode("utf-8-sig")
+
+    def _bestel_met_naam(self, naam):
+        doe_bestelling(self.client, naam=naam)
+
+    def test_formule_in_naam_wordt_geescaped(self):
+        self._bestel_met_naam("=SUM(1+1)")
+        csv_tekst = self._download_csv()
+        # Kaal "=SUM" (zonder voorafgaande apostrof) mag niet voorkomen
+        self.assertNotIn('"=SUM', csv_tekst)
+        self.assertIn("'=SUM", csv_tekst)
+
+    def test_plus_prefix_wordt_geescaped(self):
+        self._bestel_met_naam("+HYPERLINK()")
+        csv_tekst = self._download_csv()
+        self.assertIn("'+HYPERLINK", csv_tekst)
+
+    def test_at_prefix_wordt_geescaped(self):
+        self._bestel_met_naam("@SUM(A1)")
+        csv_tekst = self._download_csv()
+        self.assertIn("'@SUM", csv_tekst)
+
+    def test_min_prefix_wordt_geescaped(self):
+        self._bestel_met_naam("-1+2")
+        csv_tekst = self._download_csv()
+        self.assertIn("'-1+2", csv_tekst)
+
+    def test_gewone_naam_ongewijzigd(self):
+        self._bestel_met_naam("Jan Jansen")
+        csv_tekst = self._download_csv()
+        self.assertIn("Jan Jansen", csv_tekst)
 
 
 # ══════════════════════════════════════════════════════════════════════════════

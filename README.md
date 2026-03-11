@@ -11,12 +11,12 @@ Gebouwd met **Python/Flask**, **Mollie** (iDEAL-betalingen), **SQLite** en **Res
 |---|---|
 | Bestelformulier voor kopers | ✅ |
 | Live prijsberekening in de browser | ✅ |
-| Optionele iDEAL-transactiekosten (€0,32) door koper | ✅ |
+| Optionele iDEAL-transactiekosten door koper | ✅ |
 | iDEAL-betaling via Mollie | ✅ |
 | Automatische lotnummer-toewijzing na betaling | ✅ |
 | Bevestigingsmail met lotnummers via Resend | ✅ |
 | Beheerpagina met statistieken, zoeken, filter en CSV-export | ✅ |
-| Instellingen beheren via admin (max. eendjes, max. per bestelling) | ✅ |
+| Instellingen beheren via admin (max. eendjes, max. per bestelling, prijzen) | ✅ |
 
 ---
 
@@ -77,6 +77,9 @@ De app draait op http://localhost:5000. De SQLite-database (`eendjes.db`) wordt 
 | `HTTPS` | Nee | Zet op `true` in productie — beveiligt sessie-cookies |
 | `TZ` | Nee | Tijdzone voor juiste timestamps (bijv. `Europe/Amsterdam`) |
 | `MAX_EENDJES` | Nee | Beginstaat totaal beschikbare eendjes (standaard: `3000`). Alleen relevant bij de allereerste start — daarna via de admin te wijzigen. |
+| `PRIJS_PER_STUK` | Nee | Prijs per los eendje (standaard: `2.50`). Alleen relevant bij eerste start — daarna via de admin te wijzigen. |
+| `PRIJS_VIJF_STUKS` | Nee | Prijs voor een bundel van 5 eendjes (standaard: `10.00`). Alleen relevant bij eerste start — daarna via de admin te wijzigen. |
+| `TRANSACTIEKOSTEN` | Nee | iDEAL-transactiekosten die de koper optioneel betaalt (standaard: `0.32`). Alleen relevant bij eerste start — daarna via de admin te wijzigen. |
 | `SECURITY_CONTACT` | Nee | Contactadres voor `/.well-known/security.txt` (bijv. `mailto:admin@jouwdomein.nl`). Valt terug op `RESEND_FROM`. |
 
 > **Mollie webhook:** Railway geeft automatisch een publieke URL. Zet deze als `BASE_URL` zodat Mollie betalingsstatussen kan terugsturen. Gebruik de `live_`-sleutel pas zodra de app live staat.
@@ -96,7 +99,7 @@ De app draait op http://localhost:5000. De SQLite-database (`eendjes.db`) wordt 
 | `/admin` | Beheerpagina — statistieken, bestellingen, zoeken op naam/e-mail/lotnummer, filter op status |
 | `/admin/export-csv` | Download alle bestellingen als CSV |
 | `/admin/bestelling/<id>/wijzigen` | Bewerk naam, e-mail, telefoon, status of mailstatus |
-| `/admin/instellingen` | Wijzig totaal beschikbare eendjes en maximum per bestelling |
+| `/admin/instellingen` | Wijzig totaal beschikbare eendjes, maximum per bestelling en prijzen |
 | `/admin/opruimen` | Verwijder verlopen/mislukte/geannuleerde bestellingen zonder lotnummers |
 | `/admin/reset` | Reset volledige database (vereist 'RESET'-bevestiging) |
 | `/.well-known/security.txt` | Beveiligingscontactinformatie (RFC 9116) |
@@ -128,11 +131,11 @@ eendjesrace/
 
 | Aantal | Prijs |
 |---|---|
-| 1–4 stuks | €2,50 per stuk |
-| 5 stuks | €10,00 (bundel) |
+| 1–4 stuks | €2,50 per stuk (instelbaar) |
+| 5 stuks | €10,00 bundel (instelbaar) |
 | Meer dan 5 | Combinatie van bundels en losse stuks |
 
-Optioneel kan de koper de iDEAL-transactiekosten (€0,32) zelf betalen, zodat het volledige bedrag naar het goede doel gaat.
+Optioneel kan de koper de iDEAL-transactiekosten (standaard €0,32, instelbaar) zelf betalen, zodat het volledige bedrag naar het goede doel gaat. Alle prijzen zijn instelbaar via de beheerpagina of via omgevingsvariabelen (`PRIJS_PER_STUK`, `PRIJS_VIJF_STUKS`, `TRANSACTIEKOSTEN`) bij eerste opstart.
 
 ---
 
