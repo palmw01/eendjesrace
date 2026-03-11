@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Fout {{ code }} – Eendjesrace</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦆</text></svg>">
+  <link rel="icon" href="{{ url_for('static', filename='img/eend-favicon.png') }}">
   <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;700&display=swap" rel="stylesheet">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -26,7 +26,7 @@
       text-align: center;
       box-shadow: 0 20px 60px rgba(0,0,0,.3);
     }
-    .eend { font-size: 4rem; display: block; margin-bottom: 12px;
+    .eend { width: 4rem; height: 4rem; display: block; margin: 0 auto 12px;
             animation: schudden .5s ease-in-out 3; }
     @keyframes schudden {
       0%,100% { transform: rotate(0); }
@@ -71,7 +71,7 @@
 </head>
 <body>
   <div class="kaart">
-    <span class="eend">🦆</span>
+    <img class="eend" src="{{ url_for('static', filename='img/eend.png') }}" alt="badeend">
     <div class="code">{{ code }}</div>
     <h1>{{ titel }}</h1>
     <p>{{ bericht }}</p>

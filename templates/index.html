@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Badeendjesrace Wapenveld – Bestel je loten</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦆</text></svg>">
+  <link rel="icon" href="{{ url_for('static', filename='img/eend-favicon.png') }}">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
   <style>
@@ -50,7 +50,8 @@
     /* Drijvende eendjes decoratie */
     .eendjes-deco {
       position: fixed;
-      font-size: 2rem;
+      width: 2rem;
+      height: 2rem;
       animation: drijf linear infinite;
       opacity: 0.6;
       z-index: 1;
@@ -77,10 +78,18 @@
       margin-bottom: 32px;
     }
     .eend-groot {
-      font-size: 5rem;
+      width: 5rem;
+      height: 5rem;
       animation: wiebel 2s ease-in-out infinite;
       display: block;
+      margin: 0 auto;
       filter: drop-shadow(0 4px 12px rgba(0,0,0,0.3));
+    }
+    .eend-inline {
+      height: 1em;
+      width: auto;
+      vertical-align: middle;
+      display: inline-block;
     }
     @keyframes wiebel {
       0%,100% { transform: rotate(-5deg); }
@@ -377,13 +386,13 @@
 <div class="golven"></div>
 
 <!-- Drijvende eendjes decoratie -->
-<span class="eendjes-deco" style="top:15%;animation-duration:18s;animation-delay:-3s">🦆</span>
-<span class="eendjes-deco" style="top:60%;animation-duration:22s;animation-delay:-9s;font-size:1.4rem">🦆</span>
-<span class="eendjes-deco" style="top:35%;animation-duration:28s;animation-delay:-15s;font-size:1.1rem">🦆</span>
+<img class="eendjes-deco" src="{{ url_for('static', filename='img/eend.png') }}" alt="" style="top:15%;animation-duration:18s;animation-delay:-3s">
+<img class="eendjes-deco" src="{{ url_for('static', filename='img/eend.png') }}" alt="" style="top:60%;animation-duration:22s;animation-delay:-9s;width:1.4rem;height:1.4rem">
+<img class="eendjes-deco" src="{{ url_for('static', filename='img/eend.png') }}" alt="" style="top:35%;animation-duration:28s;animation-delay:-15s;width:1.1rem;height:1.1rem">
 
 <div class="container">
   <header>
-    <span class="eend-groot">🦆</span>
+    <img class="eend-groot" src="{{ url_for('static', filename='img/eend.png') }}" alt="badeend">
     <h1>Eendjesrace!</h1>
     <p>Hervormde Gemeente Wapenveld</p>
   </header>
@@ -426,7 +435,7 @@
   <!-- Voortgangsbalk -->
   <div class="voortgang-card">
     <div class="voortgang-header">
-      <span id="tellerVerkocht">🦆 {{ verkocht }} eendjes verkocht</span>
+      <span id="tellerVerkocht"><img class="eend-inline" src="{{ url_for('static', filename='img/eend.png') }}" alt=""> {{ verkocht }} eendjes verkocht</span>
       <span id="tellerOver">{{ beschikbaar }} over</span>
     </div>
     <div class="voortgang-bar">
@@ -504,7 +513,7 @@
       </div>
 
       <button type="submit" class="bestel-knop" id="bestelKnop">
-        🦆 Betalen via iDEAL
+        <img class="eend-inline" src="{{ url_for('static', filename='img/eend.png') }}" alt=""> Betalen via iDEAL
       </button>
     </form>
     <p class="kleine-tekst">
@@ -569,7 +578,7 @@
           if (!d || d.fout) return;
           const pct = d.max_eendjes > 0 ? Math.min(100, d.verkocht / d.max_eendjes * 100) : 0;
           fillEl.style.width = pct.toFixed(1) + '%';
-          verkochtEl.textContent = '🦆 ' + d.verkocht + ' eendjes verkocht';
+          verkochtEl.innerHTML = '<img class="eend-inline" src="{{ url_for('static', filename='img/eend.png') }}" alt=""> ' + d.verkocht + ' eendjes verkocht';
           overEl.textContent     = d.beschikbaar + ' over';
           if (labelEl) labelEl.textContent = 'Maximaal ' + d.max_eendjes + ' eendjes beschikbaar';
           if (aantalEl) {

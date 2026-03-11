@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Bestelling wijzigen – Eendjesrace</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦆</text></svg>">
+  <link rel="icon" href="{{ url_for('static', filename='img/eend-favicon.png') }}">
   <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -15,6 +15,7 @@
       margin-bottom: 24px;
     }
     h1 { font-family: 'Fredoka One', cursive; font-size: 2rem; color: #0077B6; }
+    .eend-inline { height: 1em; width: auto; vertical-align: middle; display: inline-block; }
     .terug {
       padding: 8px 18px; background: #E3F2FD; color: #0077B6;
       border-radius: 99px; text-decoration: none; font-weight: 700; font-size: .9rem;
@@ -59,7 +60,7 @@
 </head>
 <body>
   <div class="topbar">
-    <h1>🦆 Bestelling #{{ bestelling['id'] }} wijzigen</h1>
+    <h1><img class="eend-inline" src="{{ url_for('static', filename='img/eend.png') }}" alt=""> Bestelling #{{ bestelling['id'] }} wijzigen</h1>
     <a href="/admin" class="terug">← Terug</a>
   </div>
 

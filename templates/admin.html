@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin – Eendjesrace</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦆</text></svg>">
+  <link rel="icon" href="{{ url_for('static', filename='img/eend-favicon.png') }}">
   <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -16,6 +16,7 @@
       margin-bottom: 24px; flex-wrap: wrap; gap: 12px;
     }
     h1 { font-family: 'Fredoka One', cursive; font-size: 2rem; color: #0077B6; }
+    .eend-inline { height: 1em; width: auto; vertical-align: middle; display: inline-block; }
     .uitloggen {
       padding: 8px 18px; background: #FFEBEE; color: #C62828;
       border-radius: 99px; text-decoration: none; font-weight: 700; font-size: .9rem;
@@ -190,7 +191,7 @@
 </head>
 <body>
   <div class="topbar">
-    <h1>🦆 Eendjesrace – Beheer</h1>
+    <h1><img class="eend-inline" src="{{ url_for('static', filename='img/eend.png') }}" alt=""> Eendjesrace – Beheer</h1>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
       <a href="/admin/export-csv" class="knop-csv">⬇ CSV downloaden</a>
       <a href="/admin/logout" class="uitloggen">Uitloggen</a>
@@ -232,7 +233,7 @@
   <div class="voortgang">
     {% set pct = (stats['verkochte_eendjes'] / max_eendjes * 100)|round(1) %}
     <div style="display:flex;justify-content:space-between;font-size:.9rem;color:#555;">
-      <span>🦆 {{ stats['verkochte_eendjes'] }} / {{ max_eendjes }} eendjes verkocht</span>
+      <span><img class="eend-inline" src="{{ url_for('static', filename='img/eend.png') }}" alt=""> {{ stats['verkochte_eendjes'] }} / {{ max_eendjes }} eendjes verkocht</span>
       <span>{{ pct }}%</span>
     </div>
     <div class="voortgang-bar">
