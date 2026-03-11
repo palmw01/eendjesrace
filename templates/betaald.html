@@ -79,6 +79,9 @@
       </div>
       {% else %}
       <p class="info">📧 Een bevestiging is verstuurd naar <strong>{{ bestelling['email'] }}</strong>.</p>
+      <div class="mail-waarsch">
+        📂 Geen mail ontvangen? Controleer ook je <strong>spam</strong> of ongewenste e-mail map.
+      </div>
       {% endif %}
 
     {% elif status_klasse == 'fout' %}
