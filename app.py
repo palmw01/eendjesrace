@@ -10,6 +10,7 @@ import io
 import json
 import re
 import sqlite3
+from datetime import timedelta
 
 # ─── Laad config.json als omgevingsvariabelen (overschrijft geen bestaande vars)
 _config_pad = os.path.join(os.path.dirname(__file__), "config.json")
@@ -36,11 +37,12 @@ from mollie.api.error import Error as MollieError  # RequestSetupError/ResponseE
 
 # ─── App initialisatie ────────────────────────────────────────────────────────
 app = Flask(__name__)
-app.config["SECRET_KEY"]              = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
-app.config["SESSION_COOKIE_HTTPONLY"] = True
-app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
-app.config["SESSION_COOKIE_SECURE"]   = os.environ.get("HTTPS", "false").lower() == "true"
-app.config["WTF_CSRF_TIME_LIMIT"]     = 3600
+app.config["SECRET_KEY"]               = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
+app.config["SESSION_COOKIE_HTTPONLY"]  = True
+app.config["SESSION_COOKIE_SAMESITE"]  = "Lax"
+app.config["SESSION_COOKIE_SECURE"]    = os.environ.get("HTTPS", "false").lower() == "true"
+app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(hours=4)
+app.config["WTF_CSRF_TIME_LIMIT"]      = 3600
 
 csrf    = CSRFProtect(app)
 # BUG-FIX: X-Forwarded-For spoofing — zonder ProxyFix kan een aanvaller
@@ -369,7 +371,7 @@ def stuur_bevestigingsmail(naam, email, aantal, lot_van, lot_tot, bedrag, transa
             "subject": "🦆 Jouw lotnummers – Eendjesrace!",
             "html":    mail_html,
         })
-        app.logger.info(f"Mail verstuurd → {email}")
+        app.logger.info(f"Mail verstuurd → {saniteer_log(email)}")
         return True
     except Exception as e:
         app.logger.error(f"Resend-fout: {e}")
@@ -385,8 +387,19 @@ def login_vereist(f):
     return wrapper
 
 
+def saniteer_log(tekst):
+    """Verwijder newlines uit gebruikersinvoer om log-injectie te voorkomen."""
+    return str(tekst).replace("\n", " ").replace("\r", " ")
+
+
+@app.before_request
+def genereer_csp_nonce():
+    g.csp_nonce = secrets.token_hex(16)
+
+
 @app.after_request
 def security_headers(response):
+    nonce = getattr(g, "csp_nonce", "")
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"]        = "DENY"
     response.headers["X-XSS-Protection"]       = "1; mode=block"
@@ -395,7 +408,7 @@ def security_headers(response):
         "default-src 'self'; "
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
         "font-src https://fonts.gstatic.com; "
-        "script-src 'self' 'unsafe-inline'; "
+        f"script-src 'self' 'nonce-{nonce}'; "
         "img-src 'self' data:; "
         "frame-ancestors 'none';"
     )
@@ -612,7 +625,7 @@ def webhook():
 
     mollie_id = request.form.get("id", "").strip()
     if not mollie_id or not mollie_id.startswith("tr_"):
-        app.logger.warning(f"Webhook: ongeldig mollie_id '{mollie_id}'")
+        app.logger.warning(f"Webhook: ongeldig mollie_id '{saniteer_log(mollie_id)}'")
         return "", 400
 
     # Log de aanroep
@@ -685,7 +698,7 @@ def webhook():
 
         elif betaling.is_pending() or betaling.is_open():
             # Nog niet afgerond — niets doen, Mollie stuurt later opnieuw
-            app.logger.info(f"Betaling nog open/pending: id={bestelling_id}, status={betaling.status}")
+            app.logger.info(f"Betaling nog open/pending: id={bestelling_id}, status={saniteer_log(betaling.status)}")
 
         else:
             # Alles wat niet paid/pending/open is = afgebroken (failed, canceled, expired)
@@ -702,7 +715,7 @@ def webhook():
                 (nieuwe_status, bestelling_id),
             )
             db.commit()
-            app.logger.info(f"Betaling {nieuwe_status} (Mollie: {betaling.status}): id={bestelling_id}")
+            app.logger.info(f"Betaling {nieuwe_status} (Mollie: {saniteer_log(betaling.status)}): id={bestelling_id}")
 
     except sqlite3.Error as e:
         app.logger.error(f"DB-fout in webhook: {e}")
@@ -778,7 +791,7 @@ def admin_login():
         ok_wachtwoord = hmac.compare_digest(wachtwoord, ADMIN_WACHTWOORD)
         if ok_gebruiker and ok_wachtwoord and ADMIN_WACHTWOORD:
             session["admin_ingelogd"] = True
-            session.permanent = False
+            session.permanent = True
             app.logger.info(f"Admin ingelogd vanaf {request.remote_addr}")
             return redirect(url_for("admin"))
         fout = "Onjuiste gebruikersnaam of wachtwoord."
@@ -1024,5 +1037,7 @@ if __name__ == "__main__":
         raise SystemExit("❌  MOLLIE_API_KEY is niet ingesteld.")
     if not ADMIN_WACHTWOORD:
         raise SystemExit("❌  ADMIN_PASS is niet ingesteld. Kies een sterk wachtwoord.")
+    if len(ADMIN_WACHTWOORD) < 12:
+        raise SystemExit("❌  ADMIN_PASS moet minimaal 12 tekens lang zijn.")
     debug = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
     app.run(debug=debug, port=5000)

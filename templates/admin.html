@@ -326,7 +326,7 @@
     </form>
   </div>
 
-  <script>
+  <script nonce="{{ g.csp_nonce }}">
     document.getElementById('resetForm').addEventListener('submit', function(e) {
       if (!confirm('Weet je zeker dat je de database wilt resetten? Dit kan niet ongedaan worden gemaakt.')) {
         e.preventDefault();
