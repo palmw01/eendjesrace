@@ -1074,7 +1074,7 @@ def export_csv():
     return Response(
         "\ufeff" + uitvoer.getvalue(),  # BOM voor correcte weergave in Excel
         mimetype="text/csv",
-        headers={"Content-Disposition": "attachment; filename=bestellingen.csv"}
+        headers={"Content-Disposition": f"attachment; filename=bestellingen_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"}
     )
 
 
