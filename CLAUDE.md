@@ -54,7 +54,7 @@ The entire backend lives in `app.py` (single file). Templates are in `templates/
 ### Database (SQLite, `eendjes.db`, 3 tables)
 
 - **`bestellingen`**: orders — `naam`, `email`, `telefoon`, `aantal`, `bedrag`, `transactiekosten` (0/1), `mollie_id`, `status` (aangemaakt/betaald/mislukt/geannuleerd/verlopen), `lot_van`/`lot_tot` (ticket range), `mail_verstuurd`, `pogingen`
-- **`teller`**: single row with `volgend_lot` (next ticket number), `max_eendjes` (total available, editable via admin), `max_per_bestelling` (per-order limit, editable via admin), `prijs_per_stuk`, `prijs_vijf_stuks`, `transactiekosten` (all editable via admin, seeded from env on first run)
+- **`teller`**: single row with `volgend_lot` (next ticket number), `max_eendjes` (total available, editable via admin), `max_per_bestelling` (per-order limit, editable via admin), `prijs_per_stuk`, `prijs_vijf_stuks`, `transactiekosten` (all editable via admin, seeded from env on first run), `notificatie_email` (optional admin copy address, editable via admin, empty = disabled)
 - **`webhook_log`**: audit log of webhook calls
 
 ### Atomic Ticket Assignment

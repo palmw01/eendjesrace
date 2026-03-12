@@ -15,8 +15,9 @@ Gebouwd met **Python/Flask**, **Mollie** (iDEAL-betalingen), **SQLite** en **Res
 | iDEAL-betaling via Mollie | ✅ |
 | Automatische lotnummer-toewijzing na betaling | ✅ |
 | Bevestigingsmail met lotnummers via Resend | ✅ |
+| Stille kopie-mail naar beheerder bij elke bestelling (optioneel) | ✅ |
 | Beheerpagina met statistieken, zoeken, filter en CSV-export | ✅ |
-| Instellingen beheren via admin (max. eendjes, max. per bestelling, prijzen) | ✅ |
+| Instellingen beheren via admin (max. eendjes, max. per bestelling, prijzen, notificatieadres) | ✅ |
 
 ---
 
@@ -99,7 +100,7 @@ De app draait op http://localhost:5000. De SQLite-database (`eendjes.db`) wordt 
 | `/admin` | Beheerpagina — statistieken, bestellingen, zoeken op naam/e-mail/lotnummer, filter op status |
 | `/admin/export-csv` | Download alle bestellingen als CSV |
 | `/admin/bestelling/<id>/wijzigen` | Bewerk naam, e-mail, telefoon, status of mailstatus |
-| `/admin/instellingen` | Wijzig totaal beschikbare eendjes, maximum per bestelling en prijzen |
+| `/admin/instellingen` | Wijzig totaal beschikbare eendjes, maximum per bestelling, prijzen en notificatie-e-mailadres |
 | `/admin/opruimen` | Verwijder verlopen/mislukte/geannuleerde bestellingen zonder lotnummers |
 | `/admin/reset` | Reset volledige database (vereist 'RESET'-bevestiging) |
 | `/.well-known/security.txt` | Beveiligingscontactinformatie (RFC 9116) |
