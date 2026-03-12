@@ -1684,6 +1684,45 @@ class TestCsvInjectie(unittest.TestCase):
         csv_tekst = self._download_csv()
         self.assertIn("Jan Jansen", csv_tekst)
 
+    def test_bestandsnaam_bevat_tijdstempel(self):
+        r = self.client.get("/admin/export-csv")
+        self.assertEqual(r.status_code, 200)
+        cd = r.headers.get("Content-Disposition", "")
+        # Verwacht bijv. bestellingen_20260312_143022.csv
+        self.assertRegex(cd, r"bestellingen_\d{8}_\d{6}\.csv")
+
+
+class TestMailHeader(unittest.TestCase):
+
+    def _vang_mail_params(self, naam="Jan"):
+        verzonden = {}
+        def nep_send(params):
+            verzonden.update(params)
+            return {"id": "test"}
+        with patch("resend.Emails.send", side_effect=nep_send):
+            stuur_bevestigingsmail(naam, "jan@test.nl", 1, 1, 1, 2.50)
+        return verzonden
+
+    def test_onderwerp_zonder_eend_emoji(self):
+        params = self._vang_mail_params()
+        self.assertNotIn("🦆", params.get("subject", ""))
+
+    def test_onderwerp_bevat_lotnummers(self):
+        params = self._vang_mail_params()
+        self.assertIn("Jouw lotnummers", params.get("subject", ""))
+
+    def test_mail_html_bevat_afbeelding(self):
+        params = self._vang_mail_params()
+        self.assertIn("eend.png", params.get("html", ""))
+
+    def test_mail_html_bevat_blauwe_header(self):
+        params = self._vang_mail_params()
+        self.assertIn("#0077B6", params.get("html", ""))
+
+    def test_mail_html_bevat_datum(self):
+        params = self._vang_mail_params()
+        self.assertIn("30 mei 2026", params.get("html", ""))
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Uitvoeren als script

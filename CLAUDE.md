@@ -75,7 +75,7 @@ Prices (`prijs_per_stuk`, `prijs_vijf_stuks`, `transactiekosten`) are stored in 
 
 ### Admin
 
-`/admin` (protected by session login, timing-safe password check, session expires after 4 hours) shows order statistics (incl. openstaande/hangende bestellingen), lets admins resend confirmation emails for failed deliveries, filter orders by status, search orders by naam/e-mail/lotnummer (server-side, works across all pages), and offers a CSV export (`/admin/export-csv`) — semicolon-delimited with UTF-8 BOM for Excel compatibility. Orders are paginated at 50 per page (`PAGINA_GROOTTE = 50`). Status filter and search term are preserved across pagination. Each order row has an edit button (`/admin/bestelling/<id>/wijzigen`) that allows updating naam, email, telefoon, status, and mail_verstuurd — **not** lotnummers.
+`/admin` (protected by session login, timing-safe password check, session expires after 4 hours) shows order statistics (incl. openstaande/hangende bestellingen), lets admins resend confirmation emails for failed deliveries, filter orders by status, search orders by naam/e-mail/lotnummer (server-side, works across all pages), and offers a CSV export (`/admin/export-csv`) — semicolon-delimited with UTF-8 BOM for Excel compatibility; filename includes a datetime timestamp (e.g. `bestellingen_20260312_143022.csv`). Orders are paginated at 50 per page (`PAGINA_GROOTTE = 50`). Status filter and search term are preserved across pagination. Each order row has an edit button (`/admin/bestelling/<id>/wijzigen`) that allows updating naam, email, telefoon, status, and mail_verstuurd — **not** lotnummers.
 
 Admin routes:
 - `POST /admin/instellingen` — update `max_eendjes`, `max_per_bestelling`, `prijs_per_stuk`, `prijs_vijf_stuks`, and/or `transactiekosten` in the `teller` table. Validates that `max_eendjes` cannot be set below the number of already sold tickets, prices must be > 0, transactiekosten >= 0.
@@ -86,7 +86,7 @@ Admin routes:
 
 ## Testing Notes
 
-`tests/test_app.py` stubs out Mollie, Resend, Flask-WTF CSRF, and Flask-Limiter so tests run with only Flask installed. Tests cover pricing, input validation, database operations, atomic transactions, email sending, webhook processing, admin routes, `max_per_bestelling`/`max_eendjes` settings, price settings (`prijs_per_stuk`/`prijs_vijf_stuks`/`transactiekosten`) via admin, CSV injection escaping, email validation in wijzig_bestelling, opruimen, paginering, server-side statusfilter, CSP nonces, Permissions-Policy, session permanence, and `saniteer_log`. The test database uses `/tmp/eendjes_test.db` (reset before each test class). `maak_db()` includes all teller columns. Total: 182 tests.
+`tests/test_app.py` stubs out Mollie, Resend, Flask-WTF CSRF, and Flask-Limiter so tests run with only Flask installed. Tests cover pricing, input validation, database operations, atomic transactions, email sending, webhook processing, admin routes, `max_per_bestelling`/`max_eendjes` settings, price settings (`prijs_per_stuk`/`prijs_vijf_stuks`/`transactiekosten`) via admin, CSV injection escaping, CSV filename timestamp, email header content (afbeelding/kleur/datum), email validation in wijzig_bestelling, opruimen, paginering, server-side statusfilter, CSP nonces, Permissions-Policy, session permanence, and `saniteer_log`. The test database uses `/tmp/eendjes_test.db` (reset before each test class). `maak_db()` includes all teller columns. Total: 196 tests.
 
 ## Key Patterns
 
