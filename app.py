@@ -370,7 +370,7 @@ def stuur_bevestigingsmail(naam, email, aantal, lot_van, lot_tot, bedrag, transa
         lotnr_tekst = f"lotnummers <strong>#{lot_van} t/m #{lot_tot}</strong>"
 
     mail_html = f"""
-    <html><body style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#333;">
+    <html><body style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#333;padding-top:24px;">
       <div style="background:#0077B6;padding:32px 24px;border-radius:12px 12px 0 0;text-align:center;">
         <img src="{BASE_URL}/static/img/eend.png" alt="Badeend" style="height:80px;display:block;margin:0 auto 12px;">
         <h1 style="margin:0;color:#FFD700;font-size:28px;letter-spacing:1px;text-shadow:2px 2px 0 rgba(0,0,0,0.25);">Badeendjesrace!</h1>
