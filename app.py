@@ -227,6 +227,10 @@ def init_db():
         conn.execute(f"ALTER TABLE teller ADD COLUMN transactiekosten REAL NOT NULL DEFAULT {TRANSACTIEKOSTEN}")
     except sqlite3.OperationalError:
         pass  # kolom bestaat al
+    try:
+        conn.execute("ALTER TABLE teller ADD COLUMN notificatie_email TEXT NOT NULL DEFAULT ''")
+    except sqlite3.OperationalError:
+        pass  # kolom bestaat al
     # Seed-rij: alleen aanmaken als nog niet bestaat (alle kolommen zijn nu gegarandeerd aanwezig)
     conn.execute(
         "INSERT OR IGNORE INTO teller (id, volgend_lot, max_eendjes, max_per_bestelling, "
@@ -297,6 +301,11 @@ def get_prijs_vijf_stuks():
 def get_transactiekosten():
     row = get_db().execute("SELECT transactiekosten FROM teller WHERE id = 1").fetchone()
     return row["transactiekosten"] if row else TRANSACTIEKOSTEN
+
+
+def get_notificatie_email():
+    row = get_db().execute("SELECT notificatie_email FROM teller WHERE id = 1").fetchone()
+    return row["notificatie_email"] if row else ""
 
 
 # ─── Business logica ──────────────────────────────────────────────────────────
@@ -404,6 +413,18 @@ def stuur_bevestigingsmail(naam, email, aantal, lot_van, lot_tot, bedrag, transa
             "html":    mail_html,
         })
         app.logger.info(f"Mail verstuurd → {saniteer_log(email)}")
+        try:
+            notificatie = get_notificatie_email()
+            if notificatie:
+                resend.Emails.send({
+                    "from":    f"{AFZENDER_NAAM} <{RESEND_FROM}>",
+                    "to":      [notificatie],
+                    "subject": f"[Kopie] Bestelling {naam} – Badeendjesrace!",
+                    "html":    mail_html,
+                })
+                app.logger.info(f"Notificatiemail verstuurd → {saniteer_log(notificatie)}")
+        except Exception as e:
+            app.logger.error(f"Notificatiemail-fout: {e}")
         return True
     except Exception as e:
         app.logger.error(f"Resend-fout: {e}")
@@ -920,6 +941,7 @@ def admin():
                                prijs_per_stuk=get_prijs_per_stuk(),
                                prijs_vijf_stuks=get_prijs_vijf_stuks(),
                                transactiekosten=get_transactiekosten(),
+                               notificatie_email=get_notificatie_email(),
                                pagina=pagina,
                                totaal_paginas=totaal_paginas,
                                totaal=totaal,
@@ -993,6 +1015,15 @@ def admin_instellingen():
             else:
                 db.execute("UPDATE teller SET transactiekosten = ? WHERE id = 1", (tk,))
                 meldingen.append(f"Transactiekosten bijgewerkt naar € {tk:.2f}.")
+
+        # notificatie_email
+        notif_str = request.form.get("notificatie_email", "").strip()
+        if "notificatie_email" in request.form:
+            if notif_str and not EMAIL_RE.match(notif_str):
+                fouten.append("Notificatie-e-mailadres is ongeldig.")
+            else:
+                db.execute("UPDATE teller SET notificatie_email = ? WHERE id = 1", (notif_str,))
+                meldingen.append("Notificatie-e-mailadres bijgewerkt." if notif_str else "Notificatie-e-mailadres verwijderd.")
 
         if fouten:
             for f in fouten:

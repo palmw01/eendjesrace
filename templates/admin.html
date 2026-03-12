@@ -385,6 +385,10 @@
         <label class="instelling-label" for="transactiekosten">iDEAL-transactiekosten (€)</label>
         <input class="instelling-input" type="number" id="transactiekosten" name="transactiekosten" min="0" step="0.01" value="{{ '%.2f'|format(transactiekosten) }}">
       </div>
+      <div class="instelling-rij">
+        <label class="instelling-label" for="notificatie_email">Notificatie-e-mailadres (stille kopie bestellingen)</label>
+        <input class="instelling-input" type="email" id="notificatie_email" name="notificatie_email" placeholder="bijv. beheer@voorbeeld.nl" value="{{ notificatie_email }}">
+      </div>
       <button type="submit" class="instelling-knop">Opslaan</button>
     </form>
   </div>

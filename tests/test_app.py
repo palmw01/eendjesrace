@@ -1724,6 +1724,78 @@ class TestMailHeader(unittest.TestCase):
         self.assertIn("30 mei 2026", params.get("html", ""))
 
 
+class TestNotificatieEmail(unittest.TestCase):
+
+    def setUp(self):
+        self.client, self.ctx = maak_flask_client()
+        self.client.post("/admin/login",
+                         data={"gebruiker": "admin", "wachtwoord": "testpass"})
+
+    def tearDown(self):
+        self.ctx.pop()
+
+    def test_notificatie_email_instellen_en_opslaan(self):
+        r = self.client.post("/admin/instellingen",
+                             data={"notificatie_email": "beheer@test.nl"})
+        self.assertEqual(r.status_code, 302)
+        from app import get_notificatie_email
+        self.assertEqual(get_notificatie_email(), "beheer@test.nl")
+
+    def test_notificatie_email_leegmaken(self):
+        self.client.post("/admin/instellingen",
+                         data={"notificatie_email": "beheer@test.nl"})
+        self.client.post("/admin/instellingen",
+                         data={"notificatie_email": ""})
+        from app import get_notificatie_email
+        self.assertEqual(get_notificatie_email(), "")
+
+    def test_ongeldig_notificatie_email_geeft_fout(self):
+        r = self.client.post("/admin/instellingen",
+                             data={"notificatie_email": "geen-email"},
+                             follow_redirects=True)
+        self.assertIn(b"ongeldig", r.data.lower())
+
+    def test_notificatie_mail_wordt_verstuurd(self):
+        # Stel notificatie-adres in
+        self.client.post("/admin/instellingen",
+                         data={"notificatie_email": "kopie@test.nl"})
+        verzonden = []
+        def nep_send(params):
+            verzonden.append(params)
+            return {"id": "test"}
+        with patch("resend.Emails.send", side_effect=nep_send):
+            from app import stuur_bevestigingsmail
+            stuur_bevestigingsmail("Jan", "jan@test.nl", 1, 1, 1, 2.50)
+        adressen = [p["to"][0] for p in verzonden]
+        self.assertIn("jan@test.nl", adressen)
+        self.assertIn("kopie@test.nl", adressen)
+
+    def test_notificatie_onderwerp_bevat_kopie_label(self):
+        self.client.post("/admin/instellingen",
+                         data={"notificatie_email": "kopie@test.nl"})
+        verzonden = []
+        def nep_send(params):
+            verzonden.append(params)
+            return {"id": "test"}
+        with patch("resend.Emails.send", side_effect=nep_send):
+            from app import stuur_bevestigingsmail
+            stuur_bevestigingsmail("Jan", "jan@test.nl", 1, 1, 1, 2.50)
+        kopie = next(p for p in verzonden if p["to"][0] == "kopie@test.nl")
+        self.assertIn("[Kopie]", kopie["subject"])
+
+    def test_geen_notificatie_als_adres_leeg(self):
+        self.client.post("/admin/instellingen",
+                         data={"notificatie_email": ""})
+        verzonden = []
+        def nep_send(params):
+            verzonden.append(params)
+            return {"id": "test"}
+        with patch("resend.Emails.send", side_effect=nep_send):
+            from app import stuur_bevestigingsmail
+            stuur_bevestigingsmail("Jan", "jan@test.nl", 1, 1, 1, 2.50)
+        self.assertEqual(len(verzonden), 1)  # alleen naar klant
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # Uitvoeren als script
 # ══════════════════════════════════════════════════════════════════════════════
