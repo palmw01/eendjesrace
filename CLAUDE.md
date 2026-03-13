@@ -35,10 +35,10 @@ gunicorn app:app
 | `MOLLIE_API_KEY` | Mollie test/live API key |
 | `BASE_URL` | Public domain (used for webhook + redirect URLs) |
 | `RESEND_API_KEY` | Resend API key for transactional email |
-| `ADMIN_PASS` | Admin password — minimum 12 characters (app refuses to start otherwise) |
-| `ADMIN_USER` | Admin username (default: `admin`) |
+| `ADMIN_PASS` | Initial admin password — minimum 12 characters. **Only required on first start** (when the `beheerders` table is empty). Can be removed from env once accounts exist in the DB. |
+| `ADMIN_USER` | Initial admin username (default: `admin`). Only used on first start. |
 
-Key optional variables: `RESEND_FROM` (verified sender address), `MAX_EENDJES` (default 3000, seeds the DB on first run), `DATABASE` (default `eendjes.db`), `HTTPS` (set `true` in production), `SECRET_KEY`, `LOG_DIR` (default `logs`), `FLASK_DEBUG` (set `true` for debug mode), `SECURITY_CONTACT` (e.g. `mailto:admin@example.com`, used in `/.well-known/security.txt`; falls back to `RESEND_FROM`), `PRIJS_PER_STUK` (default 2.50, seeds the DB on first run), `PRIJS_VIJF_STUKS` (default 10.00, seeds the DB on first run), `TRANSACTIEKOSTEN` (default 0.32, seeds the DB on first run). All three prices are editable via the admin panel after first run.
+Key optional variables: `RESEND_FROM` (verified sender address), `MAX_EENDJES` (default 3000, seeds the DB on first run), `DATABASE` (default `eendjes.db`), `HTTPS` (set `true` in production), `SECRET_KEY`, `LOG_DIR` (default `logs`), `FLASK_DEBUG` (set `true` for debug mode), `SECURITY_CONTACT` (e.g. `mailto:admin@example.com`, used in `/.well-known/security.txt`; falls back to `RESEND_FROM`), `PRIJS_PER_STUK` (default 2.50, seeds the DB on first run), `PRIJS_VIJF_STUKS` (default 10.00, seeds the DB on first run), `TRANSACTIEKOSTEN` (default 0.32, seeds the DB on first run). All three prices are editable via the admin panel after first run. `LITESTREAM_ACCESS_KEY_ID` + `LITESTREAM_SECRET_ACCESS_KEY` enable automatic SQLite backup to Cloudflare R2 via Litestream (see `start.sh` and `litestream.yml`).
 
 ## Architecture
 
@@ -51,12 +51,12 @@ The entire backend lives in `app.py` (single file). Templates are in `templates/
 3. Mollie calls `/webhook` (async) on payment status change → assigns ticket numbers + sends confirmation email
 4. `/betaald/<id>` is a fallback for when the webhook is delayed — polls Mollie directly
 
-### Database (SQLite, `eendjes.db`, 3 tables)
+### Database (SQLite, `eendjes.db`, 4 tables)
 
 - **`bestellingen`**: orders — `naam`, `email`, `telefoon`, `aantal`, `bedrag`, `transactiekosten` (0/1), `mollie_id`, `status` (aangemaakt/betaald/mislukt/geannuleerd/verlopen), `lot_van`/`lot_tot` (ticket range), `mail_verstuurd`, `pogingen`, `betaalwijze` (ideal/contant/overboeking)
 - **`teller`**: single row with `volgend_lot` (next ticket number), `max_eendjes` (total available, editable via admin), `max_per_bestelling` (per-order limit, editable via admin), `prijs_per_stuk`, `prijs_vijf_stuks`, `transactiekosten` (all editable via admin, seeded from env on first run), `notificatie_email` (optional admin copy address, editable via admin, empty = disabled)
 - **`webhook_log`**: audit log of webhook calls
-- **`beheerders`**: admin accounts — `gebruikersnaam` (unique), `wachtwoord_hash` (Werkzeug PBKDF2), `aangemaakt_op`. Seeded on first run from `ADMIN_USER`/`ADMIN_PASS` env vars. Multiple accounts supported.
+- **`beheerders`**: admin accounts — `gebruikersnaam` (unique), `wachtwoord_hash` (Werkzeug PBKDF2), `aangemaakt_op`. Seeded on first start from `ADMIN_USER`/`ADMIN_PASS` env vars **only if the table is empty**. Multiple accounts supported; manageable via the admin panel without redeployment.
 
 ### Atomic Ticket Assignment
 
@@ -76,22 +76,26 @@ Prices (`prijs_per_stuk`, `prijs_vijf_stuks`, `transactiekosten`) are stored in 
 
 ### Admin
 
-`/admin` (protected by session login, DB-backed password check via `check_password_hash`, session expires after 4 hours) shows order statistics (incl. openstaande/hangende bestellingen), lets admins resend confirmation emails for failed deliveries, filter orders by status, search orders by naam/e-mail/lotnummer (server-side, works across all pages), and offers a CSV export (`/admin/export-csv`) — semicolon-delimited with UTF-8 BOM for Excel compatibility; filename includes a datetime timestamp (e.g. `bestellingen_20260312_143022.csv`). Orders are paginated at 50 per page (`PAGINA_GROOTTE = 50`). Status filter and search term are preserved across pagination. Each order row has an edit button (`/admin/bestelling/<id>/wijzigen`) that allows updating naam, email, telefoon, status, and mail_verstuurd — **not** lotnummers. The "Handmatige bestelling", "Instellingen", and "Beheerders" cards are collapsible via native HTML `<details>`/`<summary>` (no JavaScript). The logged-in username is shown in the topbar.
+`/admin` (protected by session login, DB-backed password check via `check_password_hash`, session expires after 4 hours) shows order statistics (incl. openstaande/hangende bestellingen), lets admins resend confirmation emails for failed deliveries, filter orders by status, search orders by naam/e-mail/lotnummer (server-side, works across all pages), and offers a CSV export (`/admin/export-csv`) — semicolon-delimited with UTF-8 BOM for Excel compatibility; filename includes a datetime timestamp (e.g. `bestellingen_20260312_143022.csv`). The CSV download button is located in the filter bar above the orders table, right-aligned. Orders are paginated at 50 per page (`PAGINA_GROOTTE = 50`). Status filter and search term are preserved across pagination. Each order row has an edit button (`/admin/bestelling/<id>/wijzigen`) that allows updating naam, email, telefoon, status, and mail_verstuurd — **not** lotnummers. The "Handmatige bestelling", "Instellingen", and "Beheerders" cards are collapsible via native HTML `<details>`/`<summary>` (no JavaScript). The logged-in username is shown in the topbar. A "🔑 Wachtwoord" button in the topbar opens a `<dialog>` modal to change the logged-in user's own password.
 
 Admin routes:
 - `POST /admin/instellingen` — update `max_eendjes`, `max_per_bestelling`, `prijs_per_stuk`, `prijs_vijf_stuks`, `transactiekosten`, and/or `notificatie_email` in the `teller` table. Validates that `max_eendjes` cannot be set below the number of already sold tickets, prices must be > 0, transactiekosten >= 0, notificatie_email must be a valid address or empty. When set, a silent copy of every confirmation email is sent to this address with subject `[Kopie] Bestelling … – Badeendjesrace!`.
 - `POST /admin/opruimen` — deletes orders with status `verlopen`/`mislukt`/`geannuleerd` where `lot_van IS NULL` (no tickets assigned). Safe to run at any time.
 - `POST /admin/handmatig` — create a manual order (cash/bank transfer); atomically assigns ticket numbers, optionally sends confirmation email if address is provided. `betaalwijze` = `contant` or `overboeking`.
-- `POST /admin/reset` — full database reset (wipes all orders + webhook_log, resets `volgend_lot` to 1, resets SQLite autoincrement so IDs start at 1 again). Requires typing `RESET` as confirmation. Has a JS confirm dialog as second safeguard.
+- `POST /admin/reset` — full database reset (wipes all orders + webhook_log, resets `volgend_lot` to 1, resets SQLite autoincrement so IDs start at 1 again). **Does not delete admin accounts** (`beheerders` table is untouched). Requires typing `RESET` as confirmation. Has a JS confirm dialog as second safeguard.
 - `POST /admin/beheerder-toevoegen` — add a new admin account; validates username not empty, password ≥ 12 chars, passwords match, username unique.
 - `POST /admin/beheerder-verwijderen/<id>` — delete an admin account; blocked if only 1 account exists or if deleting own account.
-- `POST /admin/wachtwoord-wijzigen` — change the logged-in admin's own password; requires current password, new password ≥ 12 chars, and matching confirmation.
+- `POST /admin/wachtwoord-wijzigen` — change the logged-in admin's own password; requires current password, new password ≥ 12 chars, and matching confirmation. Accessible via the "🔑 Wachtwoord" button in the topbar.
 
 `GET /api/beschikbaar` — public JSON endpoint returning `verkocht`, `beschikbaar`, `max_eendjes`, `max_per_bestelling`. Used by the homepage auto-refresh (every 30s).
 
 `GET /privacy` — AVG-compliant privacy policy (organisation details, data categories, legal bases, processors Mollie + Resend, retention periods, data subject rights).
 
 `GET /voorwaarden` — General terms and conditions (Mollie requirement: organisation details with KvK 76404862, event description, ticket rules, payment, no-refund policy, liability, prize award).
+
+### Database Backup (Litestream + Cloudflare R2)
+
+`start.sh` downloads the Litestream binary at runtime (using `curl`, `wget`, or `python3` as fallback) and starts it as a supervisor process wrapping Gunicorn. Litestream replicates the SQLite WAL to Cloudflare R2 every second (`sync-interval: 1s`). Configuration is in `litestream.yml` (bucket, endpoint with hardcoded account ID, credentials from env). On startup, if `LITESTREAM_ACCESS_KEY_ID` is set and the database file does not exist, `start.sh` automatically restores it from R2 before starting Gunicorn. `nixpacks.toml` installs `curl` during the Railway build phase.
 
 ## Testing Notes
 
@@ -103,6 +107,7 @@ Admin routes:
 - Security headers (X-Frame-Options, CSP with per-request nonces + `base-uri`/`form-action 'self'`, Permissions-Policy, suppressed `Server` header, etc.), rate limiting (5/min on admin login), and ProxyFix (for Railway deployment) are all configured in `app.py`. `saniteer_log()` strips newlines from user input before logging to prevent log injection. `GET /.well-known/security.txt` serves an RFC 9116-compliant security contact file.
 - Mollie webhook IP allowlisting is deliberately **not used** (Mollie advises against it — IP ranges change without notice). Security relies on the protocol: the webhook only delivers a payment ID (`tr_…`), and the app always retrieves the payment status via an authenticated Mollie API call.
 - The database is auto-initialized on module import (`init_db()` called at module level)
+- Admin passwords are stored as Werkzeug PBKDF2 hashes in the `beheerders` table. `ADMIN_PASS` is only validated/used when the table is empty (first start); after that it can be removed from env vars.
 
 ### Mollie API v3
 

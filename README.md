@@ -18,6 +18,9 @@ Gebouwd met **Python/Flask**, **Mollie** (iDEAL-betalingen), **SQLite** en **Res
 | Stille kopie-mail naar beheerder bij elke bestelling (optioneel) | ✅ |
 | Beheerpagina met statistieken, zoeken, filter en CSV-export | ✅ |
 | Instellingen beheren via admin (max. eendjes, max. per bestelling, prijzen, notificatieadres) | ✅ |
+| Meerdere beheerdersaccounts aanmaken en verwijderen via admin | ✅ |
+| Wachtwoord wijzigen via admin-topbar | ✅ |
+| Automatische database-backup naar Cloudflare R2 via Litestream | ✅ |
 
 ---
 
@@ -31,19 +34,19 @@ pip install -r requirements.txt
 
 ### 2. Configuratie
 
-Maak een `config.json` aan in de projectmap (wordt automatisch ingelezen):
+Maak een `.env`-bestand of stel omgevingsvariabelen in:
 
-```json
-{
-  "MOLLIE_API_KEY": "test_xxxxxxxxxxxxxxxxxxxx",
-  "BASE_URL": "http://localhost:5000",
-  "RESEND_API_KEY": "re_xxxxxxxxxxxxxxxxxxxx",
-  "RESEND_FROM": "noreply@jouwdomein.nl",
-  "ADMIN_USER": "admin",
-  "ADMIN_PASS": "kieseen sterk wachtwoord",
-  "SECRET_KEY": "willekeurige lange string"
-}
+```bash
+export MOLLIE_API_KEY="test_xxxxxxxxxxxxxxxxxxxx"
+export BASE_URL="http://localhost:5000"
+export RESEND_API_KEY="re_xxxxxxxxxxxxxxxxxxxx"
+export RESEND_FROM="noreply@jouwdomein.nl"
+export ADMIN_USER="admin"
+export ADMIN_PASS="kieseen sterk wachtwoord"   # minimaal 12 tekens
+export SECRET_KEY="willekeurige lange string"
 ```
+
+> `ADMIN_USER` en `ADMIN_PASS` zijn alleen nodig bij de **eerste start** (lege database). Zodra er beheerdersaccounts in de database staan, kunnen ze worden weggelaten.
 
 ### 3. Starten
 
@@ -59,9 +62,10 @@ De app draait op http://localhost:5000. De SQLite-database (`eendjes.db`) wordt 
 
 1. Maak een account op [railway.app](https://railway.app)
 2. Nieuw project → **Deploy from GitHub** → selecteer deze repository
-3. Voeg een **Volume** toe via **Add Service → Volume** en koppel dit aan het pad `/app` (of het pad waar `eendjes.db` staat). Zonder Volume wordt de database bij elke redeploy gewist.
+3. Voeg een **Volume** toe via **Add Service → Volume** en koppel dit aan `/app/data`
 4. Stel onderstaande omgevingsvariabelen in via **Settings → Variables**
 5. Kopieer de publieke Railway-URL en zet die als `BASE_URL`
+6. Zorg dat er **geen Custom Start Command** is ingesteld — Railway gebruikt dan automatisch de `Procfile` (`web: bash start.sh`)
 
 ### Omgevingsvariabelen
 
@@ -70,26 +74,58 @@ De app draait op http://localhost:5000. De SQLite-database (`eendjes.db`) wordt 
 | `MOLLIE_API_KEY` | Ja | Mollie API-sleutel (`test_…` of `live_…`) |
 | `BASE_URL` | Ja | Publieke URL van de app (bijv. `https://xxx.railway.app`) |
 | `RESEND_API_KEY` | Ja | Resend API-sleutel voor transactionele e-mail |
-| `ADMIN_PASS` | Ja | Wachtwoord voor de beheerpagina (minimaal 12 tekens) |
 | `SECRET_KEY` | Ja | Willekeurige geheime sleutel voor sessies (gebruik een lange random string) |
 | `RESEND_FROM` | Ja | Geverifieerd afzenderadres (bijv. `noreply@jouwdomein.nl`) |
-| `ADMIN_USER` | Nee | Gebruikersnaam admin (standaard: `admin`) |
+| `ADMIN_PASS` | Eerste start | Initieel admin-wachtwoord (minimaal 12 tekens). Alleen vereist als de database nog leeg is. Kan worden verwijderd zodra er een beheerdersaccount bestaat. |
+| `ADMIN_USER` | Eerste start | Initiële admin-gebruikersnaam (standaard: `admin`). Kan worden verwijderd na eerste start. |
 | `DATABASE` | Nee | Pad naar de SQLite-database. Zet op `/app/data/eendjes.db` als volume op `/app/data` gemount is. |
 | `HTTPS` | Nee | Zet op `true` in productie — beveiligt sessie-cookies |
 | `LITESTREAM_ACCESS_KEY_ID` | Nee | Cloudflare R2 Access Key ID voor automatische database-backup |
 | `LITESTREAM_SECRET_ACCESS_KEY` | Nee | Cloudflare R2 Secret Access Key voor automatische database-backup |
 | `TZ` | Nee | Tijdzone voor juiste timestamps (bijv. `Europe/Amsterdam`) |
-| `MAX_EENDJES` | Nee | Beginstaat totaal beschikbare eendjes (standaard: `3000`). Alleen relevant bij de allereerste start — daarna via de admin te wijzigen. |
-| `PRIJS_PER_STUK` | Nee | Prijs per los eendje (standaard: `2.50`). Alleen relevant bij eerste start — daarna via de admin te wijzigen. |
-| `PRIJS_VIJF_STUKS` | Nee | Prijs voor een bundel van 5 eendjes (standaard: `10.00`). Alleen relevant bij eerste start — daarna via de admin te wijzigen. |
-| `TRANSACTIEKOSTEN` | Nee | iDEAL-transactiekosten die de koper optioneel betaalt (standaard: `0.32`). Alleen relevant bij eerste start — daarna via de admin te wijzigen. |
-| `SECURITY_CONTACT` | Nee | Contactadres voor `/.well-known/security.txt` (bijv. `mailto:admin@jouwdomein.nl`). Valt terug op `RESEND_FROM`. |
+| `MAX_EENDJES` | Nee | Totaal beschikbare eendjes bij eerste start (standaard: `3000`). Daarna via admin te wijzigen. |
+| `PRIJS_PER_STUK` | Nee | Prijs per los eendje bij eerste start (standaard: `2.50`). Daarna via admin te wijzigen. |
+| `PRIJS_VIJF_STUKS` | Nee | Prijs voor bundel van 5 eendjes bij eerste start (standaard: `10.00`). Daarna via admin te wijzigen. |
+| `TRANSACTIEKOSTEN` | Nee | iDEAL-transactiekosten bij eerste start (standaard: `0.32`). Daarna via admin te wijzigen. |
+| `SECURITY_CONTACT` | Nee | Contactadres voor `/.well-known/security.txt`. Valt terug op `RESEND_FROM`. |
 
-> **Database-backup (Litestream):** Stel `LITESTREAM_ACCESS_KEY_ID` en `LITESTREAM_SECRET_ACCESS_KEY` in als Railway-variabelen om automatische near-realtime backup naar Cloudflare R2 te activeren. Bij volume-verlies herstelt `start.sh` de database automatisch vanuit R2. Zonder deze variabelen start de app gewoon zonder backup.
+---
 
-> **Mollie webhook:** Railway geeft automatisch een publieke URL. Zet deze als `BASE_URL` zodat Mollie betalingsstatussen kan terugsturen. Gebruik de `live_`-sleutel pas zodra de app live staat.
+## Database-backup (Litestream + Cloudflare R2)
 
-> **Resend:** Verifieer je domein in het Resend-dashboard. Zonder geverifieerd domein werkt `onboarding@resend.dev` tijdelijk als afzender, maar dan gaan mails alleen naar je eigen Resend-accountadres.
+De app maakt gebruik van [Litestream](https://litestream.io) voor near-realtime backup van de SQLite-database naar Cloudflare R2.
+
+**Hoe het werkt:**
+- `start.sh` downloadt de Litestream binary bij opstarten en start hem als supervisor-proces om Gunicorn heen
+- Litestream repliceert de SQLite WAL elke seconde naar R2 (bucket `badeendjesracewapenveld`)
+- Als bij een herstart de database ontbreekt (bijv. na volume-verlies), herstelt `start.sh` hem automatisch vanuit R2 vóór Gunicorn start
+
+**R2-token aanmaken:**
+1. Ga naar Cloudflare Dashboard → R2 → **Manage R2 API tokens**
+2. Klik **Create API token**
+3. Kies permission: **Object Read & Write**, scope op bucket `badeendjesracewapenveld`
+4. Kopieer de **Access Key ID** en **Secret Access Key** direct — de secret wordt maar één keer getoond
+5. Zet deze als `LITESTREAM_ACCESS_KEY_ID` en `LITESTREAM_SECRET_ACCESS_KEY` in Railway
+
+> ⚠️ Gebruik een **R2-specifiek token** (via de R2-pagina), niet een algemeen Cloudflare API-token.
+
+**Handmatig herstellen** (bijv. lokaal na een calamiteit):
+```bash
+LITESTREAM_ACCESS_KEY_ID=xxx \
+LITESTREAM_SECRET_ACCESS_KEY=yyy \
+DATABASE=/tmp/herstel.db \
+litestream restore -config litestream.yml /tmp/herstel.db
+```
+
+---
+
+## Beheerdersaccounts
+
+De app ondersteunt meerdere beheerdersaccounts. Wachtwoorden worden gehasht opgeslagen (Werkzeug PBKDF2).
+
+- **Accounts beheren**: inloggen → admin-paneel → sectie "Beheerders"
+- **Wachtwoord wijzigen**: knop "🔑 Wachtwoord" rechtsboven in de topbar
+- **Database reset** verwijdert **geen** beheerdersaccounts — alleen bestellingen en webhook-log worden gewist
 
 ---
 
@@ -103,13 +139,16 @@ De app draait op http://localhost:5000. De SQLite-database (`eendjes.db`) wordt 
 | `/voorwaarden` | Algemene voorwaarden |
 | `/api/prijs` | Live prijsberekening (JSON) |
 | `/api/beschikbaar` | Actueel aantal beschikbare eendjes (JSON, elke 30s door homepage gebruikt) |
-| `/admin` | Beheerpagina — statistieken, bestellingen, zoeken op naam/e-mail/lotnummer, filter op status |
+| `/admin` | Beheerpagina — statistieken, bestellingen, zoeken, filter, CSV-download |
 | `/admin/export-csv` | Download alle bestellingen als CSV |
 | `/admin/bestelling/<id>/wijzigen` | Bewerk naam, e-mail, telefoon, status of mailstatus |
 | `/admin/instellingen` | Wijzig totaal beschikbare eendjes, maximum per bestelling, prijzen en notificatie-e-mailadres |
 | `/admin/opruimen` | Verwijder verlopen/mislukte/geannuleerde bestellingen zonder lotnummers |
 | `/admin/handmatig` | Maak handmatige bestelling aan (contant/overboeking) |
-| `/admin/reset` | Reset volledige database (vereist 'RESET'-bevestiging) |
+| `/admin/reset` | Reset volledige database — bestellingen en webhook-log (beheerdersaccounts blijven intact) |
+| `/admin/beheerder-toevoegen` | Nieuw beheerdersaccount aanmaken |
+| `/admin/beheerder-verwijderen/<id>` | Beheerdersaccount verwijderen |
+| `/admin/wachtwoord-wijzigen` | Eigen wachtwoord wijzigen |
 | `/.well-known/security.txt` | Beveiligingscontactinformatie (RFC 9116) |
 
 ---
@@ -120,8 +159,10 @@ De app draait op http://localhost:5000. De SQLite-database (`eendjes.db`) wordt 
 eendjesrace/
 ├── app.py                  # Flask backend (alle logica)
 ├── requirements.txt        # Python-pakketten
-├── Procfile                # Railway/gunicorn startcommando
-├── eendjes.db              # SQLite database (automatisch aangemaakt)
+├── Procfile                # Railway startcommando (roept start.sh aan)
+├── start.sh                # Opstartscript: downloadt Litestream, herstel DB, start Gunicorn
+├── litestream.yml          # Litestream-configuratie (R2-bucket, endpoint, credentials)
+├── nixpacks.toml           # Railway build-config (installeert curl)
 ├── README.md
 ├── CLAUDE.md               # Instructies voor Claude Code
 └── templates/
@@ -145,7 +186,7 @@ eendjesrace/
 | 5 stuks | €10,00 bundel (instelbaar) |
 | Meer dan 5 | Combinatie van bundels en losse stuks |
 
-Optioneel kan de koper de iDEAL-transactiekosten (standaard €0,32, instelbaar) zelf betalen, zodat het volledige bedrag naar het goede doel gaat. Alle prijzen zijn instelbaar via de beheerpagina of via omgevingsvariabelen (`PRIJS_PER_STUK`, `PRIJS_VIJF_STUKS`, `TRANSACTIEKOSTEN`) bij eerste opstart.
+Optioneel kan de koper de iDEAL-transactiekosten (standaard €0,32, instelbaar) zelf betalen. Alle prijzen zijn instelbaar via de beheerpagina of via omgevingsvariabelen bij eerste opstart.
 
 ---
 
@@ -153,6 +194,8 @@ Optioneel kan de koper de iDEAL-transactiekosten (standaard €0,32, instelbaar)
 
 ```bash
 python -m pytest tests/test_app.py -v
+# of zonder pytest:
+python tests/test_app.py
 ```
 
-De testsuite stubt Mollie, Resend, Flask-WTF en Flask-Limiter — alleen Flask hoeft geïnstalleerd te zijn.
+De testsuite stubt Mollie, Resend, Flask-WTF en Flask-Limiter — alleen Flask en Werkzeug hoeven geïnstalleerd te zijn. 244 tests.
