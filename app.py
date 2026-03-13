@@ -1196,6 +1196,16 @@ def reset_database():
     return redirect(url_for("admin"))
 
 
+@app.route("/privacy")
+def privacy():
+    return render_template("privacy.html")
+
+
+@app.route("/voorwaarden")
+def voorwaarden():
+    return render_template("voorwaarden.html")
+
+
 # ─── Database initialisatie (ook voor gunicorn) ───────────────────────────────
 # BUG-FIX: init_db() stond alleen in if __name__ == "__main__", waardoor gunicorn
 # (Procfile: gunicorn app:app) de tabellen nooit aanmaakte en direct crashte

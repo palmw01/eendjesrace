@@ -1797,6 +1797,46 @@ class TestNotificatieEmail(unittest.TestCase):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# WETTELIJKE PAGINA'S
+#     /privacy en /voorwaarden — Mollie-vereisten en AVG-compliance
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestWettelijkePaginas(unittest.TestCase):
+
+    def setUp(self):
+        self.client, self.ctx = maak_flask_client()
+
+    def tearDown(self):
+        self.ctx.pop()
+
+    def test_privacy_pagina_bereikbaar(self):
+        r = self.client.get("/privacy")
+        self.assertEqual(r.status_code, 200)
+
+    def test_voorwaarden_pagina_bereikbaar(self):
+        r = self.client.get("/voorwaarden")
+        self.assertEqual(r.status_code, 200)
+
+    def test_privacy_bevat_kvk(self):
+        r = self.client.get("/privacy")
+        self.assertIn(b"08026487", r.data)
+
+    def test_voorwaarden_bevat_kvk(self):
+        r = self.client.get("/voorwaarden")
+        self.assertIn(b"08026487", r.data)
+
+    def test_privacy_bevat_contactgegevens(self):
+        r = self.client.get("/privacy")
+        self.assertIn(b"diaconie@hervormdwapenveld.nl", r.data)
+        self.assertIn(b"Kerkstraat", r.data)
+
+    def test_voorwaarden_bevat_contactgegevens(self):
+        r = self.client.get("/voorwaarden")
+        self.assertIn(b"diaconie@hervormdwapenveld.nl", r.data)
+        self.assertIn(b"Kerkstraat", r.data)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # Uitvoeren als script
 # ══════════════════════════════════════════════════════════════════════════════
 

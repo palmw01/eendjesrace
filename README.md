@@ -95,6 +95,8 @@ De app draait op http://localhost:5000. De SQLite-database (`eendjes.db`) wordt 
 |---|---|
 | `/` | Bestelformulier voor kopers |
 | `/betaald/<id>` | Bevestigingspagina na betaling |
+| `/privacy` | Privacyverklaring (AVG) |
+| `/voorwaarden` | Algemene voorwaarden |
 | `/api/prijs` | Live prijsberekening (JSON) |
 | `/api/beschikbaar` | Actueel aantal beschikbare eendjes (JSON, elke 30s door homepage gebruikt) |
 | `/admin` | Beheerpagina — statistieken, bestellingen, zoeken op naam/e-mail/lotnummer, filter op status |
@@ -120,6 +122,8 @@ eendjesrace/
 └── templates/
     ├── index.html          # Bestelformulier
     ├── betaald.html        # Bevestigingspagina
+    ├── privacy.html        # Privacyverklaring (AVG)
+    ├── voorwaarden.html    # Algemene voorwaarden
     ├── admin.html          # Beheerpagina
     ├── wijzigen.html       # Bestelling bewerken
     ├── admin_login.html    # Admin-login

@@ -297,6 +297,17 @@
     }
     .kleine-tekst a { color: var(--blauw); }
 
+    /* Footer */
+    .site-footer {
+      text-align: center;
+      color: rgba(255,255,255,0.6);
+      font-size: 0.8rem;
+      margin-top: 8px;
+      line-height: 1.8;
+    }
+    .site-footer a { color: rgba(255,255,255,0.75); }
+    .site-footer a:hover { color: white; }
+
     /* Transactiekosten checkbox */
     .tk-rij {
       display: flex;
@@ -539,6 +550,20 @@
       </ol>
     </div>
   </div>
+  <!-- Footer -->
+  <footer class="site-footer">
+    <p><strong style="color:rgba(255,255,255,0.85);">CvK Hervormde Gemeente Wapenveld</strong></p>
+    <p>Kerkstraat 2a · 8191 LV Wapenveld · KvK 08026487</p>
+    <p>
+      Contact: W.A.(Arnoud) van Guilik ·
+      <a href="tel:0627284249">06-27 28 42 49</a> ·
+      <a href="mailto:diaconie@hervormdwapenveld.nl">diaconie@hervormdwapenveld.nl</a>
+    </p>
+    <p>
+      <a href="/privacy">Privacyverklaring</a> ·
+      <a href="/voorwaarden">Algemene voorwaarden</a>
+    </p>
+  </footer>
 </div>
 
 <script nonce="{{ g.csp_nonce }}">
