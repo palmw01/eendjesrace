@@ -1819,11 +1819,11 @@ class TestWettelijkePaginas(unittest.TestCase):
 
     def test_privacy_bevat_kvk(self):
         r = self.client.get("/privacy")
-        self.assertIn(b"08026487", r.data)
+        self.assertIn(b"76404862", r.data)
 
     def test_voorwaarden_bevat_kvk(self):
         r = self.client.get("/voorwaarden")
-        self.assertIn(b"08026487", r.data)
+        self.assertIn(b"76404862", r.data)
 
     def test_privacy_bevat_contactgegevens(self):
         r = self.client.get("/privacy")
@@ -1834,6 +1834,14 @@ class TestWettelijkePaginas(unittest.TestCase):
         r = self.client.get("/voorwaarden")
         self.assertIn(b"diaconie@hervormdwapenveld.nl", r.data)
         self.assertIn(b"Kerkstraat", r.data)
+
+    def test_privacy_bevat_organisatienaam(self):
+        r = self.client.get("/privacy")
+        self.assertIn("Diaconie Hervormde gemeente te Wapenveld".encode(), r.data)
+
+    def test_voorwaarden_bevat_organisatienaam(self):
+        r = self.client.get("/voorwaarden")
+        self.assertIn("Diaconie Hervormde gemeente te Wapenveld".encode(), r.data)
 
 
 # ══════════════════════════════════════════════════════════════════════════════

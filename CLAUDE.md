@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-**Badeendjesrace** is a Dutch-language Flask web app for selling raffle tickets (lotnummers) for a duck race, built for Hervormde Gemeente Wapenveld. It handles order entry, iDEAL payment processing via Mollie, atomic ticket number assignment, and confirmation emails.
+**Badeendjesrace** is a Dutch-language Flask web app for selling raffle tickets (lotnummers) for a duck race, built for Diaconie Hervormde gemeente te Wapenveld (KvK 76404862). It handles order entry, iDEAL payment processing via Mollie, atomic ticket number assignment, and confirmation emails.
 
 ## Commands
 
@@ -86,11 +86,11 @@ Admin routes:
 
 `GET /privacy` — AVG-compliant privacy policy (organisation details, data categories, legal bases, processors Mollie + Resend, retention periods, data subject rights).
 
-`GET /voorwaarden` — General terms and conditions (Mollie requirement: organisation details with KvK 08026487, event description, ticket rules, payment, no-refund policy, liability, prize award).
+`GET /voorwaarden` — General terms and conditions (Mollie requirement: organisation details with KvK 76404862, event description, ticket rules, payment, no-refund policy, liability, prize award).
 
 ## Testing Notes
 
-`tests/test_app.py` stubs out Mollie, Resend, Flask-WTF CSRF, and Flask-Limiter so tests run with only Flask installed. Tests cover pricing, input validation, database operations, atomic transactions, email sending, webhook processing, admin routes, `max_per_bestelling`/`max_eendjes` settings, price settings (`prijs_per_stuk`/`prijs_vijf_stuks`/`transactiekosten`) via admin, CSV injection escaping, CSV filename timestamp, email header content (afbeelding/kleur/datum), notification email (instellen/validatie/versturen), email validation in wijzig_bestelling, opruimen, paginering, server-side statusfilter, CSP nonces, Permissions-Policy, session permanence, `saniteer_log`, and legal pages (`/privacy`, `/voorwaarden`). The test database uses `/tmp/eendjes_test.db` (reset before each test class). `maak_db()` includes all teller columns. Total: 208 tests.
+`tests/test_app.py` stubs out Mollie, Resend, Flask-WTF CSRF, and Flask-Limiter so tests run with only Flask installed. Tests cover pricing, input validation, database operations, atomic transactions, email sending, webhook processing, admin routes, `max_per_bestelling`/`max_eendjes` settings, price settings (`prijs_per_stuk`/`prijs_vijf_stuks`/`transactiekosten`) via admin, CSV injection escaping, CSV filename timestamp, email header content (afbeelding/kleur/datum), notification email (instellen/validatie/versturen), email validation in wijzig_bestelling, opruimen, paginering, server-side statusfilter, CSP nonces, Permissions-Policy, session permanence, `saniteer_log`, and legal pages (`/privacy`, `/voorwaarden`). The test database uses `/tmp/eendjes_test.db` (reset before each test class). `maak_db()` includes all teller columns. Total: 210 tests.
 
 ## Key Patterns
 
