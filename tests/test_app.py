@@ -716,6 +716,22 @@ class TestBetaaldPagina(unittest.TestCase):
         self.assertEqual(rij["status"], "betaald")
         self.assertIsNotNone(rij["lot_van"])
 
+    def test_betaald_footer_bevat_organisatienaam(self):
+        self._zet_status("betaald", lot_van=1, lot_tot=1)
+        r = self.client.get("/betaald/1")
+        self.assertIn("Diaconie Hervormde gemeente te Wapenveld".encode(), r.data)
+
+    def test_betaald_footer_bevat_kvk(self):
+        self._zet_status("betaald", lot_van=1, lot_tot=1)
+        r = self.client.get("/betaald/1")
+        self.assertIn(b"76404862", r.data)
+
+    def test_betaald_footer_bevat_contactgegevens(self):
+        self._zet_status("betaald", lot_van=1, lot_tot=1)
+        r = self.client.get("/betaald/1")
+        self.assertIn(b"diaconie@hervormdwapenveld.nl", r.data)
+        self.assertIn(b"Kerkstraat", r.data)
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 9. ADMIN
@@ -1692,6 +1708,25 @@ class TestCsvInjectie(unittest.TestCase):
         # Verwacht bijv. bestellingen_20260312_143022.csv
         self.assertRegex(cd, r"bestellingen_\d{8}_\d{6}\.csv")
 
+    def test_csv_ideal_bestelling_heeft_betaalwijze_ideal(self):
+        doe_bestelling(self.client, naam="iDEAL Koper")
+        csv_tekst = self._download_csv()
+        self.assertIn('"ideal"', csv_tekst)
+
+    def test_csv_handmatige_bestelling_heeft_betaalwijze_contant(self):
+        self.client.post("/admin/handmatig", data={
+            "naam": "Contant Koper", "email": "", "telefoon": "",
+            "aantal": "1", "betaalwijze": "contant",
+        })
+        csv_tekst = self._download_csv()
+        self.assertIn('"contant"', csv_tekst)
+
+    def test_csv_kolommen_tellen(self):
+        """Header moet exact 13 kolommen bevatten."""
+        csv_tekst = self._download_csv()
+        header = csv_tekst.splitlines()[0]
+        self.assertEqual(header.count(";"), 12)  # 13 kolommen = 12 scheidingstekens
+
 
 class TestMailHeader(unittest.TestCase):
 
@@ -1918,6 +1953,28 @@ class TestHandmatigeBestellingen(unittest.TestCase):
 # WETTELIJKE PAGINA'S
 #     /privacy en /voorwaarden — Mollie-vereisten en AVG-compliance
 # ══════════════════════════════════════════════════════════════════════════════
+
+class TestFoutPagina(unittest.TestCase):
+
+    def setUp(self):
+        self.client, self.ctx = maak_flask_client()
+
+    def tearDown(self):
+        self.ctx.pop()
+
+    def test_fout_footer_bevat_organisatienaam(self):
+        r = self.client.get("/bestaat-niet-xyz")
+        self.assertIn("Diaconie Hervormde gemeente te Wapenveld".encode(), r.data)
+
+    def test_fout_footer_bevat_kvk(self):
+        r = self.client.get("/bestaat-niet-xyz")
+        self.assertIn(b"76404862", r.data)
+
+    def test_fout_footer_bevat_contactgegevens(self):
+        r = self.client.get("/bestaat-niet-xyz")
+        self.assertIn(b"diaconie@hervormdwapenveld.nl", r.data)
+        self.assertIn(b"Kerkstraat", r.data)
+
 
 class TestWettelijkePaginas(unittest.TestCase):
 
