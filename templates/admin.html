@@ -309,7 +309,7 @@
           <span class="badge badge-{{ bw }}">{{ bw }}</span>
         </td>
         <td style="text-align:center">
-          {% if b['status'] == 'betaald' %}
+          {% if b['status'] == 'betaald' and b['email'] %}
             {% if b['mail_verstuurd'] %}<span class="mail-ok">✅</span>
             {% else %}<span class="mail-fout">❌</span>{% endif %}
           {% else %}—{% endif %}
@@ -317,7 +317,7 @@
         <td style="white-space:nowrap;color:#888;font-size:.8rem">{{ b['aangemaakt_op'][:16] }}</td>
         <td style="white-space:nowrap;">
           <a href="/admin/bestelling/{{ b['id'] }}/wijzigen" class="knop-wijzig">✏ Wijzig</a>
-          {% if b['status'] == 'betaald' %}
+          {% if b['status'] == 'betaald' and b['email'] %}
             {% if b['mail_verstuurd' ] %}
               <form method="POST" action="/admin/mail-opnieuw/{{ b['id'] }}" style="display:inline">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
