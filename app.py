@@ -895,17 +895,19 @@ def admin_login():
             session["admin_ingelogd"]       = True
             session["admin_gebruikersnaam"] = gebruiker
             session.permanent = True
-            app.logger.info(f"Admin ingelogd vanaf {request.remote_addr}")
+            app.logger.info(f"Admin ingelogd: {saniteer_log(gebruiker)} vanaf {request.remote_addr}")
             return redirect(url_for("admin"))
         fout = "Onjuiste gebruikersnaam of wachtwoord."
-        app.logger.warning(f"Mislukte admin-login vanaf {request.remote_addr}")
+        app.logger.warning(f"Mislukte admin-login voor '{saniteer_log(gebruiker)}' vanaf {request.remote_addr}")
     return render_template("admin_login.html", fout=fout)
 
 
 @app.route("/admin/logout")
 @login_vereist
 def admin_logout():
+    gebruiker = session.get("admin_gebruikersnaam", "onbekend")
     session.clear()
+    app.logger.info(f"Admin uitgelogd: {saniteer_log(gebruiker)}")
     return redirect(url_for("admin_login"))
 
 
