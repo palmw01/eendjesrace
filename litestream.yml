@@ -1,0 +1,11 @@
+dbs:
+  - path: ${DATABASE}
+    replicas:
+      - type: s3
+        bucket: badeendjesracewapenveld
+        path: eendjes.db
+        endpoint: https://2eb3cb7a21c40c330514e4f38fb61e54.r2.cloudflarestorage.com
+        region: auto
+        access-key-id: ${LITESTREAM_ACCESS_KEY_ID}
+        secret-access-key: ${LITESTREAM_SECRET_ACCESS_KEY}
+        sync-interval: 1s

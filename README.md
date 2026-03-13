@@ -74,14 +74,18 @@ De app draait op http://localhost:5000. De SQLite-database (`eendjes.db`) wordt 
 | `SECRET_KEY` | Ja | Willekeurige geheime sleutel voor sessies (gebruik een lange random string) |
 | `RESEND_FROM` | Ja | Geverifieerd afzenderadres (bijv. `noreply@jouwdomein.nl`) |
 | `ADMIN_USER` | Nee | Gebruikersnaam admin (standaard: `admin`) |
-| `DATABASE` | Nee | Pad naar de SQLite-database (standaard: `eendjes.db`) |
+| `DATABASE` | Nee | Pad naar de SQLite-database. Zet op `/app/eendjes.db` als volume op `/app` gemount is. |
 | `HTTPS` | Nee | Zet op `true` in productie — beveiligt sessie-cookies |
+| `LITESTREAM_ACCESS_KEY_ID` | Nee | Cloudflare R2 Access Key ID voor automatische database-backup |
+| `LITESTREAM_SECRET_ACCESS_KEY` | Nee | Cloudflare R2 Secret Access Key voor automatische database-backup |
 | `TZ` | Nee | Tijdzone voor juiste timestamps (bijv. `Europe/Amsterdam`) |
 | `MAX_EENDJES` | Nee | Beginstaat totaal beschikbare eendjes (standaard: `3000`). Alleen relevant bij de allereerste start — daarna via de admin te wijzigen. |
 | `PRIJS_PER_STUK` | Nee | Prijs per los eendje (standaard: `2.50`). Alleen relevant bij eerste start — daarna via de admin te wijzigen. |
 | `PRIJS_VIJF_STUKS` | Nee | Prijs voor een bundel van 5 eendjes (standaard: `10.00`). Alleen relevant bij eerste start — daarna via de admin te wijzigen. |
 | `TRANSACTIEKOSTEN` | Nee | iDEAL-transactiekosten die de koper optioneel betaalt (standaard: `0.32`). Alleen relevant bij eerste start — daarna via de admin te wijzigen. |
 | `SECURITY_CONTACT` | Nee | Contactadres voor `/.well-known/security.txt` (bijv. `mailto:admin@jouwdomein.nl`). Valt terug op `RESEND_FROM`. |
+
+> **Database-backup (Litestream):** Stel `LITESTREAM_ACCESS_KEY_ID` en `LITESTREAM_SECRET_ACCESS_KEY` in als Railway-variabelen om automatische near-realtime backup naar Cloudflare R2 te activeren. Bij volume-verlies herstelt `start.sh` de database automatisch vanuit R2. Zonder deze variabelen start de app gewoon zonder backup.
 
 > **Mollie webhook:** Railway geeft automatisch een publieke URL. Zet deze als `BASE_URL` zodat Mollie betalingsstatussen kan terugsturen. Gebruik de `live_`-sleutel pas zodra de app live staat.
 
