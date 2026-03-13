@@ -7,7 +7,7 @@ LITESTREAM_VERSION="0.3.13"
 LITESTREAM_BIN="/tmp/litestream"
 
 # Zorg dat DATABASE altijd een absoluut pad heeft (Railway volume staat op /app)
-export DATABASE="${DATABASE:-/app/eendjes.db}"
+export DATABASE="${DATABASE:-/app/data/eendjes.db}"
 
 # ── Litestream binary downloaden als die er nog niet is ──────────────────────
 if [ ! -f "$LITESTREAM_BIN" ]; then

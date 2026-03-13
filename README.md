@@ -74,7 +74,7 @@ De app draait op http://localhost:5000. De SQLite-database (`eendjes.db`) wordt 
 | `SECRET_KEY` | Ja | Willekeurige geheime sleutel voor sessies (gebruik een lange random string) |
 | `RESEND_FROM` | Ja | Geverifieerd afzenderadres (bijv. `noreply@jouwdomein.nl`) |
 | `ADMIN_USER` | Nee | Gebruikersnaam admin (standaard: `admin`) |
-| `DATABASE` | Nee | Pad naar de SQLite-database. Zet op `/app/eendjes.db` als volume op `/app` gemount is. |
+| `DATABASE` | Nee | Pad naar de SQLite-database. Zet op `/app/data/eendjes.db` als volume op `/app/data` gemount is. |
 | `HTTPS` | Nee | Zet op `true` in productie — beveiligt sessie-cookies |
 | `LITESTREAM_ACCESS_KEY_ID` | Nee | Cloudflare R2 Access Key ID voor automatische database-backup |
 | `LITESTREAM_SECRET_ACCESS_KEY` | Nee | Cloudflare R2 Secret Access Key voor automatische database-backup |
