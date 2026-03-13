@@ -12,9 +12,19 @@ export DATABASE="${DATABASE:-/app/data/eendjes.db}"
 # ── Litestream binary downloaden als die er nog niet is ──────────────────────
 if [ ! -f "$LITESTREAM_BIN" ]; then
     echo "[start.sh] Litestream v${LITESTREAM_VERSION} downloaden..."
-    curl -fsSL \
-        "https://github.com/benbjohnson/litestream/releases/download/v${LITESTREAM_VERSION}/litestream-v${LITESTREAM_VERSION}-linux-amd64.tar.gz" \
-        | tar -xz -C /tmp
+    LITESTREAM_URL="https://github.com/benbjohnson/litestream/releases/download/v${LITESTREAM_VERSION}/litestream-v${LITESTREAM_VERSION}-linux-amd64.tar.gz"
+    if command -v curl &>/dev/null; then
+        curl -fsSL "$LITESTREAM_URL" | tar -xz -C /tmp
+    elif command -v wget &>/dev/null; then
+        wget -qO- "$LITESTREAM_URL" | tar -xz -C /tmp
+    else
+        python3 -c "
+import urllib.request, tarfile, sys
+url = sys.argv[1]
+urllib.request.urlretrieve(url, '/tmp/litestream.tar.gz')
+" "$LITESTREAM_URL"
+        tar -xzf /tmp/litestream.tar.gz -C /tmp
+    fi
     chmod +x "$LITESTREAM_BIN"
     echo "[start.sh] Litestream klaar."
 fi
