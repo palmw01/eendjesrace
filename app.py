@@ -231,6 +231,10 @@ def init_db():
         conn.execute("ALTER TABLE teller ADD COLUMN notificatie_email TEXT NOT NULL DEFAULT ''")
     except sqlite3.OperationalError:
         pass  # kolom bestaat al
+    try:
+        conn.execute("ALTER TABLE bestellingen ADD COLUMN betaalwijze TEXT NOT NULL DEFAULT 'ideal'")
+    except sqlite3.OperationalError:
+        pass  # kolom bestaat al
     # Seed-rij: alleen aanmaken als nog niet bestaat (alle kolommen zijn nu gegarandeerd aanwezig)
     conn.execute(
         "INSERT OR IGNORE INTO teller (id, volgend_lot, max_eendjes, max_per_bestelling, "
@@ -644,8 +648,8 @@ def bestellen():
 
         tk_bedrag = get_transactiekosten() if incl_tk else 0
         cursor = db.execute(
-            "INSERT INTO bestellingen (naam, telefoon, email, aantal, bedrag, transactiekosten, transactiekosten_bedrag) VALUES (?,?,?,?,?,?,?)",
-            (naam, telefoon, email, aantal, bedrag, 1 if incl_tk else 0, tk_bedrag),
+            "INSERT INTO bestellingen (naam, telefoon, email, aantal, bedrag, transactiekosten, transactiekosten_bedrag, betaalwijze) VALUES (?,?,?,?,?,?,?,?)",
+            (naam, telefoon, email, aantal, bedrag, 1 if incl_tk else 0, tk_bedrag, "ideal"),
         )
         bestelling_id = cursor.lastrowid
         db.commit()
@@ -1073,7 +1077,7 @@ def export_csv():
         db = get_db()
         bestellingen = db.execute(
             "SELECT id, naam, email, telefoon, aantal, bedrag, transactiekosten, "
-            "lot_van, lot_tot, status, mail_verstuurd, aangemaakt_op "
+            "lot_van, lot_tot, status, mail_verstuurd, aangemaakt_op, betaalwijze "
             "FROM bestellingen ORDER BY id ASC"
         ).fetchall()
     except sqlite3.Error as e:
@@ -1091,14 +1095,15 @@ def export_csv():
     schrijver = csv.writer(uitvoer, delimiter=";", quoting=csv.QUOTE_ALL)
     schrijver.writerow([
         "ID", "Naam", "E-mail", "Telefoon", "Aantal", "Bedrag (€)", "iDEAL-kosten",
-        "Lot van", "Lot tot", "Status", "Mail verstuurd", "Aangemaakt op"
+        "Lot van", "Lot tot", "Status", "Betaalwijze", "Mail verstuurd", "Aangemaakt op"
     ])
     for b in bestellingen:
         schrijver.writerow([
             b["id"], csv_escape(b["naam"]), csv_escape(b["email"]), csv_escape(b["telefoon"]),
             b["aantal"], f"{b['bedrag']:.2f}", "ja" if b["transactiekosten"] else "nee",
             b["lot_van"] or "", b["lot_tot"] or "",
-            b["status"], "ja" if b["mail_verstuurd"] else "nee",
+            b["status"], b["betaalwijze"] or "ideal",
+            "ja" if b["mail_verstuurd"] else "nee",
             b["aangemaakt_op"],
         ])
 
@@ -1193,6 +1198,94 @@ def reset_database():
     except sqlite3.Error as e:
         app.logger.error(f"DB-fout reset_database: {e}")
         abort(500)
+    return redirect(url_for("admin"))
+
+
+@app.route("/admin/handmatig", methods=["POST"])
+@login_vereist
+def handmatige_bestelling():
+    """Maak een handmatige bestelling aan (contant of overboeking) vanuit de admin."""
+    naam        = request.form.get("naam", "").strip()
+    email       = request.form.get("email", "").strip().lower()
+    telefoon    = request.form.get("telefoon", "").strip()
+    betaalwijze = request.form.get("betaalwijze", "contant").strip()
+
+    try:
+        aantal = int(request.form.get("aantal", 0))
+    except (ValueError, TypeError):
+        flash("Ongeldig aantal opgegeven.", "fout")
+        return redirect(url_for("admin"))
+
+    if betaalwijze not in ("contant", "overboeking"):
+        betaalwijze = "contant"
+
+    fouten = []
+    if not naam or len(naam.strip()) < 2:
+        fouten.append("Naam is verplicht (minimaal 2 tekens).")
+    if len(naam) > 100:
+        fouten.append("Naam mag maximaal 100 tekens zijn.")
+    if email and not EMAIL_RE.match(email):
+        fouten.append("Ongeldig e-mailadres.")
+    if telefoon and not TELEFOON_RE.match(telefoon):
+        fouten.append("Ongeldig telefoonnummer.")
+    if aantal < 1:
+        fouten.append("Aantal moet minimaal 1 zijn.")
+    max_per = get_max_per_bestelling()
+    if aantal > max_per:
+        fouten.append(f"Maximaal {max_per} eendjes per bestelling.")
+
+    if fouten:
+        for f in fouten:
+            flash(f, "fout")
+        return redirect(url_for("admin"))
+
+    bedrag = bereken_bedrag(aantal, get_prijs_per_stuk(), get_prijs_vijf_stuks())
+
+    try:
+        db = get_db()
+        cursor = db.execute(
+            "INSERT INTO bestellingen (naam, telefoon, email, aantal, bedrag, betaalwijze) "
+            "VALUES (?,?,?,?,?,?)",
+            (naam, telefoon or "", email or "", aantal, bedrag, betaalwijze),
+        )
+        bestelling_id = cursor.lastrowid
+        db.commit()
+    except sqlite3.Error as e:
+        app.logger.error(f"DB-fout handmatige_bestelling INSERT: {e}")
+        abort(500)
+
+    try:
+        lot_van, lot_tot = wijs_lotnummers_toe(db, bestelling_id, aantal)
+    except ValueError:
+        try:
+            db.execute("DELETE FROM bestellingen WHERE id=?", (bestelling_id,))
+            db.commit()
+        except sqlite3.Error:
+            pass
+        flash("Niet genoeg lotnummers beschikbaar.", "fout")
+        return redirect(url_for("admin"))
+    except sqlite3.Error as e:
+        app.logger.error(f"DB-fout handmatige_bestelling lotnummers: {e}")
+        abort(500)
+
+    app.logger.info(
+        f"Handmatige bestelling aangemaakt: id={bestelling_id}, "
+        f"naam={saniteer_log(naam)}, lotnummers={lot_van}-{lot_tot}, betaalwijze={betaalwijze}"
+    )
+
+    if email:
+        mail_ok = stuur_bevestigingsmail(naam, email, aantal, lot_van, lot_tot, bedrag)
+        if mail_ok:
+            try:
+                db.execute("UPDATE bestellingen SET mail_verstuurd=1 WHERE id=?", (bestelling_id,))
+                db.commit()
+            except sqlite3.Error:
+                pass
+
+    flash(
+        f"Bestelling #{bestelling_id} aangemaakt — lotnummers {lot_van}–{lot_tot} ({betaalwijze}).",
+        "info",
+    )
     return redirect(url_for("admin"))
 
 

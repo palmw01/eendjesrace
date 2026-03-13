@@ -119,6 +119,7 @@ def maak_db():
             pogingen INTEGER NOT NULL DEFAULT 0,
             transactiekosten INTEGER NOT NULL DEFAULT 0,
             transactiekosten_bedrag REAL NOT NULL DEFAULT 0,
+            betaalwijze TEXT NOT NULL DEFAULT 'ideal',
             aangemaakt_op TEXT NOT NULL DEFAULT (datetime('now','localtime')),
             bijgewerkt_op TEXT NOT NULL DEFAULT (datetime('now','localtime'))
         )""",
@@ -1794,6 +1795,119 @@ class TestNotificatieEmail(unittest.TestCase):
             from app import stuur_bevestigingsmail
             stuur_bevestigingsmail("Jan", "jan@test.nl", 1, 1, 1, 2.50)
         self.assertEqual(len(verzonden), 1)  # alleen naar klant
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# HANDMATIGE BESTELLINGEN
+#     POST /admin/handmatig — contant/overboeking verkoop buiten iDEAL om
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestHandmatigeBestellingen(unittest.TestCase):
+
+    def setUp(self):
+        self.client, self.ctx = maak_flask_client()
+        self.client.post("/admin/login",
+                         data={"gebruiker": "admin", "wachtwoord": "testpass"})
+
+    def tearDown(self):
+        self.ctx.pop()
+
+    def test_handmatige_bestelling_contant(self):
+        r = self.client.post("/admin/handmatig", data={
+            "naam": "Piet Pietersen", "email": "piet@test.nl",
+            "telefoon": "0612345678", "aantal": "2", "betaalwijze": "contant",
+        }, follow_redirects=True)
+        self.assertEqual(r.status_code, 200)
+        db = App.get_db()
+        b = db.execute("SELECT * FROM bestellingen WHERE naam='Piet Pietersen'").fetchone()
+        self.assertIsNotNone(b)
+        self.assertEqual(b["status"], "betaald")
+        self.assertEqual(b["betaalwijze"], "contant")
+        self.assertIsNotNone(b["lot_van"])
+        self.assertIsNotNone(b["lot_tot"])
+
+    def test_handmatige_bestelling_overboeking(self):
+        r = self.client.post("/admin/handmatig", data={
+            "naam": "Klaas Klaassen", "email": "",
+            "telefoon": "", "aantal": "3", "betaalwijze": "overboeking",
+        }, follow_redirects=True)
+        self.assertEqual(r.status_code, 200)
+        db = App.get_db()
+        b = db.execute("SELECT * FROM bestellingen WHERE naam='Klaas Klaassen'").fetchone()
+        self.assertEqual(b["betaalwijze"], "overboeking")
+        self.assertEqual(b["status"], "betaald")
+
+    def test_handmatige_bestelling_zonder_email_geen_mail(self):
+        with patch("app.stuur_bevestigingsmail") as mock_mail:
+            self.client.post("/admin/handmatig", data={
+                "naam": "Geen Email", "email": "",
+                "telefoon": "", "aantal": "1", "betaalwijze": "contant",
+            })
+            mock_mail.assert_not_called()
+
+    def test_handmatige_bestelling_met_email_stuurt_mail(self):
+        with patch("app.stuur_bevestigingsmail", return_value=True) as mock_mail:
+            self.client.post("/admin/handmatig", data={
+                "naam": "Met Email", "email": "met@test.nl",
+                "telefoon": "", "aantal": "1", "betaalwijze": "contant",
+            })
+            mock_mail.assert_called_once()
+
+    def test_handmatige_bestelling_lotnummers_oplopend(self):
+        self.client.post("/admin/handmatig", data={
+            "naam": "Eerste", "email": "", "telefoon": "",
+            "aantal": "2", "betaalwijze": "contant",
+        })
+        self.client.post("/admin/handmatig", data={
+            "naam": "Tweede", "email": "", "telefoon": "",
+            "aantal": "3", "betaalwijze": "contant",
+        })
+        db = App.get_db()
+        eerste = db.execute("SELECT lot_van, lot_tot FROM bestellingen WHERE naam='Eerste'").fetchone()
+        tweede = db.execute("SELECT lot_van, lot_tot FROM bestellingen WHERE naam='Tweede'").fetchone()
+        self.assertEqual(eerste["lot_van"], 1)
+        self.assertEqual(eerste["lot_tot"], 2)
+        self.assertEqual(tweede["lot_van"], 3)
+        self.assertEqual(tweede["lot_tot"], 5)
+
+    def test_handmatige_bestelling_naam_verplicht(self):
+        r = self.client.post("/admin/handmatig", data={
+            "naam": "", "email": "", "telefoon": "",
+            "aantal": "1", "betaalwijze": "contant",
+        }, follow_redirects=True)
+        self.assertEqual(r.status_code, 200)
+        db = App.get_db()
+        count = db.execute("SELECT COUNT(*) FROM bestellingen").fetchone()[0]
+        self.assertEqual(count, 0)
+
+    def test_handmatige_bestelling_ongeldig_betaalwijze_valt_terug_op_contant(self):
+        self.client.post("/admin/handmatig", data={
+            "naam": "Test User", "email": "", "telefoon": "",
+            "aantal": "1", "betaalwijze": "ideal",  # niet geldig voor handmatig
+        })
+        db = App.get_db()
+        b = db.execute("SELECT betaalwijze FROM bestellingen WHERE naam='Test User'").fetchone()
+        self.assertEqual(b["betaalwijze"], "contant")
+
+    def test_ideal_bestelling_heeft_betaalwijze_ideal(self):
+        doe_bestelling(self.client, naam="iDEAL Koper", aantal=1)
+        db = App.get_db()
+        b = db.execute("SELECT betaalwijze FROM bestellingen WHERE naam='iDEAL Koper'").fetchone()
+        self.assertEqual(b["betaalwijze"], "ideal")
+
+    def test_csv_bevat_betaalwijze_kolom(self):
+        r = self.client.get("/admin/export-csv")
+        self.assertIn(b"Betaalwijze", r.data)
+
+    def test_handmatige_bestelling_vereist_admin_login(self):
+        # Uitloggen
+        uitgelogde_client, ctx2 = maak_flask_client()
+        r = uitgelogde_client.post("/admin/handmatig", data={
+            "naam": "Hacker", "email": "", "telefoon": "",
+            "aantal": "1", "betaalwijze": "contant",
+        })
+        self.assertIn(r.status_code, [302, 401, 403])
+        ctx2.pop()
 
 
 # ══════════════════════════════════════════════════════════════════════════════

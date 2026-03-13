@@ -91,6 +91,10 @@
     .badge-mislukt,
     .badge-verlopen,
     .badge-geannuleerd { background: #FFEBEE; color: #C62828; }
+    .badge-ideal       { background: #E3F2FD; color: #0277BD; }
+    .badge-contant     { background: #E8F5E9; color: #1B5E20; }
+    .badge-overboeking { background: #F3E5F5; color: #4A148C; }
+    .badge-handmatig   { background: #FFF8E1; color: #E65100; }
 
     .mail-fout { font-size: .8rem; color: #C62828; }
     .mail-ok   { font-size: .8rem; color: #2E7D32; }
@@ -276,6 +280,7 @@
         <th>Bedrag</th>
         <th>Loten</th>
         <th>Status</th>
+        <th>Betaald via</th>
         <th>Mail</th>
         <th>Datum</th>
         <th>Acties</th>
@@ -298,6 +303,10 @@
         </td>
         <td>
           <span class="badge badge-{{ b['status'] }}">{{ b['status'] }}</span>
+        </td>
+        <td>
+          {% set bw = b['betaalwijze'] if b['betaalwijze'] else 'ideal' %}
+          <span class="badge badge-{{ bw }}">{{ bw }}</span>
         </td>
         <td style="text-align:center">
           {% if b['status'] == 'betaald' %}
@@ -349,6 +358,42 @@
     {% endif %}
   </div>
   {% endif %}
+
+  <!-- Handmatige bestelling -->
+  <div class="instelling-kaart" style="margin-top:28px;">
+    <h2 class="instelling-titel">➕ Handmatige bestelling toevoegen</h2>
+    <p style="font-size:.9rem;color:#555;margin-bottom:16px;">
+      Voor verkoop buiten iDEAL om (contant of overboeking). Lotnummers worden direct toegewezen.
+      E-mail en telefoon zijn optioneel — als een e-mailadres is ingevuld, wordt automatisch een bevestigingsmail gestuurd.
+    </p>
+    <form method="POST" action="/admin/handmatig">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="instelling-rij">
+        <label class="instelling-label" for="h_naam">Naam <span style="color:#C62828">*</span></label>
+        <input class="instelling-input" type="text" id="h_naam" name="naam" placeholder="Voor- en achternaam" required maxlength="100">
+      </div>
+      <div class="instelling-rij">
+        <label class="instelling-label" for="h_email">E-mailadres</label>
+        <input class="instelling-input" type="email" id="h_email" name="email" placeholder="optioneel">
+      </div>
+      <div class="instelling-rij">
+        <label class="instelling-label" for="h_telefoon">Telefoonnummer</label>
+        <input class="instelling-input" type="tel" id="h_telefoon" name="telefoon" placeholder="optioneel">
+      </div>
+      <div class="instelling-rij">
+        <label class="instelling-label" for="h_aantal">Aantal eendjes <span style="color:#C62828">*</span></label>
+        <input class="instelling-input" type="number" id="h_aantal" name="aantal" min="1" value="1" required>
+      </div>
+      <div class="instelling-rij">
+        <label class="instelling-label" for="h_betaalwijze">Betaalwijze <span style="color:#C62828">*</span></label>
+        <select class="instelling-input" id="h_betaalwijze" name="betaalwijze">
+          <option value="contant">Contant</option>
+          <option value="overboeking">Overboeking</option>
+        </select>
+      </div>
+      <button type="submit" class="instelling-knop">Bestelling aanmaken</button>
+    </form>
+  </div>
 
   <!-- Instellingen -->
   {% with berichten = get_flashed_messages(with_categories=true) %}

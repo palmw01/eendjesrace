@@ -104,6 +104,7 @@ De app draait op http://localhost:5000. De SQLite-database (`eendjes.db`) wordt 
 | `/admin/bestelling/<id>/wijzigen` | Bewerk naam, e-mail, telefoon, status of mailstatus |
 | `/admin/instellingen` | Wijzig totaal beschikbare eendjes, maximum per bestelling, prijzen en notificatie-e-mailadres |
 | `/admin/opruimen` | Verwijder verlopen/mislukte/geannuleerde bestellingen zonder lotnummers |
+| `/admin/handmatig` | Maak handmatige bestelling aan (contant/overboeking) |
 | `/admin/reset` | Reset volledige database (vereist 'RESET'-bevestiging) |
 | `/.well-known/security.txt` | Beveiligingscontactinformatie (RFC 9116) |
 
