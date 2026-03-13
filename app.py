@@ -19,9 +19,9 @@ if os.path.exists(_config_pad):
         for _k, _v in json.load(_f).items():
             os.environ.setdefault(_k, str(_v))
 import logging
-import hmac
 import secrets
 import resend
+from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 from logging.handlers import RotatingFileHandler
 from flask import (
@@ -198,6 +198,19 @@ def init_db():
             ontvangen   TEXT DEFAULT (datetime('now','localtime'))
         )
     """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS beheerders (
+            id                INTEGER PRIMARY KEY AUTOINCREMENT,
+            gebruikersnaam    TEXT NOT NULL UNIQUE,
+            wachtwoord_hash   TEXT NOT NULL,
+            aangemaakt_op     TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+        )
+    """)
+    if not conn.execute("SELECT 1 FROM beheerders LIMIT 1").fetchone():
+        conn.execute(
+            "INSERT INTO beheerders (gebruikersnaam, wachtwoord_hash) VALUES (?, ?)",
+            (ADMIN_GEBRUIKER, generate_password_hash(ADMIN_WACHTWOORD))
+        )
     # Migraties eerst — zodat kolommen bestaan vóór de INSERT
     try:
         conn.execute("ALTER TABLE bestellingen ADD COLUMN transactiekosten INTEGER NOT NULL DEFAULT 0")
@@ -868,11 +881,14 @@ def admin_login():
     if request.method == "POST":
         gebruiker  = request.form.get("gebruiker", "")
         wachtwoord = request.form.get("wachtwoord", "")
-        # hmac.compare_digest voorkomt timing-attacks
-        ok_gebruiker  = hmac.compare_digest(gebruiker, ADMIN_GEBRUIKER)
-        ok_wachtwoord = hmac.compare_digest(wachtwoord, ADMIN_WACHTWOORD)
-        if ok_gebruiker and ok_wachtwoord and ADMIN_WACHTWOORD:
-            session["admin_ingelogd"] = True
+        db  = get_db()
+        rij = db.execute(
+            "SELECT wachtwoord_hash FROM beheerders WHERE gebruikersnaam = ?",
+            (gebruiker,)
+        ).fetchone()
+        if rij and check_password_hash(rij["wachtwoord_hash"], wachtwoord):
+            session["admin_ingelogd"]       = True
+            session["admin_gebruikersnaam"] = gebruiker
             session.permanent = True
             app.logger.info(f"Admin ingelogd vanaf {request.remote_addr}")
             return redirect(url_for("admin"))
@@ -937,6 +953,9 @@ def admin():
                 COALESCE(SUM(CASE WHEN status='aangemaakt' THEN 1 END), 0)       AS openstaand
             FROM bestellingen
         """).fetchone()
+        beheerders_lijst = db.execute(
+            "SELECT id, gebruikersnaam, aangemaakt_op FROM beheerders ORDER BY id"
+        ).fetchall()
         return render_template("admin.html",
                                bestellingen=bestellingen,
                                stats=stats,
@@ -950,7 +969,9 @@ def admin():
                                totaal_paginas=totaal_paginas,
                                totaal=totaal,
                                status_filter=status_filter,
-                               zoekterm=zoekterm)
+                               zoekterm=zoekterm,
+                               beheerders=beheerders_lijst,
+                               huidige_gebruiker=session.get("admin_gebruikersnaam"))
     except sqlite3.Error as e:
         app.logger.error(f"DB-fout admin: {e}")
         abort(500)
@@ -1037,6 +1058,69 @@ def admin_instellingen():
 
     except (ValueError, TypeError):
         flash("Ongeldig getal opgegeven.", "fout")
+    return redirect(url_for("admin"))
+
+
+@app.route("/admin/beheerder-toevoegen", methods=["POST"])
+@login_vereist
+def beheerder_toevoegen():
+    """Voeg een nieuw beheerdersaccount toe."""
+    gebruikersnaam     = request.form.get("gebruikersnaam", "").strip()
+    wachtwoord         = request.form.get("wachtwoord", "")
+    wachtwoord_bevestiging = request.form.get("wachtwoord_bevestiging", "")
+
+    if not gebruikersnaam:
+        flash("Gebruikersnaam is verplicht.", "fout")
+        return redirect(url_for("admin"))
+    if len(wachtwoord) < 12:
+        flash("Wachtwoord moet minimaal 12 tekens lang zijn.", "fout")
+        return redirect(url_for("admin"))
+    if wachtwoord != wachtwoord_bevestiging:
+        flash("Wachtwoorden komen niet overeen.", "fout")
+        return redirect(url_for("admin"))
+
+    try:
+        db = get_db()
+        db.execute(
+            "INSERT INTO beheerders (gebruikersnaam, wachtwoord_hash) VALUES (?, ?)",
+            (gebruikersnaam, generate_password_hash(wachtwoord))
+        )
+        db.commit()
+        app.logger.info(f"Nieuw beheerdersaccount aangemaakt: {saniteer_log(gebruikersnaam)}")
+        flash(f"Account '{gebruikersnaam}' aangemaakt.", "info")
+    except sqlite3.IntegrityError:
+        flash(f"Gebruikersnaam '{gebruikersnaam}' bestaat al.", "fout")
+    except sqlite3.Error as e:
+        app.logger.error(f"DB-fout beheerder_toevoegen: {e}")
+        abort(500)
+    return redirect(url_for("admin"))
+
+
+@app.route("/admin/beheerder-verwijderen/<int:beheerder_id>", methods=["POST"])
+@login_vereist
+def beheerder_verwijderen(beheerder_id):
+    """Verwijder een beheerdersaccount."""
+    try:
+        db = get_db()
+        aantal = db.execute("SELECT COUNT(*) FROM beheerders").fetchone()[0]
+        if aantal <= 1:
+            flash("Het laatste account kan niet worden verwijderd.", "fout")
+            return redirect(url_for("admin"))
+        rij = db.execute(
+            "SELECT gebruikersnaam FROM beheerders WHERE id = ?", (beheerder_id,)
+        ).fetchone()
+        if not rij:
+            abort(404)
+        if rij["gebruikersnaam"] == session.get("admin_gebruikersnaam"):
+            flash("Je kunt je eigen account niet verwijderen.", "fout")
+            return redirect(url_for("admin"))
+        db.execute("DELETE FROM beheerders WHERE id = ?", (beheerder_id,))
+        db.commit()
+        app.logger.info(f"Beheerdersaccount verwijderd: {saniteer_log(rij['gebruikersnaam'])}")
+        flash(f"Account '{rij['gebruikersnaam']}' verwijderd.", "info")
+    except sqlite3.Error as e:
+        app.logger.error(f"DB-fout beheerder_verwijderen: {e}")
+        abort(500)
     return redirect(url_for("admin"))
 
 

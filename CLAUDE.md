@@ -56,6 +56,7 @@ The entire backend lives in `app.py` (single file). Templates are in `templates/
 - **`bestellingen`**: orders — `naam`, `email`, `telefoon`, `aantal`, `bedrag`, `transactiekosten` (0/1), `mollie_id`, `status` (aangemaakt/betaald/mislukt/geannuleerd/verlopen), `lot_van`/`lot_tot` (ticket range), `mail_verstuurd`, `pogingen`, `betaalwijze` (ideal/contant/overboeking)
 - **`teller`**: single row with `volgend_lot` (next ticket number), `max_eendjes` (total available, editable via admin), `max_per_bestelling` (per-order limit, editable via admin), `prijs_per_stuk`, `prijs_vijf_stuks`, `transactiekosten` (all editable via admin, seeded from env on first run), `notificatie_email` (optional admin copy address, editable via admin, empty = disabled)
 - **`webhook_log`**: audit log of webhook calls
+- **`beheerders`**: admin accounts — `gebruikersnaam` (unique), `wachtwoord_hash` (Werkzeug PBKDF2), `aangemaakt_op`. Seeded on first run from `ADMIN_USER`/`ADMIN_PASS` env vars. Multiple accounts supported.
 
 ### Atomic Ticket Assignment
 
@@ -82,6 +83,8 @@ Admin routes:
 - `POST /admin/opruimen` — deletes orders with status `verlopen`/`mislukt`/`geannuleerd` where `lot_van IS NULL` (no tickets assigned). Safe to run at any time.
 - `POST /admin/handmatig` — create a manual order (cash/bank transfer); atomically assigns ticket numbers, optionally sends confirmation email if address is provided. `betaalwijze` = `contant` or `overboeking`.
 - `POST /admin/reset` — full database reset (wipes all orders + webhook_log, resets `volgend_lot` to 1, resets SQLite autoincrement so IDs start at 1 again). Requires typing `RESET` as confirmation. Has a JS confirm dialog as second safeguard.
+- `POST /admin/beheerder-toevoegen` — add a new admin account; validates username not empty, password ≥ 12 chars, passwords match, username unique.
+- `POST /admin/beheerder-verwijderen/<id>` — delete an admin account; blocked if only 1 account exists or if deleting own account.
 
 `GET /api/beschikbaar` — public JSON endpoint returning `verkocht`, `beschikbaar`, `max_eendjes`, `max_per_bestelling`. Used by the homepage auto-refresh (every 30s).
 
@@ -91,7 +94,7 @@ Admin routes:
 
 ## Testing Notes
 
-`tests/test_app.py` stubs out Mollie, Resend, Flask-WTF CSRF, and Flask-Limiter so tests run with only Flask installed. Tests cover pricing, input validation, database operations, atomic transactions, email sending, webhook processing, admin routes, `max_per_bestelling`/`max_eendjes` settings, price settings (`prijs_per_stuk`/`prijs_vijf_stuks`/`transactiekosten`) via admin, CSV injection escaping, CSV filename timestamp, CSV header columns, email header content (afbeelding/kleur/datum), notification email (instellen/validatie/versturen), email validation in wijzig_bestelling, opruimen, paginering, server-side statusfilter, CSP nonces, Permissions-Policy, session permanence, `saniteer_log`, legal pages (`/privacy`, `/voorwaarden`), footer content on `/betaald/<id>` and error pages (`fout.html`), collapsible `<details>` sections in admin. The test database uses `/tmp/eendjes_test.db` (reset before each test class). `maak_db()` includes all teller columns. Total: 233 tests.
+`tests/test_app.py` stubs out Mollie, Resend, Flask-WTF CSRF, and Flask-Limiter so tests run with only Flask installed. Tests cover pricing, input validation, database operations, atomic transactions, email sending, webhook processing, admin routes, `max_per_bestelling`/`max_eendjes` settings, price settings (`prijs_per_stuk`/`prijs_vijf_stuks`/`transactiekosten`) via admin, CSV injection escaping, CSV filename timestamp, CSV header columns, email header content (afbeelding/kleur/datum), notification email (instellen/validatie/versturen), email validation in wijzig_bestelling, opruimen, paginering, server-side statusfilter, CSP nonces, Permissions-Policy, session permanence, `saniteer_log`, legal pages (`/privacy`, `/voorwaarden`), footer content on `/betaald/<id>` and error pages (`fout.html`), collapsible `<details>` sections in admin, multi-account admin (`TestBeheerderAccounts`). The test database uses `/tmp/eendjes_test.db` (reset before each test class). `maak_db()` includes all teller columns and seeds the `beheerders` table. Total: ~241 tests.
 
 ## Key Patterns
 

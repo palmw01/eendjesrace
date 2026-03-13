@@ -216,6 +216,7 @@
     <h1><img class="eend-inline" src="{{ url_for('static', filename='img/eend.png') }}" alt=""> Badeendjesrace – Beheer</h1>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
       <a href="/admin/export-csv" class="knop-csv">⬇ CSV downloaden</a>
+      {% if huidige_gebruiker %}<span style="font-size:.88rem;color:#555;">👤 {{ huidige_gebruiker }}</span>{% endif %}
       <a href="/admin/logout" class="uitloggen">Uitloggen</a>
     </div>
   </div>
@@ -447,6 +448,62 @@
         <input class="instelling-input" type="email" id="notificatie_email" name="notificatie_email" placeholder="bijv. beheer@voorbeeld.nl" value="{{ notificatie_email }}">
       </div>
       <button type="submit" class="instelling-knop">Opslaan</button>
+    </form>
+  </details>
+
+  <!-- Beheerders -->
+  <details class="instelling-kaart">
+    <summary>👤 Beheerders</summary>
+    <table style="margin-bottom:18px;">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Gebruikersnaam</th>
+          <th>Aangemaakt op</th>
+          <th>Actie</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for b in beheerders %}
+        <tr>
+          <td>{{ b['id'] }}</td>
+          <td>{{ b['gebruikersnaam'] }}{% if b['gebruikersnaam'] == huidige_gebruiker %} <span class="badge badge-betaald">jij</span>{% endif %}</td>
+          <td style="color:#888;font-size:.85rem;">{{ b['aangemaakt_op'][:16] }}</td>
+          <td>
+            {% set is_eigen = (b['gebruikersnaam'] == huidige_gebruiker) %}
+            {% set is_enige = (beheerders|length <= 1) %}
+            {% if is_eigen or is_enige %}
+              <button class="instelling-knop" style="background:#E0E0E0;color:#888;cursor:not-allowed;padding:4px 10px;font-size:.78rem;" disabled
+                title="{% if is_eigen %}Je kunt je eigen account niet verwijderen{% else %}Het laatste account kan niet worden verwijderd{% endif %}">
+                Verwijderen
+              </button>
+            {% else %}
+              <form method="POST" action="/admin/beheerder-verwijderen/{{ b['id'] }}" style="display:inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="knop-reset" style="padding:4px 10px;font-size:.78rem;">Verwijderen</button>
+              </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p style="font-size:.9rem;font-weight:700;margin-bottom:12px;">Nieuw account aanmaken</p>
+    <form method="POST" action="/admin/beheerder-toevoegen">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="instelling-rij">
+        <label class="instelling-label" for="b_gebruikersnaam">Gebruikersnaam <span style="color:#C62828">*</span></label>
+        <input class="instelling-input" type="text" id="b_gebruikersnaam" name="gebruikersnaam" placeholder="gebruikersnaam" required maxlength="100" autocomplete="off">
+      </div>
+      <div class="instelling-rij">
+        <label class="instelling-label" for="b_wachtwoord">Wachtwoord <span style="color:#C62828">*</span></label>
+        <input class="instelling-input" type="password" id="b_wachtwoord" name="wachtwoord" placeholder="minimaal 12 tekens" required autocomplete="new-password">
+      </div>
+      <div class="instelling-rij">
+        <label class="instelling-label" for="b_wachtwoord_bevestiging">Wachtwoord bevestigen <span style="color:#C62828">*</span></label>
+        <input class="instelling-input" type="password" id="b_wachtwoord_bevestiging" name="wachtwoord_bevestiging" placeholder="herhaal wachtwoord" required autocomplete="new-password">
+      </div>
+      <button type="submit" class="instelling-knop">Account aanmaken</button>
     </form>
   </details>
 

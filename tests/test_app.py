@@ -20,6 +20,7 @@ import sqlite3
 import unittest
 from unittest.mock import MagicMock, patch
 from types import ModuleType
+from werkzeug.security import generate_password_hash
 
 
 # ─── Stub ontbrekende packages vóór app-import ───────────────────────────────
@@ -137,7 +138,14 @@ def maak_db():
             mollie_id TEXT, status TEXT, ip TEXT,
             ontvangen TEXT DEFAULT (datetime('now','localtime'))
         )""",
+        """CREATE TABLE beheerders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            gebruikersnaam TEXT NOT NULL UNIQUE,
+            wachtwoord_hash TEXT NOT NULL,
+            aangemaakt_op TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+        )""",
         f"INSERT INTO teller (id, volgend_lot, max_eendjes, max_per_bestelling, prijs_per_stuk, prijs_vijf_stuks, transactiekosten) VALUES (1, 1, {MAX_EENDJES}, 100, 2.50, 10.00, 0.32)",
+        f"INSERT INTO beheerders (gebruikersnaam, wachtwoord_hash) VALUES ('admin', '{generate_password_hash('testpass')}')",
     ]:
         conn.execute(ddl)
     return conn
@@ -761,9 +769,8 @@ class TestAdmin(unittest.TestCase):
         self.assertIn(b"Onjuiste", r.data)
 
     def test_leeg_wachtwoord_altijd_geweigerd(self):
-        with patch("app.ADMIN_WACHTWOORD", ""):
-            r = self.client.post("/admin/login",
-                                 data={"gebruiker": "admin", "wachtwoord": ""})
+        r = self.client.post("/admin/login",
+                             data={"gebruiker": "admin", "wachtwoord": ""})
         self.assertNotEqual(r.status_code, 302)
 
     def test_correct_login_geeft_toegang(self):
@@ -2037,6 +2044,116 @@ class TestWettelijkePaginas(unittest.TestCase):
     def test_voorwaarden_bevat_organisatienaam(self):
         r = self.client.get("/voorwaarden")
         self.assertIn("Diaconie Hervormde gemeente te Wapenveld".encode(), r.data)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# BEHEERDERSACCOUNTS
+#     DB-gebaseerde multi-account authenticatie
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestBeheerderAccounts(unittest.TestCase):
+
+    def setUp(self):
+        self.client, self.ctx = maak_flask_client()
+        self._login()
+
+    def tearDown(self):
+        self.ctx.pop()
+
+    def _login(self, gebruiker="admin", wachtwoord="testpass"):
+        self.client.post("/admin/login",
+                         data={"gebruiker": gebruiker, "wachtwoord": wachtwoord})
+
+    def _voeg_toe(self, gebruikersnaam="nieuw_beheerder", wachtwoord="sterkwachtwoord1", bevestiging=None):
+        if bevestiging is None:
+            bevestiging = wachtwoord
+        return self.client.post("/admin/beheerder-toevoegen", data={
+            "gebruikersnaam": gebruikersnaam,
+            "wachtwoord": wachtwoord,
+            "wachtwoord_bevestiging": bevestiging,
+        }, follow_redirects=True)
+
+    def _verwijder(self, beheerder_id):
+        return self.client.post(f"/admin/beheerder-verwijderen/{beheerder_id}",
+                                follow_redirects=True)
+
+    def test_beheerder_toevoegen_werkt(self):
+        """Nieuw account verschijnt in de database."""
+        self._voeg_toe(gebruikersnaam="testbeheerder")
+        rij = App.get_db().execute(
+            "SELECT gebruikersnaam FROM beheerders WHERE gebruikersnaam='testbeheerder'"
+        ).fetchone()
+        self.assertIsNotNone(rij)
+
+    def test_beheerder_toevoegen_te_kort_wachtwoord(self):
+        """Wachtwoord korter dan 12 tekens geeft foutmelding."""
+        r = self._voeg_toe(wachtwoord="kort", bevestiging="kort")
+        self.assertIn(b"12", r.data)
+
+    def test_beheerder_toevoegen_wachtwoord_mismatch(self):
+        """Niet-overeenkomende wachtwoorden geven foutmelding."""
+        r = self._voeg_toe(wachtwoord="sterkwachtwoord1", bevestiging="anderwachtwoord2")
+        self.assertIn(b"overeen", r.data)
+
+    def test_beheerder_toevoegen_dubbele_naam(self):
+        """Bestaande gebruikersnaam geeft foutmelding."""
+        self._voeg_toe(gebruikersnaam="dubbel_beheerder")
+        r = self._voeg_toe(gebruikersnaam="dubbel_beheerder")
+        self.assertIn(b"bestaat al", r.data)
+
+    def test_beheerder_verwijderen_werkt(self):
+        """Tweede account kan worden verwijderd."""
+        self._voeg_toe(gebruikersnaam="te_verwijderen")
+        rij = App.get_db().execute(
+            "SELECT id FROM beheerders WHERE gebruikersnaam='te_verwijderen'"
+        ).fetchone()
+        self.assertIsNotNone(rij)
+        self._verwijder(rij["id"])
+        weg = App.get_db().execute(
+            "SELECT id FROM beheerders WHERE gebruikersnaam='te_verwijderen'"
+        ).fetchone()
+        self.assertIsNone(weg)
+
+    def test_beheerder_verwijderen_laatste_geblokkeerd(self):
+        """Als er maar 1 account is, mag het niet worden verwijderd."""
+        rij = App.get_db().execute(
+            "SELECT id FROM beheerders WHERE gebruikersnaam='admin'"
+        ).fetchone()
+        r = self._verwijder(rij["id"])
+        self.assertIn(b"laatste", r.data)
+        # Account nog steeds aanwezig
+        nog_aanwezig = App.get_db().execute(
+            "SELECT id FROM beheerders WHERE gebruikersnaam='admin'"
+        ).fetchone()
+        self.assertIsNotNone(nog_aanwezig)
+
+    def test_beheerder_verwijderen_eigen_geblokkeerd(self):
+        """Eigen account kan niet worden verwijderd."""
+        # Voeg een tweede account toe zodat verwijdering in theorie mogelijk is
+        self._voeg_toe(gebruikersnaam="ander_account")
+        rij = App.get_db().execute(
+            "SELECT id FROM beheerders WHERE gebruikersnaam='admin'"
+        ).fetchone()
+        r = self._verwijder(rij["id"])
+        self.assertIn(b"eigen", r.data)
+        nog_aanwezig = App.get_db().execute(
+            "SELECT id FROM beheerders WHERE gebruikersnaam='admin'"
+        ).fetchone()
+        self.assertIsNotNone(nog_aanwezig)
+
+    def test_tweede_account_kan_inloggen(self):
+        """Nieuw aangemaakt account kan succesvol inloggen."""
+        self._voeg_toe(gebruikersnaam="tweede_admin", wachtwoord="sterkwachtwoord2",
+                       bevestiging="sterkwachtwoord2")
+        # Uitloggen en inloggen met nieuw account
+        self.client.get("/admin/logout")
+        r = self.client.post("/admin/login",
+                             data={"gebruiker": "tweede_admin",
+                                   "wachtwoord": "sterkwachtwoord2"})
+        self.assertEqual(r.status_code, 302)
+        self.assertIn("/admin", r.headers["Location"])
+        # Admin pagina bereikbaar
+        self.assertEqual(self.client.get("/admin").status_code, 200)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
