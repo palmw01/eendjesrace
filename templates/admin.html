@@ -488,7 +488,24 @@
         {% endfor %}
       </tbody>
     </table>
-    <p style="font-size:.9rem;font-weight:700;margin-bottom:12px;">Nieuw account aanmaken</p>
+    <p style="font-size:.9rem;font-weight:700;margin-bottom:12px;">Wachtwoord wijzigen</p>
+    <form method="POST" action="/admin/wachtwoord-wijzigen">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="instelling-rij">
+        <label class="instelling-label" for="huidig_wachtwoord">Huidig wachtwoord <span style="color:#C62828">*</span></label>
+        <input class="instelling-input" type="password" id="huidig_wachtwoord" name="huidig_wachtwoord" required autocomplete="current-password">
+      </div>
+      <div class="instelling-rij">
+        <label class="instelling-label" for="nieuw_wachtwoord">Nieuw wachtwoord <span style="color:#C62828">*</span></label>
+        <input class="instelling-input" type="password" id="nieuw_wachtwoord" name="nieuw_wachtwoord" placeholder="minimaal 12 tekens" required autocomplete="new-password">
+      </div>
+      <div class="instelling-rij">
+        <label class="instelling-label" for="nieuw_wachtwoord_bevestiging">Bevestigen <span style="color:#C62828">*</span></label>
+        <input class="instelling-input" type="password" id="nieuw_wachtwoord_bevestiging" name="nieuw_wachtwoord_bevestiging" placeholder="herhaal nieuw wachtwoord" required autocomplete="new-password">
+      </div>
+      <button type="submit" class="instelling-knop">Wachtwoord wijzigen</button>
+    </form>
+    <p style="font-size:.9rem;font-weight:700;margin-bottom:12px;margin-top:24px;">Nieuw account aanmaken</p>
     <form method="POST" action="/admin/beheerder-toevoegen">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="instelling-rij">

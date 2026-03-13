@@ -1124,6 +1124,42 @@ def beheerder_verwijderen(beheerder_id):
     return redirect(url_for("admin"))
 
 
+@app.route("/admin/wachtwoord-wijzigen", methods=["POST"])
+@login_vereist
+def wachtwoord_wijzigen():
+    """Wijzig het wachtwoord van de ingelogde beheerder."""
+    huidig = request.form.get("huidig_wachtwoord", "")
+    nieuw = request.form.get("nieuw_wachtwoord", "")
+    bevestiging = request.form.get("nieuw_wachtwoord_bevestiging", "")
+    gebruiker = session.get("admin_gebruikersnaam")
+    try:
+        db = get_db()
+        rij = db.execute(
+            "SELECT id, wachtwoord_hash FROM beheerders WHERE gebruikersnaam = ?",
+            (gebruiker,)
+        ).fetchone()
+        if not rij or not check_password_hash(rij["wachtwoord_hash"], huidig):
+            flash("Huidig wachtwoord is onjuist.", "fout")
+            return redirect(url_for("admin"))
+        if len(nieuw) < 12:
+            flash("Nieuw wachtwoord moet minimaal 12 tekens zijn.", "fout")
+            return redirect(url_for("admin"))
+        if nieuw != bevestiging:
+            flash("Nieuwe wachtwoorden komen niet overeen.", "fout")
+            return redirect(url_for("admin"))
+        db.execute(
+            "UPDATE beheerders SET wachtwoord_hash = ? WHERE id = ?",
+            (generate_password_hash(nieuw), rij["id"])
+        )
+        db.commit()
+        app.logger.info(f"Wachtwoord gewijzigd voor: {saniteer_log(gebruiker)}")
+        flash("Wachtwoord succesvol gewijzigd.", "info")
+    except sqlite3.Error as e:
+        app.logger.error(f"DB-fout wachtwoord_wijzigen: {e}")
+        abort(500)
+    return redirect(url_for("admin"))
+
+
 @app.route("/admin/mail-opnieuw/<int:bestelling_id>", methods=["POST"])
 @login_vereist
 def mail_opnieuw(bestelling_id):

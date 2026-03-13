@@ -2155,6 +2155,40 @@ class TestBeheerderAccounts(unittest.TestCase):
         # Admin pagina bereikbaar
         self.assertEqual(self.client.get("/admin").status_code, 200)
 
+    def _wijzig_wachtwoord(self, huidig, nieuw, bevestiging=None):
+        if bevestiging is None:
+            bevestiging = nieuw
+        return self.client.post("/admin/wachtwoord-wijzigen", data={
+            "huidig_wachtwoord": huidig,
+            "nieuw_wachtwoord": nieuw,
+            "nieuw_wachtwoord_bevestiging": bevestiging,
+        }, follow_redirects=True)
+
+    def test_wachtwoord_wijzigen_werkt(self):
+        """Wachtwoord succesvol wijzigen met correct huidig wachtwoord."""
+        r = self._wijzig_wachtwoord("testpass", "nieuwwachtwoord99")
+        self.assertIn(b"succesvol", r.data)
+        # Inloggen met nieuw wachtwoord werkt
+        self.client.get("/admin/logout")
+        r2 = self.client.post("/admin/login",
+                              data={"gebruiker": "admin", "wachtwoord": "nieuwwachtwoord99"})
+        self.assertEqual(r2.status_code, 302)
+
+    def test_wachtwoord_wijzigen_fout_huidig(self):
+        """Verkeerd huidig wachtwoord geeft foutmelding."""
+        r = self._wijzig_wachtwoord("verkeerd", "nieuwwachtwoord99")
+        self.assertIn(b"onjuist", r.data)
+
+    def test_wachtwoord_wijzigen_te_kort(self):
+        """Nieuw wachtwoord korter dan 12 tekens geeft foutmelding."""
+        r = self._wijzig_wachtwoord("testpass", "kortww", "kortww")
+        self.assertIn(b"12", r.data)
+
+    def test_wachtwoord_wijzigen_mismatch(self):
+        """Niet-overeenkomende nieuwe wachtwoorden geven foutmelding."""
+        r = self._wijzig_wachtwoord("testpass", "nieuwwachtwoord99", "anderwachtwoord00")
+        self.assertIn(b"overeen", r.data)
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Uitvoeren als script
