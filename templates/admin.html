@@ -96,6 +96,18 @@
     .badge-overboeking { background: #F3E5F5; color: #4A148C; }
     .badge-handmatig   { background: #FFF8E1; color: #E65100; }
 
+    /* Inklapbare kaarten via <details> */
+    details.instelling-kaart > summary {
+      font-family: 'Fredoka One', cursive; font-size: 1.4rem; color: #0077B6;
+      cursor: pointer; list-style: none;
+      display: flex; justify-content: space-between; align-items: center;
+      user-select: none;
+    }
+    details.instelling-kaart > summary::-webkit-details-marker { display: none; }
+    details.instelling-kaart > summary::after { content: '▾'; font-size: 1rem; transition: transform .2s; }
+    details.instelling-kaart[open] > summary::after { transform: rotate(-180deg); }
+    details.instelling-kaart[open] > summary { margin-bottom: 18px; }
+
     .mail-fout { font-size: .8rem; color: #C62828; }
     .mail-ok   { font-size: .8rem; color: #2E7D32; }
 
@@ -360,8 +372,8 @@
   {% endif %}
 
   <!-- Handmatige bestelling -->
-  <div class="instelling-kaart" style="margin-top:28px;">
-    <h2 class="instelling-titel">➕ Handmatige bestelling toevoegen</h2>
+  <details class="instelling-kaart" style="margin-top:28px;">
+    <summary>➕ Handmatige bestelling toevoegen</summary>
     <p style="font-size:.9rem;color:#555;margin-bottom:16px;">
       Voor verkoop buiten iDEAL om (contant of overboeking). Lotnummers worden direct toegewezen.
       E-mail en telefoon zijn optioneel — als een e-mailadres is ingevuld, wordt automatisch een bevestigingsmail gestuurd.
@@ -393,7 +405,7 @@
       </div>
       <button type="submit" class="instelling-knop">Bestelling aanmaken</button>
     </form>
-  </div>
+  </details>
 
   <!-- Instellingen -->
   {% with berichten = get_flashed_messages(with_categories=true) %}
@@ -406,8 +418,8 @@
     {% endfor %}
   {% endwith %}
 
-  <div class="instelling-kaart">
-    <h2 class="instelling-titel">Instellingen</h2>
+  <details class="instelling-kaart">
+    <summary>Instellingen</summary>
     <form method="POST" action="/admin/instellingen">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="instelling-rij">
@@ -436,7 +448,7 @@
       </div>
       <button type="submit" class="instelling-knop">Opslaan</button>
     </form>
-  </div>
+  </details>
 
   <!-- Gevaarzone: database resetten -->
   <div class="gevaarzone">

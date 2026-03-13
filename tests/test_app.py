@@ -775,6 +775,18 @@ class TestAdmin(unittest.TestCase):
         self.client.get("/admin/logout")
         self.assertEqual(self.client.get("/admin").status_code, 302)
 
+    def test_admin_bevat_details_handmatige_bestelling(self):
+        self._login()
+        r = self.client.get("/admin")
+        self.assertIn(b"<details", r.data)
+        self.assertIn("Handmatige bestelling".encode(), r.data)
+
+    def test_admin_bevat_details_instellingen(self):
+        self._login()
+        r = self.client.get("/admin")
+        self.assertIn(b"<details", r.data)
+        self.assertIn("Instellingen".encode(), r.data)
+
     def test_mail_opnieuw_niet_betaald_geeft_404(self):
         doe_bestelling(self.client)
         self._login()
@@ -1726,6 +1738,14 @@ class TestCsvInjectie(unittest.TestCase):
         csv_tekst = self._download_csv()
         header = csv_tekst.splitlines()[0]
         self.assertEqual(header.count(";"), 12)  # 13 kolommen = 12 scheidingstekens
+
+    def test_csv_header_bevat_alle_kolomnamen(self):
+        csv_tekst = self._download_csv()
+        header = csv_tekst.splitlines()[0]
+        for kolom in ["ID", "Naam", "E-mail", "Telefoon", "Aantal", "Bedrag",
+                      "iDEAL-kosten", "Lot van", "Lot tot", "Status",
+                      "Betaalwijze", "Mail verstuurd", "Aangemaakt op"]:
+            self.assertIn(kolom, header)
 
 
 class TestMailHeader(unittest.TestCase):
