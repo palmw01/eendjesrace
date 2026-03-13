@@ -215,7 +215,6 @@
   <div class="topbar">
     <h1><img class="eend-inline" src="{{ url_for('static', filename='img/eend.png') }}" alt=""> Badeendjesrace – Beheer</h1>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-      <a href="/admin/export-csv" class="knop-csv">⬇ CSV downloaden</a>
       {% if huidige_gebruiker %}
         <span style="font-size:.88rem;color:#555;">👤 {{ huidige_gebruiker }}</span>
         <button type="button" id="btnWachtwoordWijzigen" style="padding:8px 14px;background:#E3F2FD;color:#1565C0;border:none;border-radius:99px;font-weight:700;font-size:.9rem;cursor:pointer;">🔑 Wachtwoord</button>
@@ -281,6 +280,7 @@
       <a href="/admin?status=verlopen{% if zoekterm %}&zoek={{ zoekterm | urlencode }}{% endif %}" class="filter-knop {% if status_filter == 'verlopen' %}actief{% endif %}">Verlopen</a>
       <a href="/admin?status=geannuleerd{% if zoekterm %}&zoek={{ zoekterm | urlencode }}{% endif %}" class="filter-knop {% if status_filter == 'geannuleerd' %}actief{% endif %}">Geannuleerd</a>
     </div>
+    <a href="/admin/export-csv" class="knop-csv" style="margin-left:auto;">⬇ CSV downloaden</a>
   </form>
 
   <!-- Bestellingen tabel -->
