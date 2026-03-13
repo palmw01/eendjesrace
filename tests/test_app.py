@@ -2191,6 +2191,1153 @@ class TestBeheerderAccounts(unittest.TestCase):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# SECURITY.TXT
+#     GET /.well-known/security.txt — RFC 9116 compliance
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestSecurityTxt(unittest.TestCase):
+
+    def setUp(self):
+        self.client, self.ctx = maak_flask_client()
+
+    def tearDown(self):
+        self.ctx.pop()
+
+    def test_security_txt_geeft_200(self):
+        r = self.client.get("/.well-known/security.txt")
+        self.assertEqual(r.status_code, 200)
+
+    def test_security_txt_mimetype_text_plain(self):
+        r = self.client.get("/.well-known/security.txt")
+        self.assertIn("text/plain", r.content_type)
+
+    def test_security_txt_bevat_contact_veld(self):
+        r = self.client.get("/.well-known/security.txt")
+        self.assertIn(b"Contact:", r.data)
+
+    def test_security_txt_bevat_expires_veld(self):
+        r = self.client.get("/.well-known/security.txt")
+        self.assertIn(b"Expires:", r.data)
+
+    def test_security_txt_bevat_preferred_languages(self):
+        r = self.client.get("/.well-known/security.txt")
+        self.assertIn(b"Preferred-Languages: nl, en", r.data)
+
+    def test_security_txt_bevat_canonical_veld(self):
+        r = self.client.get("/.well-known/security.txt")
+        self.assertIn(b"Canonical:", r.data)
+
+    def test_security_txt_expires_is_toekomst(self):
+        """Expires-datum moet in de toekomst liggen (minimaal vandaag)."""
+        import re as _re
+        r = self.client.get("/.well-known/security.txt")
+        tekst = r.data.decode()
+        m = _re.search(r"Expires: (\d{4}-\d{2}-\d{2})", tekst)
+        self.assertIsNotNone(m)
+        from datetime import date
+        jaar, maand, dag = map(int, m.group(1).split("-"))
+        self.assertGreaterEqual(date(jaar, maand, dag), date.today())
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ADMIN LOGIN GEBRUIKERSNAAM IN SESSIE
+#     Sessie slaat gebruikersnaam op en logout gebruikt die
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestAdminLoginSessie(unittest.TestCase):
+
+    def setUp(self):
+        self.client, self.ctx = maak_flask_client()
+
+    def tearDown(self):
+        self.ctx.pop()
+
+    def test_login_slaat_gebruikersnaam_op_in_sessie(self):
+        """Na succesvol inloggen moet admin_gebruikersnaam in de sessie staan."""
+        self.client.post("/admin/login",
+                         data={"gebruiker": "admin", "wachtwoord": "testpass12345"})
+        with self.client.session_transaction() as sess:
+            self.assertEqual(sess.get("admin_gebruikersnaam"), "admin")
+
+    def test_logout_redirect_naar_loginpagina(self):
+        """Uitloggen stuurt door naar de inlogpagina."""
+        self.client.post("/admin/login",
+                         data={"gebruiker": "admin", "wachtwoord": "testpass12345"})
+        r = self.client.get("/admin/logout")
+        self.assertEqual(r.status_code, 302)
+        self.assertIn("login", r.headers["Location"])
+
+    def test_logout_wist_sessie_volledig(self):
+        """Na uitloggen mogen geen admin-sessiegegevens meer aanwezig zijn."""
+        self.client.post("/admin/login",
+                         data={"gebruiker": "admin", "wachtwoord": "testpass12345"})
+        self.client.get("/admin/logout")
+        with self.client.session_transaction() as sess:
+            self.assertFalse(sess.get("admin_ingelogd", False))
+            self.assertIsNone(sess.get("admin_gebruikersnaam"))
+
+    def test_logout_zonder_login_geeft_302(self):
+        """Uitloggen zonder actieve sessie redirect naar inlogpagina."""
+        r = self.client.get("/admin/logout")
+        self.assertEqual(r.status_code, 302)
+
+    def test_login_onbekende_gebruiker_geeft_fout(self):
+        """Een onbekende gebruikersnaam geeft een foutmelding op de loginpagina."""
+        r = self.client.post("/admin/login",
+                             data={"gebruiker": "onbekend", "wachtwoord": "testpass12345"})
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(b"Onjuiste", r.data)
+
+    def test_login_geeft_200_bij_GET(self):
+        """GET-verzoek op loginpagina geeft formulier terug."""
+        r = self.client.get("/admin/login")
+        self.assertEqual(r.status_code, 200)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# BEHEERDER TOEVOEGEN — EXTRA GEVALLEN
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestBeheerderToevoegenExtra(unittest.TestCase):
+
+    def setUp(self):
+        self.client, self.ctx = maak_flask_client()
+        self.client.post("/admin/login",
+                         data={"gebruiker": "admin", "wachtwoord": "testpass12345"})
+
+    def tearDown(self):
+        self.ctx.pop()
+
+    def test_beheerder_toevoegen_lege_naam_geeft_fout(self):
+        """Lege gebruikersnaam wordt geweigerd."""
+        r = self.client.post("/admin/beheerder-toevoegen", data={
+            "gebruikersnaam": "",
+            "wachtwoord": "sterkwachtwoord1",
+            "wachtwoord_bevestiging": "sterkwachtwoord1",
+        }, follow_redirects=True)
+        self.assertIn(b"verplicht", r.data)
+
+    def test_beheerder_toevoegen_zonder_login_geeft_302(self):
+        """Unauthenticated toegang wordt doorgestuurd naar login."""
+        self.client.get("/admin/logout")
+        r = self.client.post("/admin/beheerder-toevoegen", data={
+            "gebruikersnaam": "nieuw",
+            "wachtwoord": "sterkwachtwoord1",
+            "wachtwoord_bevestiging": "sterkwachtwoord1",
+        })
+        self.assertEqual(r.status_code, 302)
+        self.assertIn("login", r.headers["Location"])
+
+    def test_beheerder_toevoegen_slaat_hash_op_niet_plaintext(self):
+        """Wachtwoord wordt gehashed opgeslagen — niet als plaintext."""
+        self.client.post("/admin/beheerder-toevoegen", data={
+            "gebruikersnaam": "hash_test",
+            "wachtwoord": "sterkwachtwoord1",
+            "wachtwoord_bevestiging": "sterkwachtwoord1",
+        })
+        rij = App.get_db().execute(
+            "SELECT wachtwoord_hash FROM beheerders WHERE gebruikersnaam='hash_test'"
+        ).fetchone()
+        self.assertIsNotNone(rij)
+        self.assertNotEqual(rij["wachtwoord_hash"], "sterkwachtwoord1")
+        # Hash mag niet gelijk zijn aan het plaintext wachtwoord
+        self.assertGreater(len(rij["wachtwoord_hash"]), 20)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# BEHEERDER VERWIJDEREN — EXTRA GEVALLEN
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestBeheerderVerwijderenExtra(unittest.TestCase):
+
+    def setUp(self):
+        self.client, self.ctx = maak_flask_client()
+        self.client.post("/admin/login",
+                         data={"gebruiker": "admin", "wachtwoord": "testpass12345"})
+
+    def tearDown(self):
+        self.ctx.pop()
+
+    def test_beheerder_verwijderen_onbekend_id_geeft_404(self):
+        """Verwijderen van niet-bestaand account geeft 404."""
+        # Voeg tweede account toe zodat de "laatste account"-blokkering niet vuurt
+        self.client.post("/admin/beheerder-toevoegen", data={
+            "gebruikersnaam": "tweede",
+            "wachtwoord": "sterkwachtwoord1",
+            "wachtwoord_bevestiging": "sterkwachtwoord1",
+        })
+        r = self.client.post("/admin/beheerder-verwijderen/99999",
+                             follow_redirects=False)
+        self.assertEqual(r.status_code, 404)
+
+    def test_beheerder_verwijderen_zonder_login_geeft_302(self):
+        """Unauthenticated toegang wordt doorgestuurd naar login."""
+        self.client.get("/admin/logout")
+        r = self.client.post("/admin/beheerder-verwijderen/1")
+        self.assertEqual(r.status_code, 302)
+        self.assertIn("login", r.headers["Location"])
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# WACHTWOORD WIJZIGEN — EXTRA GEVALLEN
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestWachtwoordWijzigenExtra(unittest.TestCase):
+
+    def setUp(self):
+        self.client, self.ctx = maak_flask_client()
+        self.client.post("/admin/login",
+                         data={"gebruiker": "admin", "wachtwoord": "testpass12345"})
+
+    def tearDown(self):
+        self.ctx.pop()
+
+    def test_wachtwoord_wijzigen_zonder_login_geeft_302(self):
+        """Unauthenticated toegang wordt doorgestuurd naar login."""
+        self.client.get("/admin/logout")
+        r = self.client.post("/admin/wachtwoord-wijzigen", data={
+            "huidig_wachtwoord": "testpass12345",
+            "nieuw_wachtwoord": "nieuwwachtwoord99",
+            "nieuw_wachtwoord_bevestiging": "nieuwwachtwoord99",
+        })
+        self.assertEqual(r.status_code, 302)
+        self.assertIn("login", r.headers["Location"])
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# HANDMATIGE BESTELLING — EXTRA GEVALLEN
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestHandmatigeBestellingenExtra(unittest.TestCase):
+
+    def setUp(self):
+        self.client, self.ctx = maak_flask_client()
+        self.client.post("/admin/login",
+                         data={"gebruiker": "admin", "wachtwoord": "testpass12345"})
+
+    def tearDown(self):
+        self.ctx.pop()
+
+    def test_handmatige_bestelling_ongeldig_aantal_tekst(self):
+        """Tekstwaarde voor aantal geeft foutmelding, geen crash."""
+        r = self.client.post("/admin/handmatig", data={
+            "naam": "Test Persoon", "email": "", "telefoon": "",
+            "aantal": "veel", "betaalwijze": "contant",
+        }, follow_redirects=True)
+        self.assertEqual(r.status_code, 200)
+        count = App.get_db().execute("SELECT COUNT(*) FROM bestellingen").fetchone()[0]
+        self.assertEqual(count, 0)
+
+    def test_handmatige_bestelling_aantal_nul_geeft_fout(self):
+        """Aantal = 0 wordt geweigerd."""
+        r = self.client.post("/admin/handmatig", data={
+            "naam": "Test Persoon", "email": "", "telefoon": "",
+            "aantal": "0", "betaalwijze": "contant",
+        }, follow_redirects=True)
+        self.assertEqual(r.status_code, 200)
+        count = App.get_db().execute("SELECT COUNT(*) FROM bestellingen").fetchone()[0]
+        self.assertEqual(count, 0)
+
+    def test_handmatige_bestelling_oversell_geeft_fout_geen_record(self):
+        """Bij oversell wordt geen bestelling aangemaakt en de foutmelding getoond."""
+        App.get_db().execute("UPDATE teller SET volgend_lot=? WHERE id=1", (MAX_EENDJES + 1,))
+        r = self.client.post("/admin/handmatig", data={
+            "naam": "Oversell Test", "email": "", "telefoon": "",
+            "aantal": "1", "betaalwijze": "contant",
+        }, follow_redirects=True)
+        self.assertEqual(r.status_code, 200)
+        count = App.get_db().execute("SELECT COUNT(*) FROM bestellingen").fetchone()[0]
+        self.assertEqual(count, 0)
+
+    def test_handmatige_bestelling_ongeldig_email_geeft_fout(self):
+        """Ongeldig e-mailadres bij handmatige bestelling wordt geweigerd."""
+        r = self.client.post("/admin/handmatig", data={
+            "naam": "Test Persoon", "email": "geen-at-teken",
+            "telefoon": "", "aantal": "1", "betaalwijze": "contant",
+        }, follow_redirects=True)
+        self.assertEqual(r.status_code, 200)
+        count = App.get_db().execute("SELECT COUNT(*) FROM bestellingen").fetchone()[0]
+        self.assertEqual(count, 0)
+
+    def test_handmatige_bestelling_naam_te_lang_geeft_fout(self):
+        """Naam langer dan 100 tekens wordt geweigerd."""
+        r = self.client.post("/admin/handmatig", data={
+            "naam": "A" * 101, "email": "", "telefoon": "",
+            "aantal": "1", "betaalwijze": "contant",
+        }, follow_redirects=True)
+        self.assertEqual(r.status_code, 200)
+        count = App.get_db().execute("SELECT COUNT(*) FROM bestellingen").fetchone()[0]
+        self.assertEqual(count, 0)
+
+    def test_handmatige_bestelling_mail_verstuurd_bij_succes_met_email(self):
+        """Bij een succesvolle bestelling met e-mail wordt mail_verstuurd=1 als mail slaagt."""
+        with patch("app.stuur_bevestigingsmail", return_value=True):
+            self.client.post("/admin/handmatig", data={
+                "naam": "Met Email", "email": "met@test.nl",
+                "telefoon": "", "aantal": "1", "betaalwijze": "contant",
+            })
+        rij = App.get_db().execute(
+            "SELECT mail_verstuurd FROM bestellingen WHERE naam='Met Email'"
+        ).fetchone()
+        self.assertEqual(rij["mail_verstuurd"], 1)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ADMIN ZOEKFUNCTIE
+#     Server-side zoekopdracht via ?zoek=... parameter
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestAdminZoekfunctie(unittest.TestCase):
+
+    def setUp(self):
+        self.client, self.ctx = maak_flask_client()
+        self.client.post("/admin/login",
+                         data={"gebruiker": "admin", "wachtwoord": "testpass12345"})
+        # Vul database met testbestellingen
+        db = App.get_db()
+        db.execute(
+            "INSERT INTO bestellingen (naam, telefoon, email, aantal, bedrag, status, lot_van, lot_tot) "
+            "VALUES (?,?,?,?,?,?,?,?)",
+            ("Zoek Jansen", "0612345678", "zoek@test.nl", 2, 5.00, "betaald", 1, 2)
+        )
+        db.execute(
+            "INSERT INTO bestellingen (naam, telefoon, email, aantal, bedrag, status) "
+            "VALUES (?,?,?,?,?,?)",
+            ("Andere Persoon", "0687654321", "andere@test.nl", 1, 2.50, "aangemaakt")
+        )
+
+    def tearDown(self):
+        self.ctx.pop()
+
+    def test_zoek_op_naam_vindt_resultaat(self):
+        r = self.client.get("/admin?zoek=Zoek")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("Zoek Jansen".encode(), r.data)
+        self.assertNotIn("Andere Persoon".encode(), r.data)
+
+    def test_zoek_op_email_vindt_resultaat(self):
+        r = self.client.get("/admin?zoek=zoek@test.nl")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(b"zoek@test.nl", r.data)
+        self.assertNotIn(b"andere@test.nl", r.data)
+
+    def test_zoek_op_lotnummer_vindt_resultaat(self):
+        r = self.client.get("/admin?zoek=1")
+        self.assertEqual(r.status_code, 200)
+        # Lot_van=1 komt voor in de eerste bestelling
+        self.assertIn("Zoek Jansen".encode(), r.data)
+
+    def test_zoek_geen_resultaat_toont_lege_lijst(self):
+        r = self.client.get("/admin?zoek=bestaaniet99999")
+        self.assertEqual(r.status_code, 200)
+        self.assertNotIn("Zoek Jansen".encode(), r.data)
+        self.assertNotIn("Andere Persoon".encode(), r.data)
+
+    def test_zoek_gecombineerd_met_statusfilter(self):
+        """Zoek en statusfilter samen werken correct."""
+        r = self.client.get("/admin?zoek=Persoon&status=aangemaakt")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("Andere Persoon".encode(), r.data)
+        self.assertNotIn("Zoek Jansen".encode(), r.data)
+
+    def test_zoek_te_lang_wordt_afgekapt(self):
+        """Zoekterm langer dan 100 tekens wordt afgekapt zonder fout."""
+        lange_zoekterm = "x" * 200
+        r = self.client.get(f"/admin?zoek={lange_zoekterm}")
+        self.assertEqual(r.status_code, 200)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# FOUTPAGINA'S — HTTP 400, 403, 500
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestFoutpaginasExtra(unittest.TestCase):
+
+    def setUp(self):
+        self.client, self.ctx = maak_flask_client()
+
+    def tearDown(self):
+        self.ctx.pop()
+
+    def test_404_bevat_paginacode(self):
+        r = self.client.get("/bestaat-niet-xyz")
+        self.assertEqual(r.status_code, 404)
+        self.assertIn(b"404", r.data)
+
+    def test_500_error_handler_geeft_foutpagina(self):
+        """De 500-errorhandler geeft een foutpagina terug met status 500."""
+        with App.app.test_request_context():
+            resp = App.app.make_response(
+                App.app.handle_http_exception(
+                    __import__("werkzeug.exceptions", fromlist=["InternalServerError"])
+                    .InternalServerError()
+                )
+            )
+        self.assertEqual(resp.status_code, 500)
+
+    def test_foutpagina_bevat_security_headers(self):
+        """Ook foutpagina's krijgen de security headers mee."""
+        r = self.client.get("/bestaat-niet-xyz")
+        self.assertIn("X-Frame-Options", r.headers)
+        self.assertIn("Content-Security-Policy", r.headers)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# BETAALD PAGINA — EXTRA GEVALLEN
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestBetaaldPaginaExtra(unittest.TestCase):
+
+    def setUp(self):
+        self.client, self.ctx = maak_flask_client()
+
+    def tearDown(self):
+        self.ctx.pop()
+
+    def test_aangemaakt_zonder_mollie_id_toont_wachtpagina(self):
+        """Bestelling met status 'aangemaakt' maar zonder mollie_id toont wachtpagina
+        zonder Mollie-aanroep te doen (geen mollie_id = geen fallback check)."""
+        doe_bestelling(self.client)
+        # Verwijder mollie_id zodat de fallback niet getriggerd wordt
+        App.get_db().execute("UPDATE bestellingen SET mollie_id=NULL WHERE id=1")
+        r = self.client.get("/betaald/1")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(b"wacht", r.data)
+
+    def test_betaald_geeft_lotnummers_weer(self):
+        """Succespagina toont de toegewezen lotnummers."""
+        doe_bestelling(self.client, aantal=2)
+        App.get_db().execute(
+            "UPDATE bestellingen SET status='betaald', mollie_id='tr_x', "
+            "lot_van=5, lot_tot=6 WHERE id=1"
+        )
+        r = self.client.get("/betaald/1")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(b"5", r.data)
+        self.assertIn(b"6", r.data)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ADMIN INSTELLINGEN — EXTRA GEVALLEN
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestAdminInstellingenExtra(unittest.TestCase):
+
+    def setUp(self):
+        self.client, self.ctx = maak_flask_client()
+        self.client.post("/admin/login",
+                         data={"gebruiker": "admin", "wachtwoord": "testpass12345"})
+
+    def tearDown(self):
+        self.ctx.pop()
+
+    def test_transactiekosten_negatief_geeft_fout(self):
+        """Negatieve transactiekosten worden geweigerd."""
+        r = self.client.post("/admin/instellingen",
+                             data={"transactiekosten": "-0.10"},
+                             follow_redirects=True)
+        self.assertIn(b"negatief", r.data)
+        # Waarde mag niet gewijzigd zijn
+        self.assertAlmostEqual(App.get_transactiekosten(), 0.32, places=2)
+
+    def test_max_per_bestelling_en_max_eendjes_samen_opgeslagen(self):
+        """max_per_bestelling en max_eendjes worden tegelijk correct opgeslagen."""
+        self.client.post("/admin/instellingen", data={
+            "max_eendjes": "500",
+            "max_per_bestelling": "20",
+        }, follow_redirects=True)
+        rij = App.get_db().execute(
+            "SELECT max_eendjes, max_per_bestelling FROM teller WHERE id=1"
+        ).fetchone()
+        self.assertEqual(rij["max_eendjes"], 500)
+        self.assertEqual(rij["max_per_bestelling"], 20)
+
+    def test_max_eendjes_nul_geeft_fout(self):
+        """max_eendjes = 0 wordt geweigerd (moet minimaal 1 zijn)."""
+        r = self.client.post("/admin/instellingen",
+                             data={"max_eendjes": "0"},
+                             follow_redirects=True)
+        self.assertEqual(r.status_code, 200)
+        rij = App.get_db().execute("SELECT max_eendjes FROM teller WHERE id=1").fetchone()
+        self.assertGreater(rij["max_eendjes"], 0)
+
+    def test_ongeldig_getal_geeft_fout(self):
+        """Niet-numerieke waarde voor prijs geeft een foutmelding."""
+        r = self.client.post("/admin/instellingen",
+                             data={"prijs_per_stuk": "abc"},
+                             follow_redirects=True)
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(b"Ongeldig", r.data)
+
+    def test_notificatie_email_niet_aanwezig_in_form_wijzigt_niet(self):
+        """Als notificatie_email niet in het formulier zit, wordt het niet gewijzigd."""
+        # Stel eerst een adres in
+        self.client.post("/admin/instellingen",
+                         data={"notificatie_email": "beheer@test.nl"})
+        # Stuur nu een formulier zonder notificatie_email veld
+        self.client.post("/admin/instellingen",
+                         data={"max_per_bestelling": "50"})
+        from app import get_notificatie_email
+        # Het adres moet ongewijzigd zijn
+        self.assertEqual(get_notificatie_email(), "beheer@test.nl")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# HOMEPAGE EN API
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestHomepageEnApi(unittest.TestCase):
+
+    def setUp(self):
+        self.client, self.ctx = maak_flask_client()
+
+    def tearDown(self):
+        self.ctx.pop()
+
+    def test_homepage_geeft_200(self):
+        r = self.client.get("/")
+        self.assertEqual(r.status_code, 200)
+
+    def test_homepage_toont_beschikbare_eendjes(self):
+        r = self.client.get("/")
+        self.assertEqual(r.status_code, 200)
+        # De pagina moet een getal tonen (beschikbare eendjes)
+        self.assertIn(b"eendj", r.data.lower())
+
+    def test_api_beschikbaar_levert_max_per_bestelling(self):
+        d = self.client.get("/api/beschikbaar").get_json()
+        self.assertIn("max_per_bestelling", d)
+        self.assertEqual(d["max_per_bestelling"], 100)
+
+    def test_api_beschikbaar_verkocht_begint_op_nul(self):
+        d = self.client.get("/api/beschikbaar").get_json()
+        self.assertEqual(d["verkocht"], 0)
+
+    def test_api_prijs_met_transactiekosten_param(self):
+        """?transactiekosten=1 verhoogt het bedrag met de iDEAL-kosten."""
+        r = self.client.get("/api/prijs?aantal=1&transactiekosten=1")
+        self.assertEqual(r.status_code, 200)
+        bedrag = r.get_json()["bedrag"]
+        self.assertAlmostEqual(bedrag, 2.50 + 0.32, places=2)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECURITY HEADERS — AANVULLEND
+#     X-XSS-Protection, onderdrukt Server-header, CSP base-uri / form-action
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestSecurityHeadersAanvullend(unittest.TestCase):
+
+    def setUp(self):
+        self.client, self.ctx = maak_flask_client()
+
+    def tearDown(self):
+        self.ctx.pop()
+
+    def test_x_xss_protection_header_aanwezig(self):
+        """X-XSS-Protection header moet aanwezig zijn."""
+        r = self.client.get("/")
+        self.assertIn("1; mode=block", r.headers.get("X-XSS-Protection", ""))
+
+    def test_server_header_leeg(self):
+        """Server-header mag geen versie-informatie bevatten."""
+        r = self.client.get("/")
+        self.assertEqual(r.headers.get("Server", ""), "")
+
+    def test_csp_bevat_base_uri_self(self):
+        """CSP moet base-uri 'self' bevatten om base-tag-injectie te voorkomen."""
+        csp = self.client.get("/").headers.get("Content-Security-Policy", "")
+        self.assertIn("base-uri 'self'", csp)
+
+    def test_csp_bevat_form_action_self(self):
+        """CSP moet form-action 'self' bevatten."""
+        csp = self.client.get("/").headers.get("Content-Security-Policy", "")
+        self.assertIn("form-action 'self'", csp)
+
+    def test_csp_bevat_frame_ancestors_none(self):
+        """CSP moet frame-ancestors 'none' bevatten (vervangt X-Frame-Options)."""
+        csp = self.client.get("/").headers.get("Content-Security-Policy", "")
+        self.assertIn("frame-ancestors 'none'", csp)
+
+    def test_csp_bevat_img_src_self(self):
+        """CSP mag afbeeldingen alleen van 'self' en data: URI's toestaan."""
+        csp = self.client.get("/").headers.get("Content-Security-Policy", "")
+        self.assertIn("img-src 'self' data:", csp)
+
+    def test_referrer_policy_waarde(self):
+        """Referrer-Policy moet strict-origin-when-cross-origin zijn."""
+        r = self.client.get("/")
+        self.assertEqual(
+            r.headers.get("Referrer-Policy", ""),
+            "strict-origin-when-cross-origin",
+        )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# BEVESTIGINGSMAIL — LOTNUMMER-TEKSTOPMAAK
+#     stuur_bevestigingsmail() kent 3 tekstvarianten afhankelijk van het aantal:
+#       1 lotnummer  → "lotnummer #X"
+#       2-4 nummers  → opsomming "# x · # y · …"
+#       5+ nummers   → bereik "# x t/m # y"
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestBevestigingsmailOpmaakvarianten(unittest.TestCase):
+
+    def _vang_html(self, lot_van, lot_tot, aantal=None):
+        if aantal is None:
+            aantal = lot_tot - lot_van + 1
+        verzonden = {}
+        def nep_send(params):
+            verzonden["html"] = params.get("html", "")
+            return {"id": "test"}
+        with patch("resend.Emails.send", side_effect=nep_send):
+            stuur_bevestigingsmail("Jan", "jan@test.nl", aantal, lot_van, lot_tot, 5.00)
+        return verzonden.get("html", "")
+
+    def test_een_lotnummer_tekst_enkelvoud(self):
+        """Bij lot_van == lot_tot verschijnt 'lotnummer' in enkelvoud."""
+        html = self._vang_html(5, 5, aantal=1)
+        self.assertIn("lotnummer", html)
+        self.assertIn("#5", html)
+
+    def test_twee_lotnummers_worden_opgesomd(self):
+        """2 lotnummers worden individueel opgesomd met · als scheidingsteken."""
+        html = self._vang_html(3, 4, aantal=2)
+        self.assertIn("#3", html)
+        self.assertIn("#4", html)
+        self.assertIn("middot", html)  # HTML-entiteit &middot;
+
+    def test_vier_lotnummers_worden_opgesomd(self):
+        """4 lotnummers (< 5) worden individueel opgesomd."""
+        html = self._vang_html(10, 13, aantal=4)
+        self.assertIn("#10", html)
+        self.assertIn("#13", html)
+        self.assertIn("middot", html)
+
+    def test_vijf_lotnummers_bullets(self):
+        """5 lotnummers (verschil=4 < 5) gebruiken bullet-notatie."""
+        html = self._vang_html(1, 5, aantal=5)
+        self.assertIn("middot", html)
+        self.assertIn("#1", html)
+        self.assertIn("#5", html)
+        self.assertNotIn("t/m", html)
+
+    def test_zes_lotnummers_bereiknotatie(self):
+        """6 lotnummers (verschil>=5) gebruiken bereiknotatie 't/m'."""
+        html = self._vang_html(1, 6, aantal=6)
+        self.assertIn("t/m", html)
+        self.assertIn("#1", html)
+        self.assertIn("#6", html)
+
+    def test_tien_lotnummers_bereiknotatie(self):
+        """10 lotnummers gebruiken bereiknotatie."""
+        html = self._vang_html(1, 10, aantal=10)
+        self.assertIn("t/m", html)
+        self.assertNotIn("middot", html)
+
+    def test_een_eendje_tekst_in_mail(self):
+        """Bij 1 eendje staat 'eendje' (enkelvoud) in de mail."""
+        html = self._vang_html(1, 1, aantal=1)
+        self.assertIn("eendje", html)
+
+    def test_meerdere_eendjes_tekst_in_mail(self):
+        """Bij meerdere eendjes staat 'eendjes' (meervoud) in de mail."""
+        html = self._vang_html(1, 3, aantal=3)
+        self.assertIn("eendjes", html)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# VALIDEER INVOER — GRENSWAARDES
+#     Aanvullende tests voor exacte grenswaardes in valideer_invoer()
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestValideerInvoerGrenswaardes(unittest.TestCase):
+
+    def _ok(self, naam="Jan Jansen", tel="0612345678",
+            email="jan@test.nl", aantal=3, max_per_bestelling=100):
+        return valideer_invoer(naam, tel, email, aantal, max_per_bestelling)
+
+    def test_naam_precies_2_tekens_geldig(self):
+        """Naam van exact 2 tekens moet geldig zijn."""
+        self.assertEqual(self._ok(naam="AB"), [])
+
+    def test_naam_precies_100_tekens_geldig(self):
+        """Naam van exact 100 tekens moet geldig zijn."""
+        self.assertEqual(self._ok(naam="A" * 100), [])
+
+    def test_naam_101_tekens_ongeldig(self):
+        """Naam van 101 tekens moet ongeldig zijn."""
+        self.assertGreater(len(self._ok(naam="A" * 101)), 0)
+
+    def test_aantal_precies_max_per_bestelling_geldig(self):
+        """Aantal precies gelijk aan max_per_bestelling is geldig."""
+        self.assertEqual(self._ok(aantal=50, max_per_bestelling=50), [])
+
+    def test_aantal_een_boven_max_per_bestelling_ongeldig(self):
+        """Aantal één boven max_per_bestelling is ongeldig."""
+        fouten = self._ok(aantal=51, max_per_bestelling=50)
+        self.assertGreater(len(fouten), 0)
+
+    def test_telefoon_precies_6_cijfers_geldig(self):
+        """Telefoonnummer van exact 6 tekens (met cijfers) is geldig."""
+        self.assertEqual(self._ok(tel="123456"), [])
+
+    def test_telefoon_precies_20_tekens_geldig(self):
+        """Telefoonnummer van exact 20 tekens is geldig."""
+        self.assertEqual(self._ok(tel="+31 6 1234 5678 9012"), [])
+
+    def test_email_met_subdomein_geldig(self):
+        """E-mail met subdomein moet geldig zijn."""
+        self.assertEqual(self._ok(email="jan@mail.example.com"), [])
+
+    def test_email_met_plusteken_geldig(self):
+        """E-mail met plus-adressering moet geldig zijn."""
+        self.assertEqual(self._ok(email="jan+test@example.com"), [])
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# WIJS LOTNUMMERS TOE — AANVULLEND
+#     Direct testen van wijs_lotnummers_toe() voor idempotentie bij al-betaald
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestWijsLotnummersToeAanvullend(unittest.TestCase):
+
+    def setUp(self):
+        self.db = maak_db()
+
+    def tearDown(self):
+        self.db.close()
+
+    def _voeg_bestelling_toe(self, naam="Jan", aantal=2, status="aangemaakt"):
+        self.db.execute(
+            "INSERT INTO bestellingen (naam,telefoon,email,aantal,bedrag,status) "
+            "VALUES (?,?,?,?,?,?)", (naam, "06", "jan@t.nl", aantal, 5.00, status)
+        )
+        return self.db.execute("SELECT last_insert_rowid()").fetchone()[0]
+
+    def test_idempotentie_geeft_bestaande_loten_terug(self):
+        """Als bestelling al 'betaald' is, worden de bestaande loten teruggegeven."""
+        bid = self._voeg_bestelling_toe(aantal=2)
+        # Eerste toewijzing
+        s1, e1 = wijs_lotnummers_toe(self.db, bid, 2)
+        # Tweede aanroep — idempotent
+        s2, e2 = wijs_lotnummers_toe(self.db, bid, 2)
+        self.assertEqual(s1, s2)
+        self.assertEqual(e1, e2)
+
+    def test_idempotentie_verhoogt_teller_niet(self):
+        """Tweede aanroep op al-betaalde bestelling mag teller niet verhogen."""
+        bid = self._voeg_bestelling_toe(aantal=3)
+        wijs_lotnummers_toe(self.db, bid, 3)
+        teller_na_eerste = self.db.execute(
+            "SELECT volgend_lot FROM teller WHERE id=1"
+        ).fetchone()["volgend_lot"]
+        wijs_lotnummers_toe(self.db, bid, 3)
+        teller_na_tweede = self.db.execute(
+            "SELECT volgend_lot FROM teller WHERE id=1"
+        ).fetchone()["volgend_lot"]
+        self.assertEqual(teller_na_eerste, teller_na_tweede)
+
+    def test_precies_een_lotnummer(self):
+        """Bestelling van 1 krijgt lot_van == lot_tot."""
+        bid = self._voeg_bestelling_toe(aantal=1)
+        s, e = wijs_lotnummers_toe(self.db, bid, 1)
+        self.assertEqual(s, e)
+
+    def test_teller_verhoogd_na_toewijzing(self):
+        """Na toewijzing van N loten staat de teller op start + N."""
+        bid = self._voeg_bestelling_toe(aantal=4)
+        s, e = wijs_lotnummers_toe(self.db, bid, 4)
+        teller = self.db.execute(
+            "SELECT volgend_lot FROM teller WHERE id=1"
+        ).fetchone()["volgend_lot"]
+        self.assertEqual(teller, e + 1)
+
+    def test_oversell_op_exact_laatste_lotnummer(self):
+        """Wanneer volgend_lot == max_eendjes is nog 1 lot beschikbaar (niet over)."""
+        self.db.execute("UPDATE teller SET volgend_lot=? WHERE id=1", (MAX_EENDJES,))
+        bid = self._voeg_bestelling_toe(aantal=1)
+        # Dit moet NIET falen — er is nog precies 1 over
+        s, e = wijs_lotnummers_toe(self.db, bid, 1)
+        self.assertEqual(s, MAX_EENDJES)
+        self.assertEqual(e, MAX_EENDJES)
+
+    def test_oversell_een_boven_maximum(self):
+        """Wanneer einde > max_eendjes gooit de functie ValueError."""
+        self.db.execute("UPDATE teller SET volgend_lot=? WHERE id=1", (MAX_EENDJES,))
+        bid = self._voeg_bestelling_toe(aantal=2)
+        with self.assertRaises(ValueError):
+            wijs_lotnummers_toe(self.db, bid, 2)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ADMIN PAGINA — GEBRUIKERSNAAM EN BEHEERDERLIJST
+#     Admin-panel toont ingelogde gebruiker en lijst van beheerders
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestAdminPaginaGebruikersnaam(unittest.TestCase):
+
+    def setUp(self):
+        self.client, self.ctx = maak_flask_client()
+        self.client.post("/admin/login",
+                         data={"gebruiker": "admin", "wachtwoord": "testpass12345"})
+
+    def tearDown(self):
+        self.ctx.pop()
+
+    def test_admin_pagina_toont_ingelogde_gebruiker(self):
+        """Admin-pagina moet de gebruikersnaam van de ingelogde beheerder tonen."""
+        r = self.client.get("/admin")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(b"admin", r.data)
+
+    def test_admin_pagina_toont_beheerderlijst(self):
+        """Admin-pagina moet de lijst van beheerdersaccounts tonen."""
+        r = self.client.get("/admin")
+        self.assertEqual(r.status_code, 200)
+        # Het account 'admin' moet in de lijst staan
+        self.assertIn(b"admin", r.data)
+
+    def test_admin_pagina_toont_tweede_beheerder_na_toevoegen(self):
+        """Na toevoegen van een tweede account verschijnt die in de admin-pagina."""
+        self.client.post("/admin/beheerder-toevoegen", data={
+            "gebruikersnaam": "tweede_admin_zichtbaar",
+            "wachtwoord": "sterkwachtwoord9",
+            "wachtwoord_bevestiging": "sterkwachtwoord9",
+        })
+        r = self.client.get("/admin")
+        self.assertIn(b"tweede_admin_zichtbaar", r.data)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# WACHTWOORD WIJZIGEN — OUD WACHTWOORD WERKT NIET MEER
+#     Na een succesvolle wachtwoordwijziging werkt het oude wachtwoord niet meer
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestWachtwoordWijzigenOudWachtwoord(unittest.TestCase):
+
+    def setUp(self):
+        self.client, self.ctx = maak_flask_client()
+        self.client.post("/admin/login",
+                         data={"gebruiker": "admin", "wachtwoord": "testpass12345"})
+
+    def tearDown(self):
+        self.ctx.pop()
+
+    def test_oud_wachtwoord_werkt_niet_meer_na_wijziging(self):
+        """Na wijzigen moet inloggen met het oude wachtwoord mislukken."""
+        self.client.post("/admin/wachtwoord-wijzigen", data={
+            "huidig_wachtwoord": "testpass12345",
+            "nieuw_wachtwoord": "nieuwwachtwoord99",
+            "nieuw_wachtwoord_bevestiging": "nieuwwachtwoord99",
+        })
+        self.client.get("/admin/logout")
+        r = self.client.post("/admin/login",
+                             data={"gebruiker": "admin",
+                                   "wachtwoord": "testpass12345"})
+        # Moet op de loginpagina blijven — geen redirect naar /admin
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(b"Onjuiste", r.data)
+
+    def test_wachtwoord_wijzigen_hash_in_db_gewijzigd(self):
+        """Na wijzigen moet de hash in de DB veranderd zijn."""
+        oude_hash = App.get_db().execute(
+            "SELECT wachtwoord_hash FROM beheerders WHERE gebruikersnaam='admin'"
+        ).fetchone()["wachtwoord_hash"]
+        self.client.post("/admin/wachtwoord-wijzigen", data={
+            "huidig_wachtwoord": "testpass12345",
+            "nieuw_wachtwoord": "nieuwwachtwoord99",
+            "nieuw_wachtwoord_bevestiging": "nieuwwachtwoord99",
+        })
+        nieuwe_hash = App.get_db().execute(
+            "SELECT wachtwoord_hash FROM beheerders WHERE gebruikersnaam='admin'"
+        ).fetchone()["wachtwoord_hash"]
+        self.assertNotEqual(oude_hash, nieuwe_hash)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# BETAALD PAGINA — FALLBACK MOLLIE-FOUT
+#     /betaald/<id> vangt Mollie-API-fouten af zonder te crashen
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestBetaaldPaginaFallbackFout(unittest.TestCase):
+
+    def setUp(self):
+        self.client, self.ctx = maak_flask_client()
+
+    def tearDown(self):
+        self.ctx.pop()
+
+    def test_mollie_fout_in_fallback_toont_wachtpagina(self):
+        """Als Mollie-API faalt in de fallback, toont de pagina de wachtstatus."""
+        doe_bestelling(self.client)
+        stel_mollie_id_in(1, "tr_fallback_fout")
+        with patch("app.maak_mollie_client") as mc:
+            mc.return_value.payments.get.side_effect = Exception("Mollie onbereikbaar")
+            r = self.client.get("/betaald/1")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(b"wacht", r.data)
+
+    def test_mollie_mollie_error_in_fallback_geeft_200(self):
+        """MollieError in de fallback levert geen crash op."""
+        doe_bestelling(self.client)
+        stel_mollie_id_in(1, "tr_fallback_molliefout")
+        with patch("app.maak_mollie_client") as mc:
+            mc.return_value.payments.get.side_effect = MollieError("timeout")
+            r = self.client.get("/betaald/1")
+        self.assertEqual(r.status_code, 200)
+
+    def test_betaald_status_geannuleerd_toont_waarschuwing(self):
+        """Geannuleerde betaling toont een waarschuwingsstatus."""
+        doe_bestelling(self.client)
+        App.get_db().execute(
+            "UPDATE bestellingen SET status='geannuleerd', mollie_id='tr_ann' WHERE id=1"
+        )
+        r = self.client.get("/betaald/1")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(b"waarsch", r.data)
+
+    def test_betaald_status_verlopen_toont_waarschuwing(self):
+        """Verlopen betaling toont een waarschuwingsstatus."""
+        doe_bestelling(self.client)
+        App.get_db().execute(
+            "UPDATE bestellingen SET status='verlopen', mollie_id='tr_exp' WHERE id=1"
+        )
+        r = self.client.get("/betaald/1")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(b"waarsch", r.data)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# BESTELLEN — AANVULLENDE GEVALLEN
+#     Minder geteste paden in de /bestellen route
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestBestellenAanvullend(unittest.TestCase):
+
+    def setUp(self):
+        self.client, self.ctx = maak_flask_client()
+
+    def tearDown(self):
+        self.ctx.pop()
+
+    def test_geldige_bestelling_slaat_betaalwijze_ideal_op(self):
+        """Normale iDEAL-bestelling krijgt betaalwijze='ideal' in de database."""
+        doe_bestelling(self.client, naam="iDEAL Test")
+        rij = App.get_db().execute(
+            "SELECT betaalwijze FROM bestellingen WHERE naam='iDEAL Test'"
+        ).fetchone()
+        self.assertEqual(rij["betaalwijze"], "ideal")
+
+    def test_validatiefout_behoudt_ingevulde_naam(self):
+        """Bij validatiefout (lege naam) moet de response de eerder ingevulde
+        gegevens terugsturen (vorig-dict)."""
+        r = self.client.post("/bestellen", data={
+            "naam": "",
+            "telefoon": "0612345678",
+            "email": "jan@test.nl",
+            "aantal": "2",
+        })
+        self.assertEqual(r.status_code, 422)
+
+    def test_naam_alleen_spaties_geeft_422(self):
+        """Naam met alleen spaties (len < 2 na strip) geeft een 422."""
+        r = doe_bestelling(self.client, naam="   ")
+        self.assertEqual(r.status_code, 422)
+
+    def test_te_veel_eendjes_bij_bijna_vol_geeft_409(self):
+        """Als er minder eendjes beschikbaar zijn dan besteld wordt, geeft 409."""
+        # Stel max op 3, bestel er 5
+        App.get_db().execute("UPDATE teller SET max_eendjes=3 WHERE id=1")
+        r = doe_bestelling(self.client, aantal=5)
+        self.assertEqual(r.status_code, 409)
+
+    def test_bestelling_slaat_naam_op(self):
+        """De naam wordt correct opgeslagen in de database."""
+        doe_bestelling(self.client, naam="Unieke Naam Test")
+        rij = App.get_db().execute(
+            "SELECT naam FROM bestellingen WHERE naam='Unieke Naam Test'"
+        ).fetchone()
+        self.assertIsNotNone(rij)
+        self.assertEqual(rij["naam"], "Unieke Naam Test")
+
+    def test_bestelling_slaat_email_lowercase_op(self):
+        """E-mailadres wordt lowercase opgeslagen."""
+        doe_bestelling(self.client, email="TEST@EXAMPLE.COM")
+        rij = App.get_db().execute(
+            "SELECT email FROM bestellingen WHERE id=1"
+        ).fetchone()
+        self.assertEqual(rij["email"], "test@example.com")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ADMIN INSTELLINGEN — LEEG FORMULIER
+#     Formulier zonder ingevulde velden doet geen wijzigingen
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestAdminInstellingenLeegFormulier(unittest.TestCase):
+
+    def setUp(self):
+        self.client, self.ctx = maak_flask_client()
+        self.client.post("/admin/login",
+                         data={"gebruiker": "admin", "wachtwoord": "testpass12345"})
+
+    def tearDown(self):
+        self.ctx.pop()
+
+    def test_leeg_formulier_wijzigt_niets(self):
+        """Volledig leeg instellingen-formulier mag geen waarden wijzigen."""
+        # Lees beginsituatie
+        rij_voor = App.get_db().execute(
+            "SELECT max_eendjes, max_per_bestelling, prijs_per_stuk, "
+            "prijs_vijf_stuks, transactiekosten FROM teller WHERE id=1"
+        ).fetchone()
+        r = self.client.post("/admin/instellingen", data={})
+        self.assertEqual(r.status_code, 302)
+        rij_na = App.get_db().execute(
+            "SELECT max_eendjes, max_per_bestelling, prijs_per_stuk, "
+            "prijs_vijf_stuks, transactiekosten FROM teller WHERE id=1"
+        ).fetchone()
+        self.assertEqual(rij_voor["max_eendjes"],        rij_na["max_eendjes"])
+        self.assertEqual(rij_voor["max_per_bestelling"], rij_na["max_per_bestelling"])
+        self.assertEqual(rij_voor["prijs_per_stuk"],     rij_na["prijs_per_stuk"])
+        self.assertEqual(rij_voor["prijs_vijf_stuks"],   rij_na["prijs_vijf_stuks"])
+        self.assertAlmostEqual(rij_voor["transactiekosten"],
+                               rij_na["transactiekosten"], places=4)
+
+    def test_prijs_per_stuk_negatief_geeft_fout(self):
+        """Negatieve prijs per stuk wordt geweigerd."""
+        r = self.client.post("/admin/instellingen",
+                             data={"prijs_per_stuk": "-1.00"},
+                             follow_redirects=True)
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(b"groter dan 0", r.data)
+        self.assertAlmostEqual(App.get_prijs_per_stuk(), 2.50, places=2)
+
+    def test_max_per_bestelling_nul_geeft_fout(self):
+        """max_per_bestelling = 0 is ongeldig (moet minimaal 1 zijn)."""
+        r = self.client.post("/admin/instellingen",
+                             data={"max_per_bestelling": "0"},
+                             follow_redirects=True)
+        self.assertEqual(r.status_code, 200)
+        rij = App.get_db().execute(
+            "SELECT max_per_bestelling FROM teller WHERE id=1"
+        ).fetchone()
+        self.assertGreater(rij["max_per_bestelling"], 0)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# HANDMATIGE BESTELLING — ONGELDIG TELEFOONNUMMER
+#     handmatige_bestelling() valideert ook het telefoonnummer
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestHandmatigeBestellingTelefoon(unittest.TestCase):
+
+    def setUp(self):
+        self.client, self.ctx = maak_flask_client()
+        self.client.post("/admin/login",
+                         data={"gebruiker": "admin", "wachtwoord": "testpass12345"})
+
+    def tearDown(self):
+        self.ctx.pop()
+
+    def test_ongeldig_telefoonnummer_geeft_fout(self):
+        """Ongeldig telefoonnummer bij handmatige bestelling wordt geweigerd."""
+        r = self.client.post("/admin/handmatig", data={
+            "naam": "Test Persoon", "email": "",
+            "telefoon": "abc-xyz",  # geen cijfers
+            "aantal": "1", "betaalwijze": "contant",
+        }, follow_redirects=True)
+        self.assertEqual(r.status_code, 200)
+        count = App.get_db().execute("SELECT COUNT(*) FROM bestellingen").fetchone()[0]
+        self.assertEqual(count, 0)
+
+    def test_geldig_telefoonnummer_met_spaties_en_plus(self):
+        """Telefoonnummer met spaties, plus en streepjes is geldig."""
+        r = self.client.post("/admin/handmatig", data={
+            "naam": "Test Persoon", "email": "",
+            "telefoon": "+31 6-12345678",
+            "aantal": "1", "betaalwijze": "contant",
+        }, follow_redirects=True)
+        self.assertEqual(r.status_code, 200)
+        rij = App.get_db().execute(
+            "SELECT COUNT(*) AS n FROM bestellingen WHERE naam='Test Persoon'"
+        ).fetchone()
+        self.assertEqual(rij["n"], 1)
+
+    def test_handmatig_zonder_telefoon_is_geldig(self):
+        """Lege telefoon bij handmatige bestelling is toegestaan."""
+        r = self.client.post("/admin/handmatig", data={
+            "naam": "Geen Telefoon", "email": "",
+            "telefoon": "",
+            "aantal": "1", "betaalwijze": "contant",
+        }, follow_redirects=True)
+        self.assertEqual(r.status_code, 200)
+        rij = App.get_db().execute(
+            "SELECT COUNT(*) AS n FROM bestellingen WHERE naam='Geen Telefoon'"
+        ).fetchone()
+        self.assertEqual(rij["n"], 1)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# WEBHOOK — AANVULLENDE GEVALLEN
+#     Extra edge-cases voor de webhook-handler
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestWebhookAanvullend(unittest.TestCase):
+
+    def setUp(self):
+        self.client, self.ctx = maak_flask_client()
+
+    def tearDown(self):
+        self.ctx.pop()
+
+    def test_webhook_logt_aanroep_in_webhook_log(self):
+        """Elke geldige webhook-aanroep wordt opgeslagen in webhook_log."""
+        doe_bestelling(self.client)
+        stel_mollie_id_in(1, "tr_logtest")
+        doe_webhook(self.client, "tr_logtest", "paid")
+        rij = App.get_db().execute(
+            "SELECT mollie_id FROM webhook_log WHERE mollie_id='tr_logtest'"
+        ).fetchone()
+        self.assertIsNotNone(rij)
+
+    def test_webhook_id_zonder_tr_prefix_geeft_400(self):
+        """ID zonder 'tr_' prefix is ongeldig en geeft 400."""
+        r = self.client.post("/webhook", data={"id": "pp_test001"},
+                             environ_base={"REMOTE_ADDR": "127.0.0.1"})
+        self.assertEqual(r.status_code, 400)
+
+    def test_webhook_paid_mail_niet_opnieuw_bij_dubbele_aanroep(self):
+        """Bij een tweede paid-webhook voor dezelfde bestelling wordt geen mail verstuurd."""
+        doe_bestelling(self.client)
+        stel_mollie_id_in(1, "tr_dubbel_mail")
+        # Eerste aanroep
+        doe_webhook(self.client, "tr_dubbel_mail", "paid")
+        pogingen_na_eerste = App.get_db().execute(
+            "SELECT pogingen FROM bestellingen WHERE mollie_id='tr_dubbel_mail'"
+        ).fetchone()["pogingen"]
+        # Tweede aanroep — webhook-handler herkent 'al betaald' en stuurt geen mail
+        doe_webhook(self.client, "tr_dubbel_mail", "paid")
+        pogingen_na_tweede = App.get_db().execute(
+            "SELECT pogingen FROM bestellingen WHERE mollie_id='tr_dubbel_mail'"
+        ).fetchone()["pogingen"]
+        # Pogingen mogen niet verhoogd worden bij de tweede aanroep
+        self.assertEqual(pogingen_na_eerste, pogingen_na_tweede)
+
+    def test_webhook_ip_wordt_opgeslagen_in_log(self):
+        """Het IP-adres van de webhook-aanroep wordt opgeslagen in webhook_log."""
+        doe_bestelling(self.client)
+        stel_mollie_id_in(1, "tr_ip_log")
+        doe_webhook(self.client, "tr_ip_log", "open", ip="10.0.0.1")
+        rij = App.get_db().execute(
+            "SELECT ip FROM webhook_log WHERE mollie_id='tr_ip_log'"
+        ).fetchone()
+        self.assertIsNotNone(rij)
+        self.assertEqual(rij["ip"], "10.0.0.1")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # Uitvoeren als script
 # ══════════════════════════════════════════════════════════════════════════════
 
