@@ -467,7 +467,8 @@
   <!-- Beheerders -->
   <details class="instelling-kaart">
     <summary>👤 Beheerders</summary>
-    <table style="margin-bottom:18px;">
+    <div class="tabel-wrapper" style="margin-bottom:18px;">
+    <table>
       <thead>
         <tr>
           <th>#</th>
@@ -501,6 +502,7 @@
         {% endfor %}
       </tbody>
     </table>
+    </div>
     <p style="font-size:.9rem;font-weight:700;margin-bottom:12px;">Nieuw account aanmaken</p>
     <form method="POST" action="/admin/beheerder-toevoegen">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
