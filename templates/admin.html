@@ -15,11 +15,18 @@
       display: flex; justify-content: space-between; align-items: center;
       margin-bottom: 24px; flex-wrap: wrap; gap: 12px;
     }
+    .topbar-acties { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
     h1 { font-family: 'Fredoka One', cursive; font-size: 2rem; color: #0077B6; }
     .eend-inline { height: 1em; width: auto; vertical-align: middle; display: inline-block; }
     .uitloggen {
       padding: 8px 18px; background: #FFEBEE; color: #C62828;
       border-radius: 99px; text-decoration: none; font-weight: 700; font-size: .9rem;
+    }
+    @media (max-width: 600px) {
+      body { padding: 14px; }
+      h1 { font-size: 1.4rem; }
+      .topbar { flex-direction: column; align-items: flex-start; gap: 8px; }
+      .topbar-acties { width: 100%; }
     }
 
     .waarschuwing {
@@ -217,7 +224,7 @@
 <body>
   <div class="topbar">
     <h1><img class="eend-inline" src="{{ url_for('static', filename='img/eend.png') }}" alt=""> Badeendjesrace – Beheer</h1>
-    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+    <div class="topbar-acties">
       {% if huidige_gebruiker %}
         <span style="font-size:.88rem;color:#555;">👤 {{ huidige_gebruiker }}</span>
         <button type="button" id="btnWachtwoordWijzigen" style="padding:8px 14px;background:#E3F2FD;color:#1565C0;border:none;border-radius:99px;font-weight:700;font-size:.9rem;cursor:pointer;">🔑 Wachtwoord</button>
