@@ -207,6 +207,11 @@ def init_db():
         )
     """)
     if not conn.execute("SELECT 1 FROM beheerders LIMIT 1").fetchone():
+        if not ADMIN_WACHTWOORD or len(ADMIN_WACHTWOORD) < 12:
+            raise SystemExit(
+                "❌  ADMIN_PASS is niet ingesteld of te kort (minimaal 12 tekens). "
+                "Vereist voor initiële database-setup."
+            )
         conn.execute(
             "INSERT INTO beheerders (gebruikersnaam, wachtwoord_hash) VALUES (?, ?)",
             (ADMIN_GEBRUIKER, generate_password_hash(ADMIN_WACHTWOORD))
@@ -1438,9 +1443,14 @@ with app.app_context():
 if __name__ == "__main__":
     if not MOLLIE_API_KEY:
         raise SystemExit("❌  MOLLIE_API_KEY is niet ingesteld.")
-    if not ADMIN_WACHTWOORD:
-        raise SystemExit("❌  ADMIN_PASS is niet ingesteld. Kies een sterk wachtwoord.")
-    if len(ADMIN_WACHTWOORD) < 12:
-        raise SystemExit("❌  ADMIN_PASS moet minimaal 12 tekens lang zijn.")
+    # ADMIN_PASS alleen vereist als de beheerders-tabel nog leeg is (eerste start).
+    # Zodra er accounts in de DB staan, kan ADMIN_PASS weggelaten worden.
+    with sqlite3.connect(DATABASE) as _c:
+        leeg = not _c.execute("SELECT 1 FROM beheerders LIMIT 1").fetchone()
+    if leeg:
+        if not ADMIN_WACHTWOORD:
+            raise SystemExit("❌  ADMIN_PASS is niet ingesteld. Vereist voor eerste start.")
+        if len(ADMIN_WACHTWOORD) < 12:
+            raise SystemExit("❌  ADMIN_PASS moet minimaal 12 tekens lang zijn.")
     debug = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
     app.run(debug=debug, port=5000)

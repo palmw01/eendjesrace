@@ -88,7 +88,7 @@ _mollie_error.Error   = _FakeMollieError
 # ─── Omgevingsvariabelen ──────────────────────────────────────────────────────
 os.environ["MOLLIE_API_KEY"] = "test_sleutel"
 os.environ["ADMIN_USER"]     = "admin"
-os.environ["ADMIN_PASS"]     = "testpass"
+os.environ["ADMIN_PASS"]     = "testpass12345"
 os.environ["SECRET_KEY"]     = "testgeheim-32tekens-voor-signing!"
 os.environ["LOG_DIR"]        = "/tmp/eendjes_test_logs"
 os.environ["DATABASE"]       = "/tmp/eendjes_test.db"
@@ -145,7 +145,7 @@ def maak_db():
             aangemaakt_op TEXT NOT NULL DEFAULT (datetime('now','localtime'))
         )""",
         f"INSERT INTO teller (id, volgend_lot, max_eendjes, max_per_bestelling, prijs_per_stuk, prijs_vijf_stuks, transactiekosten) VALUES (1, 1, {MAX_EENDJES}, 100, 2.50, 10.00, 0.32)",
-        f"INSERT INTO beheerders (gebruikersnaam, wachtwoord_hash) VALUES ('admin', '{generate_password_hash('testpass')}')",
+        f"INSERT INTO beheerders (gebruikersnaam, wachtwoord_hash) VALUES ('admin', '{generate_password_hash('testpass12345')}')",
     ]:
         conn.execute(ddl)
     return conn
@@ -755,7 +755,7 @@ class TestAdmin(unittest.TestCase):
 
     def _login(self):
         self.client.post("/admin/login",
-                         data={"gebruiker": "admin", "wachtwoord": "testpass"})
+                         data={"gebruiker": "admin", "wachtwoord": "testpass12345"})
 
     def test_admin_zonder_login_geeft_302(self):
         r = self.client.get("/admin")
@@ -1068,7 +1068,7 @@ class TestWijzigenVerwijderen(unittest.TestCase):
 
     def _login(self):
         self.client.post("/admin/login",
-                         data={"gebruiker": "admin", "wachtwoord": "testpass"})
+                         data={"gebruiker": "admin", "wachtwoord": "testpass12345"})
 
     def _wijzig(self, bestelling_id=1, **kwargs):
         data = {
@@ -1258,7 +1258,7 @@ class TestMaxPerBestelling(unittest.TestCase):
     def setUp(self):
         self.client, self.ctx = maak_flask_client()
         self.client.post("/admin/login",
-                         data={"gebruiker": "admin", "wachtwoord": "testpass"})
+                         data={"gebruiker": "admin", "wachtwoord": "testpass12345"})
 
     def tearDown(self):
         self.ctx.pop()
@@ -1349,7 +1349,7 @@ class TestOpruimenEnApiBeschikbaar(unittest.TestCase):
     def setUp(self):
         self.client, self.ctx = maak_flask_client()
         self.client.post("/admin/login",
-                         data={"gebruiker": "admin", "wachtwoord": "testpass"})
+                         data={"gebruiker": "admin", "wachtwoord": "testpass12345"})
 
     def tearDown(self):
         self.ctx.pop()
@@ -1423,7 +1423,7 @@ class TestBeveiligingsVerbeteringen(unittest.TestCase):
 
     def _login(self):
         self.client.post("/admin/login",
-                         data={"gebruiker": "admin", "wachtwoord": "testpass"})
+                         data={"gebruiker": "admin", "wachtwoord": "testpass12345"})
 
     # ── CSP nonce ─────────────────────────────────────────────────────────────
 
@@ -1456,7 +1456,7 @@ class TestBeveiligingsVerbeteringen(unittest.TestCase):
         with self.client.session_transaction() as sess:
             self.assertFalse(sess.get("admin_ingelogd", False))
         self.client.post("/admin/login",
-                         data={"gebruiker": "admin", "wachtwoord": "testpass"})
+                         data={"gebruiker": "admin", "wachtwoord": "testpass12345"})
         with self.client.session_transaction() as sess:
             self.assertTrue(sess.get("admin_ingelogd", False))
             self.assertTrue(sess.permanent)
@@ -1562,7 +1562,7 @@ class TestMailOpnieuw(unittest.TestCase):
             mc.return_value.payments.get.return_value = simuleer_mollie_betaling("paid")
             self.client.post("/webhook", data={"id": "tr_test001"})
         self.client.post("/admin/login",
-                         data={"gebruiker": "admin", "wachtwoord": "testpass"})
+                         data={"gebruiker": "admin", "wachtwoord": "testpass12345"})
 
     def tearDown(self):
         self.ctx.pop()
@@ -1614,7 +1614,7 @@ class TestAdminPrijsInstellingen(unittest.TestCase):
     def setUp(self):
         self.client, self.ctx = maak_flask_client()
         self.client.post("/admin/login",
-                         data={"gebruiker": "admin", "wachtwoord": "testpass"})
+                         data={"gebruiker": "admin", "wachtwoord": "testpass12345"})
 
     def tearDown(self):
         self.ctx.pop()
@@ -1679,7 +1679,7 @@ class TestCsvInjectie(unittest.TestCase):
     def setUp(self):
         self.client, self.ctx = maak_flask_client()
         self.client.post("/admin/login",
-                         data={"gebruiker": "admin", "wachtwoord": "testpass"})
+                         data={"gebruiker": "admin", "wachtwoord": "testpass12345"})
 
     def tearDown(self):
         self.ctx.pop()
@@ -1792,7 +1792,7 @@ class TestNotificatieEmail(unittest.TestCase):
     def setUp(self):
         self.client, self.ctx = maak_flask_client()
         self.client.post("/admin/login",
-                         data={"gebruiker": "admin", "wachtwoord": "testpass"})
+                         data={"gebruiker": "admin", "wachtwoord": "testpass12345"})
 
     def tearDown(self):
         self.ctx.pop()
@@ -1869,7 +1869,7 @@ class TestHandmatigeBestellingen(unittest.TestCase):
     def setUp(self):
         self.client, self.ctx = maak_flask_client()
         self.client.post("/admin/login",
-                         data={"gebruiker": "admin", "wachtwoord": "testpass"})
+                         data={"gebruiker": "admin", "wachtwoord": "testpass12345"})
 
     def tearDown(self):
         self.ctx.pop()
@@ -2060,7 +2060,7 @@ class TestBeheerderAccounts(unittest.TestCase):
     def tearDown(self):
         self.ctx.pop()
 
-    def _login(self, gebruiker="admin", wachtwoord="testpass"):
+    def _login(self, gebruiker="admin", wachtwoord="testpass12345"):
         self.client.post("/admin/login",
                          data={"gebruiker": gebruiker, "wachtwoord": wachtwoord})
 
@@ -2166,7 +2166,7 @@ class TestBeheerderAccounts(unittest.TestCase):
 
     def test_wachtwoord_wijzigen_werkt(self):
         """Wachtwoord succesvol wijzigen met correct huidig wachtwoord."""
-        r = self._wijzig_wachtwoord("testpass", "nieuwwachtwoord99")
+        r = self._wijzig_wachtwoord("testpass12345", "nieuwwachtwoord99")
         self.assertIn(b"succesvol", r.data)
         # Inloggen met nieuw wachtwoord werkt
         self.client.get("/admin/logout")
@@ -2181,12 +2181,12 @@ class TestBeheerderAccounts(unittest.TestCase):
 
     def test_wachtwoord_wijzigen_te_kort(self):
         """Nieuw wachtwoord korter dan 12 tekens geeft foutmelding."""
-        r = self._wijzig_wachtwoord("testpass", "kortww", "kortww")
+        r = self._wijzig_wachtwoord("testpass12345", "kortww", "kortww")
         self.assertIn(b"12", r.data)
 
     def test_wachtwoord_wijzigen_mismatch(self):
         """Niet-overeenkomende nieuwe wachtwoorden geven foutmelding."""
-        r = self._wijzig_wachtwoord("testpass", "nieuwwachtwoord99", "anderwachtwoord00")
+        r = self._wijzig_wachtwoord("testpass12345", "nieuwwachtwoord99", "anderwachtwoord00")
         self.assertIn(b"overeen", r.data)
 
 
