@@ -1281,6 +1281,13 @@ def handmatige_bestelling():
                 db.commit()
             except sqlite3.Error:
                 pass
+    else:
+        # Geen e-mail opgegeven — markeer als verstuurd zodat de waarschuwing niet verschijnt
+        try:
+            db.execute("UPDATE bestellingen SET mail_verstuurd=1 WHERE id=?", (bestelling_id,))
+            db.commit()
+        except sqlite3.Error:
+            pass
 
     flash(
         f"Bestelling #{bestelling_id} aangemaakt — lotnummers {lot_van}–{lot_tot} ({betaalwijze}).",

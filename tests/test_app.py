@@ -1844,6 +1844,10 @@ class TestHandmatigeBestellingen(unittest.TestCase):
                 "telefoon": "", "aantal": "1", "betaalwijze": "contant",
             })
             mock_mail.assert_not_called()
+        # mail_verstuurd=1 zodat de admin-waarschuwing niet verschijnt
+        db = App.get_db()
+        b = db.execute("SELECT mail_verstuurd FROM bestellingen WHERE naam='Geen Email'").fetchone()
+        self.assertEqual(b["mail_verstuurd"], 1)
 
     def test_handmatige_bestelling_met_email_stuurt_mail(self):
         with patch("app.stuur_bevestigingsmail", return_value=True) as mock_mail:
