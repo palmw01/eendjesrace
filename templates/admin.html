@@ -216,7 +216,10 @@
     <h1><img class="eend-inline" src="{{ url_for('static', filename='img/eend.png') }}" alt=""> Badeendjesrace – Beheer</h1>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
       <a href="/admin/export-csv" class="knop-csv">⬇ CSV downloaden</a>
-      {% if huidige_gebruiker %}<span style="font-size:.88rem;color:#555;">👤 {{ huidige_gebruiker }}</span>{% endif %}
+      {% if huidige_gebruiker %}
+        <span style="font-size:.88rem;color:#555;">👤 {{ huidige_gebruiker }}</span>
+        <button type="button" id="btnWachtwoordWijzigen" style="padding:8px 14px;background:#E3F2FD;color:#1565C0;border:none;border-radius:99px;font-weight:700;font-size:.9rem;cursor:pointer;">🔑 Wachtwoord</button>
+      {% endif %}
       <a href="/admin/logout" class="uitloggen">Uitloggen</a>
     </div>
   </div>
@@ -488,24 +491,7 @@
         {% endfor %}
       </tbody>
     </table>
-    <p style="font-size:.9rem;font-weight:700;margin-bottom:12px;">Wachtwoord wijzigen</p>
-    <form method="POST" action="/admin/wachtwoord-wijzigen">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <div class="instelling-rij">
-        <label class="instelling-label" for="huidig_wachtwoord">Huidig wachtwoord <span style="color:#C62828">*</span></label>
-        <input class="instelling-input" type="password" id="huidig_wachtwoord" name="huidig_wachtwoord" required autocomplete="current-password">
-      </div>
-      <div class="instelling-rij">
-        <label class="instelling-label" for="nieuw_wachtwoord">Nieuw wachtwoord <span style="color:#C62828">*</span></label>
-        <input class="instelling-input" type="password" id="nieuw_wachtwoord" name="nieuw_wachtwoord" placeholder="minimaal 12 tekens" required autocomplete="new-password">
-      </div>
-      <div class="instelling-rij">
-        <label class="instelling-label" for="nieuw_wachtwoord_bevestiging">Bevestigen <span style="color:#C62828">*</span></label>
-        <input class="instelling-input" type="password" id="nieuw_wachtwoord_bevestiging" name="nieuw_wachtwoord_bevestiging" placeholder="herhaal nieuw wachtwoord" required autocomplete="new-password">
-      </div>
-      <button type="submit" class="instelling-knop">Wachtwoord wijzigen</button>
-    </form>
-    <p style="font-size:.9rem;font-weight:700;margin-bottom:12px;margin-top:24px;">Nieuw account aanmaken</p>
+    <p style="font-size:.9rem;font-weight:700;margin-bottom:12px;">Nieuw account aanmaken</p>
     <form method="POST" action="/admin/beheerder-toevoegen">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="instelling-rij">
@@ -546,7 +532,38 @@
     </form>
   </div>
 
+  <!-- Modal: wachtwoord wijzigen -->
+  <dialog id="wachtwoordModal" style="border:none;border-radius:14px;padding:28px 32px;box-shadow:0 4px 32px rgba(0,0,0,.18);max-width:420px;width:100%;">
+    <h2 style="margin-top:0;font-size:1.1rem;">🔑 Wachtwoord wijzigen</h2>
+    <form method="POST" action="/admin/wachtwoord-wijzigen">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="instelling-rij">
+        <label class="instelling-label" for="m_huidig">Huidig wachtwoord <span style="color:#C62828">*</span></label>
+        <input class="instelling-input" type="password" id="m_huidig" name="huidig_wachtwoord" required autocomplete="current-password">
+      </div>
+      <div class="instelling-rij">
+        <label class="instelling-label" for="m_nieuw">Nieuw wachtwoord <span style="color:#C62828">*</span></label>
+        <input class="instelling-input" type="password" id="m_nieuw" name="nieuw_wachtwoord" placeholder="minimaal 12 tekens" required autocomplete="new-password">
+      </div>
+      <div class="instelling-rij">
+        <label class="instelling-label" for="m_bevestiging">Bevestigen <span style="color:#C62828">*</span></label>
+        <input class="instelling-input" type="password" id="m_bevestiging" name="nieuw_wachtwoord_bevestiging" placeholder="herhaal nieuw wachtwoord" required autocomplete="new-password">
+      </div>
+      <div style="display:flex;gap:10px;margin-top:18px;">
+        <button type="submit" class="instelling-knop" style="flex:1;">Wachtwoord wijzigen</button>
+        <button type="button" id="btnWachtwoordSluiten" style="flex:1;padding:10px;background:#F5F5F5;border:none;border-radius:8px;font-weight:700;cursor:pointer;">Annuleren</button>
+      </div>
+    </form>
+  </dialog>
+
   <script nonce="{{ g.csp_nonce }}">
+    var modal = document.getElementById('wachtwoordModal');
+    var btnOpen = document.getElementById('btnWachtwoordWijzigen');
+    var btnSluit = document.getElementById('btnWachtwoordSluiten');
+    if (btnOpen) { btnOpen.addEventListener('click', function() { modal.showModal(); }); }
+    if (btnSluit) { btnSluit.addEventListener('click', function() { modal.close(); }); }
+    modal.addEventListener('click', function(e) { if (e.target === modal) { modal.close(); } });
+
     document.getElementById('resetForm').addEventListener('submit', function(e) {
       if (!confirm('Weet je zeker dat je de database wilt resetten? Dit kan niet ongedaan worden gemaakt.')) {
         e.preventDefault();
