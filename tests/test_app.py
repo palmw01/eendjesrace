@@ -156,9 +156,10 @@ def maak_db():
 def maak_flask_client():
     App.app.config["TESTING"]          = True
     App.app.config["WTF_CSRF_ENABLED"] = False
-    # Frisse database voor elke test — verwijder vorige testdata
-    if os.path.exists(App.DATABASE):
-        os.unlink(App.DATABASE)
+    # Frisse database voor elke test — verwijder vorige testdata incl. WAL/SHM
+    for _db_bestand in [App.DATABASE, App.DATABASE + "-wal", App.DATABASE + "-shm"]:
+        if os.path.exists(_db_bestand):
+            os.unlink(_db_bestand)
     client = App.app.test_client()
     ctx    = App.app.app_context()
     ctx.push()
