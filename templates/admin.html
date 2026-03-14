@@ -92,6 +92,12 @@
       font-family: 'Nunito', sans-serif; font-size: .95rem; font-weight: 700;
     }
     .instelling-knop:hover { background: #005f8e; }
+    .annuleer-knop {
+      flex: 1; padding: 9px 24px; background: #F5F5F5; color: #333;
+      border: none; border-radius: 10px; cursor: pointer;
+      font-family: 'Nunito', sans-serif; font-size: .95rem; font-weight: 700;
+    }
+    .annuleer-knop:hover { background: #E0E0E0; }
 
     .stats { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 28px; }
     .stat {
@@ -524,8 +530,8 @@
         <input class="instelling-input" type="password" id="m_bevestiging" name="nieuw_wachtwoord_bevestiging" placeholder="herhaal nieuw wachtwoord" required autocomplete="new-password">
       </div>
       <div style="display:flex;gap:10px;margin-top:18px;">
-        <button type="submit" class="instelling-knop" style="flex:1;">Wachtwoord wijzigen</button>
-        <button type="button" id="btnWachtwoordSluiten" style="flex:1;padding:10px;background:#F5F5F5;border:none;border-radius:8px;font-weight:700;cursor:pointer;">Annuleren</button>
+        <button type="submit" class="instelling-knop" style="flex:1;margin-top:0;">Wachtwoord wijzigen</button>
+        <button type="button" id="btnWachtwoordSluiten" class="annuleer-knop">Annuleren</button>
       </div>
     </form>
   </dialog>
