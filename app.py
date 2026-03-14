@@ -1092,18 +1092,10 @@ def admin():
                 COALESCE(SUM(CASE WHEN status='aangemaakt' THEN 1 END), 0)       AS openstaand
             FROM bestellingen
         """).fetchone()
-        beheerders_lijst = db.execute(
-            "SELECT id, gebruikersnaam, aangemaakt_op FROM beheerders ORDER BY id"
-        ).fetchall()
         return render_template("admin.html",
                                bestellingen=bestellingen,
                                stats=stats,
                                max_eendjes=get_max_eendjes(),
-                               max_per_bestelling=get_max_per_bestelling(),
-                               prijs_per_stuk=get_prijs_per_stuk(),
-                               prijs_vijf_stuks=get_prijs_vijf_stuks(),
-                               transactiekosten=get_transactiekosten(),
-                               notificatie_email=get_notificatie_email(),
                                pagina=pagina,
                                totaal_paginas=totaal_paginas,
                                totaal=totaal,
@@ -1111,10 +1103,32 @@ def admin():
                                zoekterm=zoekterm,
                                sorter=sorter,
                                richting=richting,
-                               beheerders=beheerders_lijst,
                                huidige_gebruiker=session.get("admin_gebruikersnaam"))
     except sqlite3.Error as e:
         app.logger.error(f"DB-fout admin: {e}")
+        abort(500)
+
+
+@app.route("/admin/beheer")
+@login_vereist
+def admin_beheer():
+    """Beheerpagina met instellingen, beheerders en gevaarzone."""
+    try:
+        db = get_db()
+        beheerders_lijst = db.execute(
+            "SELECT id, gebruikersnaam, aangemaakt_op FROM beheerders ORDER BY id"
+        ).fetchall()
+        return render_template("admin_beheer.html",
+                               max_eendjes=get_max_eendjes(),
+                               max_per_bestelling=get_max_per_bestelling(),
+                               prijs_per_stuk=get_prijs_per_stuk(),
+                               prijs_vijf_stuks=get_prijs_vijf_stuks(),
+                               transactiekosten=get_transactiekosten(),
+                               notificatie_email=get_notificatie_email(),
+                               beheerders=beheerders_lijst,
+                               huidige_gebruiker=session.get("admin_gebruikersnaam"))
+    except sqlite3.Error as e:
+        app.logger.error(f"DB-fout admin_beheer: {e}")
         abort(500)
 
 
@@ -1199,7 +1213,7 @@ def admin_instellingen():
 
     except (ValueError, TypeError):
         flash("Ongeldig getal opgegeven.", "fout")
-    return redirect(url_for("admin"))
+    return redirect(url_for("admin_beheer"))
 
 
 @app.route("/admin/beheerder-toevoegen", methods=["POST"])
@@ -1212,13 +1226,13 @@ def beheerder_toevoegen():
 
     if not gebruikersnaam:
         flash("Gebruikersnaam is verplicht.", "fout")
-        return redirect(url_for("admin"))
+        return redirect(url_for("admin_beheer"))
     if len(wachtwoord) < 12:
         flash("Wachtwoord moet minimaal 12 tekens lang zijn.", "fout")
-        return redirect(url_for("admin"))
+        return redirect(url_for("admin_beheer"))
     if wachtwoord != wachtwoord_bevestiging:
         flash("Wachtwoorden komen niet overeen.", "fout")
-        return redirect(url_for("admin"))
+        return redirect(url_for("admin_beheer"))
 
     try:
         db = get_db()
@@ -1234,7 +1248,7 @@ def beheerder_toevoegen():
     except sqlite3.Error as e:
         app.logger.error(f"DB-fout beheerder_toevoegen: {e}")
         abort(500)
-    return redirect(url_for("admin"))
+    return redirect(url_for("admin_beheer"))
 
 
 @app.route("/admin/beheerder-verwijderen/<int:beheerder_id>", methods=["POST"])
@@ -1246,7 +1260,7 @@ def beheerder_verwijderen(beheerder_id):
         aantal = db.execute("SELECT COUNT(*) FROM beheerders").fetchone()[0]
         if aantal <= 1:
             flash("Het laatste account kan niet worden verwijderd.", "fout")
-            return redirect(url_for("admin"))
+            return redirect(url_for("admin_beheer"))
         rij = db.execute(
             "SELECT gebruikersnaam FROM beheerders WHERE id = ?", (beheerder_id,)
         ).fetchone()
@@ -1254,7 +1268,7 @@ def beheerder_verwijderen(beheerder_id):
             abort(404)
         if rij["gebruikersnaam"] == session.get("admin_gebruikersnaam"):
             flash("Je kunt je eigen account niet verwijderen.", "fout")
-            return redirect(url_for("admin"))
+            return redirect(url_for("admin_beheer"))
         db.execute("DELETE FROM beheerders WHERE id = ?", (beheerder_id,))
         db.commit()
         app.logger.info(f"Beheerdersaccount verwijderd: {saniteer_log(rij['gebruikersnaam'])}")
@@ -1262,7 +1276,7 @@ def beheerder_verwijderen(beheerder_id):
     except sqlite3.Error as e:
         app.logger.error(f"DB-fout beheerder_verwijderen: {e}")
         abort(500)
-    return redirect(url_for("admin"))
+    return redirect(url_for("admin_beheer"))
 
 
 @app.route("/admin/wachtwoord-wijzigen", methods=["POST"])
@@ -1440,7 +1454,7 @@ def admin_opruimen():
     except sqlite3.Error as e:
         app.logger.error(f"DB-fout admin_opruimen: {e}")
         abort(500)
-    return redirect(url_for("admin"))
+    return redirect(url_for("admin_beheer"))
 
 
 @app.route("/admin/reset", methods=["POST"])
@@ -1450,7 +1464,7 @@ def reset_database():
     bevestiging = request.form.get("bevestiging", "").strip()
     if bevestiging != "RESET":
         flash("Voer 'RESET' in om de database te wissen.", "fout")
-        return redirect(url_for("admin"))
+        return redirect(url_for("admin_beheer"))
     try:
         db = get_db()
         db.execute("DELETE FROM bestellingen")
@@ -1463,7 +1477,7 @@ def reset_database():
     except sqlite3.Error as e:
         app.logger.error(f"DB-fout reset_database: {e}")
         abort(500)
-    return redirect(url_for("admin"))
+    return redirect(url_for("admin_beheer"))
 
 
 @app.route("/admin/handmatig", methods=["POST"])

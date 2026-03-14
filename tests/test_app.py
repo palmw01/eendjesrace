@@ -3569,6 +3569,110 @@ class TestWebhookAanvullend(unittest.TestCase):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# ADMIN BEHEER PAGINA
+#     GET /admin/beheer — instellingen, beheerders, gevaarzone
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestAdminBeheerPagina(unittest.TestCase):
+
+    def setUp(self):
+        self.client, self.ctx = maak_flask_client()
+
+    def tearDown(self):
+        self.ctx.pop()
+
+    def _login(self):
+        self.client.post("/admin/login",
+                         data={"gebruiker": "admin", "wachtwoord": "testpass12345"})
+
+    def test_admin_beheer_zonder_login_redirect(self):
+        """GET /admin/beheer zonder login geeft 302."""
+        r = self.client.get("/admin/beheer")
+        self.assertEqual(r.status_code, 302)
+
+    def test_admin_beheer_met_login_geeft_200(self):
+        """GET /admin/beheer met login geeft 200."""
+        self._login()
+        r = self.client.get("/admin/beheer")
+        self.assertEqual(r.status_code, 200)
+
+    def test_admin_beheer_bevat_instellingen(self):
+        """Beheerpagina bevat de Instellingen-sectie."""
+        self._login()
+        r = self.client.get("/admin/beheer")
+        self.assertIn(b"Instellingen", r.data)
+
+    def test_admin_beheer_bevat_beheerders(self):
+        """Beheerpagina bevat de Beheerders-sectie."""
+        self._login()
+        r = self.client.get("/admin/beheer")
+        self.assertIn(b"Beheerders", r.data)
+
+    def test_admin_beheer_bevat_gevaarzone(self):
+        """Beheerpagina bevat de Gevaarzone-sectie."""
+        self._login()
+        r = self.client.get("/admin/beheer")
+        self.assertIn(b"Gevaarzone", r.data)
+
+    def test_admin_beheer_bevat_nav_bestellingen(self):
+        """Beheerpagina bevat een link terug naar /admin."""
+        self._login()
+        r = self.client.get("/admin/beheer")
+        self.assertIn(b"/admin", r.data)
+
+    def test_admin_beheer_bevat_noindex(self):
+        """Beheerpagina bevat noindex meta-tag."""
+        self._login()
+        r = self.client.get("/admin/beheer")
+        self.assertIn(b"noindex", r.data)
+
+    def test_admin_instellingen_redirect_naar_beheer(self):
+        """POST naar /admin/instellingen stuurt door naar /admin/beheer."""
+        self._login()
+        r = self.client.post("/admin/instellingen",
+                             data={"max_eendjes": "3000"})
+        self.assertEqual(r.status_code, 302)
+        self.assertIn("/admin/beheer", r.headers["Location"])
+
+    def test_admin_opruimen_redirect_naar_beheer(self):
+        """POST naar /admin/opruimen stuurt door naar /admin/beheer."""
+        self._login()
+        r = self.client.post("/admin/opruimen")
+        self.assertEqual(r.status_code, 302)
+        self.assertIn("/admin/beheer", r.headers["Location"])
+
+    def test_admin_reset_redirect_naar_beheer(self):
+        """POST naar /admin/reset met RESET stuurt door naar /admin/beheer."""
+        self._login()
+        r = self.client.post("/admin/reset", data={"bevestiging": "RESET"})
+        self.assertEqual(r.status_code, 302)
+        self.assertIn("/admin/beheer", r.headers["Location"])
+
+    def test_admin_pagina_bevat_beheer_knop(self):
+        """GET /admin bevat een link naar /admin/beheer."""
+        self._login()
+        r = self.client.get("/admin")
+        self.assertIn(b"/admin/beheer", r.data)
+
+    def test_admin_pagina_bevat_geen_instellingen(self):
+        """GET /admin bevat de instellingen-formuliervelden niet meer."""
+        self._login()
+        r = self.client.get("/admin")
+        self.assertNotIn(b"Totaal beschikbare eendjes", r.data)
+
+    def test_beheerder_toevoegen_redirect_naar_beheer(self):
+        """POST naar /admin/beheerder-toevoegen stuurt door naar /admin/beheer."""
+        self._login()
+        r = self.client.post("/admin/beheerder-toevoegen", data={
+            "gebruikersnaam": "nieuw_test_beheerder",
+            "wachtwoord": "sterkwachtwoord99",
+            "wachtwoord_bevestiging": "sterkwachtwoord99",
+        })
+        self.assertEqual(r.status_code, 302)
+        self.assertIn("/admin/beheer", r.headers["Location"])
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # Uitvoeren als script
 # ══════════════════════════════════════════════════════════════════════════════
 

@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Beheer – Badeendjesrace</title>
+  <link rel="icon" href="{{ url_for('static', filename='img/eend-favicon.png') }}">
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { overflow-x: hidden; }
+    body { font-family: 'Nunito', sans-serif; background: #F0F4F8; color: #1A1A2E; padding: 24px; }
+
+    .topbar {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 24px; flex-wrap: wrap; gap: 12px;
+    }
+    .topbar-acties { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    h1 { font-family: 'Fredoka One', cursive; font-size: clamp(1rem, 4.5vw, 2rem); color: #0077B6; }
+    .eend-inline { height: 1em; width: auto; vertical-align: middle; display: inline-block; }
+    .uitloggen {
+      padding: 8px 18px; background: #FFEBEE; color: #C62828;
+      border-radius: 99px; text-decoration: none; font-weight: 700; font-size: .9rem;
+    }
+    /* Avatar-dropdown (mobiel) */
+    .avatar-menu { position: relative; display: none; }
+    .avatar-knop {
+      width: 38px; height: 38px; border-radius: 50%;
+      background: #0077B6; color: white;
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Fredoka One', cursive; font-size: 1.1rem;
+      cursor: pointer; list-style: none; user-select: none;
+      border: 2px solid #005f8e;
+    }
+    .avatar-knop::-webkit-details-marker { display: none; }
+    .avatar-dropdown {
+      position: absolute; right: 0; top: calc(100% + 8px);
+      background: white; border-radius: 14px; padding: 10px;
+      box-shadow: 0 4px 24px rgba(0,0,0,.15);
+      min-width: 190px; z-index: 100;
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .avatar-naam {
+      font-size: .85rem; color: #555; padding: 6px 10px 10px;
+      border-bottom: 1px solid #F0F4F8; margin-bottom: 2px;
+    }
+    .avatar-dd-knop {
+      padding: 9px 14px; border-radius: 99px; font-weight: 700;
+      font-size: .9rem; text-align: left; border: none; cursor: pointer;
+      width: 100%; display: block; text-decoration: none; white-space: nowrap;
+    }
+
+    /* Topbar-switching wordt afgehandeld via JS (ResizeObserver) */
+
+    .waarschuwing {
+      background: #FFF8E1; border: 2px solid #FFD700; border-radius: 12px;
+      padding: 14px 18px; margin-bottom: 20px; color: #E65100; font-weight: 600;
+    }
+    .bevestiging {
+      background: #E8F5E9; border: 2px solid #A5D6A7; border-radius: 12px;
+      padding: 14px 18px; margin-bottom: 20px; color: #2E7D32; font-weight: 600;
+    }
+
+    /* Instellingen-kaart */
+    .instelling-kaart {
+      margin-top: 40px; background: white; border-radius: 14px;
+      padding: 22px 28px; box-shadow: 0 2px 12px rgba(0,0,0,.07);
+    }
+    .instelling-titel {
+      font-family: 'Fredoka One', cursive; font-size: 1.4rem;
+      color: #0077B6; margin-bottom: 18px;
+    }
+    .instelling-rij {
+      display: flex; align-items: center; gap: 16px; margin-bottom: 12px;
+    }
+    .instelling-label {
+      font-weight: 700; font-size: .95rem; width: 220px; flex-shrink: 0;
+    }
+    .instelling-input {
+      width: 240px; padding: 8px 10px; border: 2px solid #E0E0E0;
+      border-radius: 10px; font-family: 'Nunito', sans-serif; font-size: .95rem;
+    }
+    .instelling-input:focus { outline: none; border-color: #0077B6; }
+    #wachtwoordModal .instelling-rij { flex-direction: column; align-items: flex-start; gap: 6px; }
+    #wachtwoordModal .instelling-label { width: auto; }
+    #wachtwoordModal .instelling-input { width: 100%; }
+    .instelling-knop {
+      margin-top: 8px; padding: 9px 24px; background: #0077B6; color: white;
+      border: none; border-radius: 10px; cursor: pointer;
+      font-family: 'Nunito', sans-serif; font-size: .95rem; font-weight: 700;
+    }
+    .instelling-knop:hover { background: #005f8e; }
+
+    /* Inklapbare kaarten via <details> */
+    details.instelling-kaart > summary {
+      font-family: 'Fredoka One', cursive; font-size: 1.4rem; color: #0077B6;
+      cursor: pointer; list-style: none;
+      display: flex; justify-content: space-between; align-items: center;
+      user-select: none;
+    }
+    details.instelling-kaart > summary::-webkit-details-marker { display: none; }
+    details.instelling-kaart > summary::after { content: '▾'; font-size: 1rem; transition: transform .2s; }
+    details.instelling-kaart[open] > summary::after { transform: rotate(-180deg); }
+    details.instelling-kaart[open] > summary { margin-bottom: 18px; }
+
+    table { width: 100%; border-collapse: collapse; background: white;
+            border-radius: 14px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,.07);
+            font-size: .86rem; }
+    th { background: #0077B6; color: white; padding: 11px 12px; text-align: left; white-space: nowrap; }
+    td { padding: 9px 12px; border-bottom: 1px solid #F0F4F8; vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #F7FBFF; }
+
+    .badge {
+      display: inline-block; padding: 2px 10px; border-radius: 99px;
+      font-size: .76rem; font-weight: 700; white-space: nowrap;
+    }
+    .badge-betaald { background: #E8F5E9; color: #2E7D32; }
+
+    .tabel-wrapper {
+      overflow-x: auto; -webkit-overflow-scrolling: touch;
+      border-radius: 14px; box-shadow: 0 2px 12px rgba(0,0,0,.07);
+    }
+    .tabel-wrapper table { border-radius: 0; box-shadow: none; }
+
+    .gevaarzone {
+      margin-top: 40px; border: 2px solid #EF9A9A; border-radius: 14px;
+      padding: 22px 28px; background: #FFEBEE;
+    }
+    .gevaarzone h2 { color: #C62828; font-family: 'Fredoka One', cursive; font-size: 1.4rem; margin-bottom: 8px; }
+    .gevaarzone p { font-size: .9rem; color: #555; margin-bottom: 14px; }
+    .gevaarzone input[type="text"] {
+      padding: 9px 12px; border: 2px solid #EF9A9A; border-radius: 10px;
+      font-family: 'Nunito', sans-serif; font-size: .95rem; width: 180px; margin-right: 10px;
+    }
+    .gevaarzone input[type="text"]:focus { outline: none; border-color: #C62828; }
+    .knop-reset {
+      padding: 9px 20px; background: #C62828; color: white;
+      border: none; border-radius: 10px; cursor: pointer;
+      font-family: 'Nunito', sans-serif; font-size: .95rem; font-weight: 700;
+    }
+    .knop-reset:hover { background: #b71c1c; }
+
+    @media (max-width: 700px) {
+      body { padding: 14px; max-width: 100%; }
+
+      .instelling-kaart { padding: 16px; margin-top: 28px; }
+      .instelling-rij { flex-direction: column; align-items: flex-start; gap: 6px; }
+      .instelling-label { width: auto; }
+      .instelling-input { width: 100%; }
+      .instelling-knop { width: 100%; }
+
+      .gevaarzone { padding: 16px; margin-top: 28px; }
+      .gevaarzone input[type="text"] {
+        width: 100%; margin-right: 0; margin-bottom: 10px; display: block;
+      }
+      .knop-reset { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <h1><img class="eend-inline" src="{{ url_for('static', filename='img/eend.png') }}" alt=""> Badeendjesrace – Beheerinstellingen</h1>
+    <div class="topbar-acties">
+      {% if huidige_gebruiker %}
+        <span style="font-size:.88rem;color:#555;">👤 {{ huidige_gebruiker }}</span>
+        <button type="button" id="btnWachtwoordWijzigen" style="padding:8px 14px;background:#E3F2FD;color:#1565C0;border:none;border-radius:99px;font-weight:700;font-size:.9rem;cursor:pointer;">🔑 Wachtwoord</button>
+      {% endif %}
+      <a href="/admin" style="padding:8px 18px;background:#F0F4F8;color:#0077B6;border-radius:99px;text-decoration:none;font-weight:700;font-size:.9rem;border:2px solid #E0E0E0;">← Bestellingen</a>
+      <a href="/admin/logout" class="uitloggen">Uitloggen</a>
+    </div>
+    {% if huidige_gebruiker %}
+    <details class="avatar-menu" id="avatarMenu">
+      <summary class="avatar-knop">{{ huidige_gebruiker[0]|upper }}</summary>
+      <div class="avatar-dropdown">
+        <div class="avatar-naam">👤 {{ huidige_gebruiker }}</div>
+        <a href="/admin" class="avatar-dd-knop" style="background:#F0F4F8;color:#0077B6;">← Bestellingen</a>
+        <button type="button" id="btnWachtwoordWijzigenAvatar" class="avatar-dd-knop" style="background:#E3F2FD;color:#1565C0;">🔑 Wachtwoord wijzigen</button>
+        <a href="/admin/logout" class="avatar-dd-knop" style="background:#FFEBEE;color:#C62828;">Uitloggen</a>
+      </div>
+    </details>
+    {% endif %}
+  </div>
+
+  {% with berichten = get_flashed_messages(with_categories=true) %}
+    {% for categorie, bericht in berichten %}
+    {% if categorie == 'info' %}
+    <div class="bevestiging">✓ {{ bericht }}</div>
+    {% else %}
+    <div class="waarschuwing">⚠️ {{ bericht }}</div>
+    {% endif %}
+    {% endfor %}
+  {% endwith %}
+
+  <!-- Instellingen -->
+  <details class="instelling-kaart">
+    <summary>⚙️ Instellingen</summary>
+    <form method="POST" action="/admin/instellingen">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="instelling-rij">
+        <label class="instelling-label" for="max_eendjes">Totaal beschikbare eendjes</label>
+        <input class="instelling-input" type="number" id="max_eendjes" name="max_eendjes" min="1" value="{{ max_eendjes }}">
+      </div>
+      <div class="instelling-rij">
+        <label class="instelling-label" for="max_per_bestelling">Maximaal per bestelling</label>
+        <input class="instelling-input" type="number" id="max_per_bestelling" name="max_per_bestelling" min="1" max="{{ max_eendjes }}" value="{{ max_per_bestelling }}">
+      </div>
+      <div class="instelling-rij">
+        <label class="instelling-label" for="prijs_per_stuk">Prijs per eendje (€)</label>
+        <input class="instelling-input" type="number" id="prijs_per_stuk" name="prijs_per_stuk" min="0.01" step="0.01" value="{{ '%.2f'|format(prijs_per_stuk) }}">
+      </div>
+      <div class="instelling-rij">
+        <label class="instelling-label" for="prijs_vijf_stuks">Prijs voor 5 eendjes (€)</label>
+        <input class="instelling-input" type="number" id="prijs_vijf_stuks" name="prijs_vijf_stuks" min="0.01" step="0.01" value="{{ '%.2f'|format(prijs_vijf_stuks) }}">
+      </div>
+      <div class="instelling-rij">
+        <label class="instelling-label" for="transactiekosten">iDEAL-transactiekosten (€)</label>
+        <input class="instelling-input" type="number" id="transactiekosten" name="transactiekosten" min="0" step="0.01" value="{{ '%.2f'|format(transactiekosten) }}">
+      </div>
+      <div class="instelling-rij">
+        <label class="instelling-label" for="notificatie_email">Notificatie-e-mailadres (stille kopie bestellingen)</label>
+        <input class="instelling-input" type="email" id="notificatie_email" name="notificatie_email" placeholder="bijv. beheer@voorbeeld.nl" value="{{ notificatie_email }}">
+      </div>
+      <button type="submit" class="instelling-knop">Opslaan</button>
+    </form>
+  </details>
+
+  <!-- Beheerders -->
+  <details class="instelling-kaart">
+    <summary>👤 Beheerders</summary>
+    <div class="tabel-wrapper" style="margin-bottom:18px;">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Gebruikersnaam</th>
+          <th>Aangemaakt op</th>
+          <th>Actie</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for b in beheerders %}
+        <tr>
+          <td>{{ b['id'] }}</td>
+          <td>{{ b['gebruikersnaam'] }}{% if b['gebruikersnaam'] == huidige_gebruiker %} <span class="badge badge-betaald">jij</span>{% endif %}</td>
+          <td style="color:#888;font-size:.85rem;">{{ b['aangemaakt_op'][:16] }}</td>
+          <td>
+            {% set is_eigen = (b['gebruikersnaam'] == huidige_gebruiker) %}
+            {% set is_enige = (beheerders|length <= 1) %}
+            {% if is_eigen or is_enige %}
+              <button class="instelling-knop" style="background:#E0E0E0;color:#888;cursor:not-allowed;padding:4px 10px;font-size:.78rem;" disabled
+                title="{% if is_eigen %}Je kunt je eigen account niet verwijderen{% else %}Het laatste account kan niet worden verwijderd{% endif %}">
+                Verwijderen
+              </button>
+            {% else %}
+              <form method="POST" action="/admin/beheerder-verwijderen/{{ b['id'] }}" style="display:inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="knop-reset" style="padding:4px 10px;font-size:.78rem;">Verwijderen</button>
+              </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    <p style="font-size:.9rem;font-weight:700;margin-bottom:12px;">Nieuw account aanmaken</p>
+    <form method="POST" action="/admin/beheerder-toevoegen">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="instelling-rij">
+        <label class="instelling-label" for="b_gebruikersnaam">Gebruikersnaam <span style="color:#C62828">*</span></label>
+        <input class="instelling-input" type="text" id="b_gebruikersnaam" name="gebruikersnaam" placeholder="gebruikersnaam" required maxlength="100" autocomplete="off">
+      </div>
+      <div class="instelling-rij">
+        <label class="instelling-label" for="b_wachtwoord">Wachtwoord <span style="color:#C62828">*</span></label>
+        <input class="instelling-input" type="password" id="b_wachtwoord" name="wachtwoord" placeholder="minimaal 12 tekens" required autocomplete="new-password">
+      </div>
+      <div class="instelling-rij">
+        <label class="instelling-label" for="b_wachtwoord_bevestiging">Wachtwoord bevestigen <span style="color:#C62828">*</span></label>
+        <input class="instelling-input" type="password" id="b_wachtwoord_bevestiging" name="wachtwoord_bevestiging" placeholder="herhaal wachtwoord" required autocomplete="new-password">
+      </div>
+      <button type="submit" class="instelling-knop">Account aanmaken</button>
+    </form>
+  </details>
+
+  <!-- Gevaarzone: database resetten -->
+  <div class="gevaarzone">
+    <h2>⚠ Gevaarzone</h2>
+    <p style="margin-bottom:10px;">
+      <strong>Opruimen</strong> verwijdert verlopen, mislukte en geannuleerde bestellingen
+      <em>zonder lotnummers</em>. Betaalde bestellingen blijven onaangetast.
+    </p>
+    <form method="POST" action="/admin/opruimen" id="opruimenForm" style="margin-bottom:18px;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="knop-reset" style="background:#E65100;">Opruimen</button>
+    </form>
+    <p>
+      <strong>Database resetten</strong> verwijdert <em>alle</em> bestellingen en reset de lotnummering naar 1.
+      De webhook-log wordt ook gewist. Dit kan <strong>niet</strong> ongedaan worden gemaakt.
+    </p>
+    <form method="POST" action="/admin/reset" id="resetForm">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="text" name="bevestiging" placeholder="Typ RESET" autocomplete="off">
+      <button type="submit" class="knop-reset">Database resetten</button>
+    </form>
+  </div>
+
+  <!-- Modal: wachtwoord wijzigen -->
+  <dialog id="wachtwoordModal" style="border:none;border-radius:14px;padding:28px 32px;box-shadow:0 4px 32px rgba(0,0,0,.18);max-width:420px;width:90%;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);margin:0;">
+    <h2 style="margin-top:0;font-size:1.1rem;">🔑 Wachtwoord wijzigen</h2>
+    <form method="POST" action="/admin/wachtwoord-wijzigen">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="instelling-rij">
+        <label class="instelling-label" for="m_huidig">Huidig wachtwoord <span style="color:#C62828">*</span></label>
+        <input class="instelling-input" type="password" id="m_huidig" name="huidig_wachtwoord" required autocomplete="current-password">
+      </div>
+      <div class="instelling-rij">
+        <label class="instelling-label" for="m_nieuw">Nieuw wachtwoord <span style="color:#C62828">*</span></label>
+        <input class="instelling-input" type="password" id="m_nieuw" name="nieuw_wachtwoord" placeholder="minimaal 12 tekens" required autocomplete="new-password">
+      </div>
+      <div class="instelling-rij">
+        <label class="instelling-label" for="m_bevestiging">Bevestigen <span style="color:#C62828">*</span></label>
+        <input class="instelling-input" type="password" id="m_bevestiging" name="nieuw_wachtwoord_bevestiging" placeholder="herhaal nieuw wachtwoord" required autocomplete="new-password">
+      </div>
+      <div style="display:flex;gap:10px;margin-top:18px;">
+        <button type="submit" class="instelling-knop" style="flex:1;">Wachtwoord wijzigen</button>
+        <button type="button" id="btnWachtwoordSluiten" style="flex:1;padding:10px;background:#F5F5F5;border:none;border-radius:8px;font-weight:700;cursor:pointer;">Annuleren</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script nonce="{{ g.csp_nonce }}">
+    var modal = document.getElementById('wachtwoordModal');
+    var btnOpen = document.getElementById('btnWachtwoordWijzigen');
+    var btnSluit = document.getElementById('btnWachtwoordSluiten');
+    var btnOpenAvatar = document.getElementById('btnWachtwoordWijzigenAvatar');
+    var avatarMenu = document.getElementById('avatarMenu');
+    var topbarActies = document.querySelector('.topbar-acties');
+    var topbar = document.querySelector('.topbar');
+
+    // Dynamisch wisselen tussen topbar-acties en avatar op basis van beschikbare ruimte
+    function updateTopbar() {
+      if (!topbarActies || !avatarMenu || !topbar) return;
+      topbarActies.style.display = 'flex';
+      avatarMenu.style.display = 'none';
+      // Tijdelijk nowrap + geen shrink zodat scrollWidth de werkelijke breedte toont
+      topbar.style.flexWrap = 'nowrap';
+      var kinderen = Array.from(topbar.children);
+      kinderen.forEach(function(el) { el.style.flexShrink = '0'; });
+      var past = topbar.scrollWidth <= topbar.clientWidth;
+      topbar.style.flexWrap = '';
+      kinderen.forEach(function(el) { el.style.flexShrink = ''; });
+      if (past) {
+        topbarActies.style.display = '';
+        avatarMenu.style.display = 'none';
+      } else {
+        topbarActies.style.display = 'none';
+        avatarMenu.style.display = 'block';
+      }
+    }
+    updateTopbar();
+    new ResizeObserver(updateTopbar).observe(topbar);
+
+    if (btnOpen) { btnOpen.addEventListener('click', function() { modal.showModal(); }); }
+    if (btnOpenAvatar) { btnOpenAvatar.addEventListener('click', function() { if (avatarMenu) avatarMenu.removeAttribute('open'); modal.showModal(); }); }
+    if (btnSluit) { btnSluit.addEventListener('click', function() { modal.close(); }); }
+    modal.addEventListener('click', function(e) { if (e.target === modal) { modal.close(); } });
+    document.addEventListener('click', function(e) { if (avatarMenu && avatarMenu.open && !avatarMenu.contains(e.target)) { avatarMenu.removeAttribute('open'); } });
+
+    document.getElementById('resetForm').addEventListener('submit', function(e) {
+      if (!confirm('Weet je zeker dat je de database wilt resetten? Dit kan niet ongedaan worden gemaakt.')) {
+        e.preventDefault();
+      }
+    });
+    document.getElementById('opruimenForm').addEventListener('submit', function(e) {
+      if (!confirm('Verlopen, mislukte en geannuleerde bestellingen zonder lotnummers verwijderen?')) {
+        e.preventDefault();
+      }
+    });
+  </script>
+</body>
+</html>

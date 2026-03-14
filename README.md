@@ -142,7 +142,8 @@ De app ondersteunt meerdere beheerdersaccounts. Wachtwoorden worden gehasht opge
 | `/api/beschikbaar` | Actueel aantal beschikbare eendjes (JSON, elke 30s door homepage gebruikt) |
 | `/robots.txt` | Crawler-instructies (blokkeert admin/bestellen/betaald, verwijst naar sitemap) |
 | `/sitemap.xml` | XML-sitemap met openbare pagina's (`/`, `/privacy`, `/voorwaarden`) |
-| `/admin` | Beheerpagina — statistieken, bestellingen, zoeken, filter, CSV-download |
+| `/admin` | Bestellingenpagina — statistieken, bestellingen, zoeken, filter, CSV-download |
+| `/admin/beheer` | Beheerpagina — instellingen, beheerders, gevaarzone |
 | `/admin/export-csv` | Download alle bestellingen als CSV |
 | `/admin/bestelling/<id>/wijzigen` | Bewerk naam, e-mail, telefoon, status of mailstatus |
 | `/admin/instellingen` | Wijzig totaal beschikbare eendjes, maximum per bestelling, prijzen en notificatie-e-mailadres |
