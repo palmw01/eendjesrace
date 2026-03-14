@@ -165,6 +165,26 @@
     }
     .knop-csv:hover { background: #C8E6C9; }
 
+    .filter-csv-rij {
+      display: flex; justify-content: space-between; align-items: center;
+      width: 100%; flex-wrap: wrap; gap: 8px;
+    }
+    .csv-menu { display: none; position: relative; }
+    .csv-knop {
+      width: 38px; height: 38px; border-radius: 50%;
+      background: #E8F5E9; color: #2E7D32;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.1rem; cursor: pointer; list-style: none;
+      border: 1px solid #A5D6A7; user-select: none;
+    }
+    .csv-knop::-webkit-details-marker { display: none; }
+    .csv-dropdown {
+      position: absolute; right: 0; top: calc(100% + 8px);
+      background: white; border-radius: 14px; padding: 10px;
+      box-shadow: 0 4px 24px rgba(0,0,0,.15);
+      min-width: 180px; z-index: 100;
+    }
+
     .knop-wijzig {
       padding: 3px 9px; background: #E3F2FD; color: #0077B6;
       border: 1px solid #90CAF9; border-radius: 6px;
@@ -234,8 +254,9 @@
       .zoek { display: flex !important; flex-direction: column !important; align-items: stretch !important; }
       .zoek input[type="text"] { max-width: 100%; min-width: 0; flex: none !important; }
       .zoek button { width: 100%; }
-      .statusfilter { width: 100%; }
-      .knop-csv { align-self: flex-end; }
+      .statusfilter { width: auto; flex: 1; }
+      .knop-csv { display: none; }
+      .csv-menu { display: block; }
 
       .instelling-kaart { padding: 16px; margin-top: 28px; }
       .instelling-rij { flex-direction: column; align-items: flex-start; gap: 6px; }
@@ -322,15 +343,23 @@
     <input type="text" name="zoek" value="{{ zoekterm }}" placeholder="🔍 Zoek op naam, e-mail of lotnummer…" style="flex:1;min-width:200px;">
     <button type="submit" class="filter-knop actief">Zoeken</button>
     {% if zoekterm %}<a href="/admin{% if status_filter %}?status={{ status_filter }}{% endif %}" class="filter-knop">✕ Wissen</a>{% endif %}
-    <div class="statusfilter">
-      <a href="/admin{% if zoekterm %}?zoek={{ zoekterm | urlencode }}{% endif %}" class="filter-knop {% if not status_filter %}actief{% endif %}">Alles</a>
-      <a href="/admin?status=betaald{% if zoekterm %}&zoek={{ zoekterm | urlencode }}{% endif %}" class="filter-knop {% if status_filter == 'betaald' %}actief{% endif %}">Betaald</a>
-      <a href="/admin?status=aangemaakt{% if zoekterm %}&zoek={{ zoekterm | urlencode }}{% endif %}" class="filter-knop {% if status_filter == 'aangemaakt' %}actief{% endif %}">Openstaand</a>
-      <a href="/admin?status=mislukt{% if zoekterm %}&zoek={{ zoekterm | urlencode }}{% endif %}" class="filter-knop {% if status_filter == 'mislukt' %}actief{% endif %}">Mislukt</a>
-      <a href="/admin?status=verlopen{% if zoekterm %}&zoek={{ zoekterm | urlencode }}{% endif %}" class="filter-knop {% if status_filter == 'verlopen' %}actief{% endif %}">Verlopen</a>
-      <a href="/admin?status=geannuleerd{% if zoekterm %}&zoek={{ zoekterm | urlencode }}{% endif %}" class="filter-knop {% if status_filter == 'geannuleerd' %}actief{% endif %}">Geannuleerd</a>
+    <div class="filter-csv-rij">
+      <div class="statusfilter">
+        <a href="/admin{% if zoekterm %}?zoek={{ zoekterm | urlencode }}{% endif %}" class="filter-knop {% if not status_filter %}actief{% endif %}">Alles</a>
+        <a href="/admin?status=betaald{% if zoekterm %}&zoek={{ zoekterm | urlencode }}{% endif %}" class="filter-knop {% if status_filter == 'betaald' %}actief{% endif %}">Betaald</a>
+        <a href="/admin?status=aangemaakt{% if zoekterm %}&zoek={{ zoekterm | urlencode }}{% endif %}" class="filter-knop {% if status_filter == 'aangemaakt' %}actief{% endif %}">Openstaand</a>
+        <a href="/admin?status=mislukt{% if zoekterm %}&zoek={{ zoekterm | urlencode }}{% endif %}" class="filter-knop {% if status_filter == 'mislukt' %}actief{% endif %}">Mislukt</a>
+        <a href="/admin?status=verlopen{% if zoekterm %}&zoek={{ zoekterm | urlencode }}{% endif %}" class="filter-knop {% if status_filter == 'verlopen' %}actief{% endif %}">Verlopen</a>
+        <a href="/admin?status=geannuleerd{% if zoekterm %}&zoek={{ zoekterm | urlencode }}{% endif %}" class="filter-knop {% if status_filter == 'geannuleerd' %}actief{% endif %}">Geannuleerd</a>
+      </div>
+      <a href="/admin/export-csv" class="knop-csv">⬇ CSV downloaden</a>
+      <details class="csv-menu" id="csvMenu">
+        <summary class="csv-knop">⬇</summary>
+        <div class="csv-dropdown">
+          <a href="/admin/export-csv" class="avatar-dd-knop" style="background:#E8F5E9;color:#2E7D32;">⬇ CSV downloaden</a>
+        </div>
+      </details>
     </div>
-    <a href="/admin/export-csv" class="knop-csv" style="margin-left:auto;">⬇ CSV downloaden</a>
   </form>
 
   <!-- Bestellingen tabel -->
@@ -663,6 +692,8 @@
     if (btnSluit) { btnSluit.addEventListener('click', function() { modal.close(); }); }
     modal.addEventListener('click', function(e) { if (e.target === modal) { modal.close(); } });
     document.addEventListener('click', function(e) { if (avatarMenu && avatarMenu.open && !avatarMenu.contains(e.target)) { avatarMenu.removeAttribute('open'); } });
+    var csvMenu = document.getElementById('csvMenu');
+    document.addEventListener('click', function(e) { if (csvMenu && csvMenu.open && !csvMenu.contains(e.target)) { csvMenu.removeAttribute('open'); } });
 
     document.getElementById('resetForm').addEventListener('submit', function(e) {
       if (!confirm('Weet je zeker dat je de database wilt resetten? Dit kan niet ongedaan worden gemaakt.')) {
