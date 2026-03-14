@@ -804,7 +804,7 @@ class TestAdmin(unittest.TestCase):
 
     def test_admin_bevat_details_instellingen(self):
         self._login()
-        r = self.client.get("/admin")
+        r = self.client.get("/admin/beheer")
         self.assertIn(b"<details", r.data)
         self.assertIn("Instellingen".encode(), r.data)
 
@@ -3670,6 +3670,36 @@ class TestAdminBeheerPagina(unittest.TestCase):
         })
         self.assertEqual(r.status_code, 302)
         self.assertIn("/admin/beheer", r.headers["Location"])
+
+    def test_admin_titel_bestellingen(self):
+        """Paginatitel van /admin is 'Bestellingen'."""
+        self._login()
+        r = self.client.get("/admin")
+        self.assertIn(b"Bestellingen", r.data)
+
+    def test_admin_beheer_titel_beheer(self):
+        """Paginatitel van /admin/beheer is 'Beheer'."""
+        self._login()
+        r = self.client.get("/admin/beheer")
+        self.assertIn(b"Beheer", r.data)
+
+    def test_admin_bevat_zoek_rij(self):
+        """Bestellingenpagina bevat zoek-rij met zoekveld."""
+        self._login()
+        r = self.client.get("/admin")
+        self.assertIn(b"zoek-rij", r.data)
+
+    def test_admin_bevat_filter_rij(self):
+        """Bestellingenpagina bevat filter-rij met statusfilters."""
+        self._login()
+        r = self.client.get("/admin")
+        self.assertIn(b"filter-rij", r.data)
+
+    def test_admin_bevat_bestellingen_nav_link(self):
+        """Beheerpagina bevat link terug naar /admin."""
+        self._login()
+        r = self.client.get("/admin/beheer")
+        self.assertIn(b"/admin\"", r.data)
 
 
 # ══════════════════════════════════════════════════════════════════════════════

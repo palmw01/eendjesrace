@@ -202,4 +202,4 @@ python -m pytest tests/test_app.py -v
 python tests/test_app.py
 ```
 
-De testsuite stubt Mollie, Resend, Flask-WTF en Flask-Limiter — alleen Flask en Werkzeug hoeven geïnstalleerd te zijn. 387 tests.
+De testsuite stubt Mollie, Resend, Flask-WTF en Flask-Limiter — alleen Flask en Werkzeug hoeven geïnstalleerd te zijn. 405 tests.
