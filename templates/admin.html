@@ -16,7 +16,7 @@
       margin-bottom: 24px; flex-wrap: wrap; gap: 12px;
     }
     .topbar-acties { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-    h1 { font-family: 'Fredoka One', cursive; font-size: 2rem; color: #0077B6; }
+    h1 { font-family: 'Fredoka One', cursive; font-size: clamp(1rem, 4.5vw, 2rem); color: #0077B6; }
     .eend-inline { height: 1em; width: auto; vertical-align: middle; display: inline-block; }
     .uitloggen {
       padding: 8px 18px; background: #FFEBEE; color: #C62828;
@@ -216,7 +216,6 @@
 
     @media (max-width: 700px) {
       body { padding: 14px; max-width: 100%; }
-      h1 { font-size: 1.4rem; }
 
       .stat { padding: 14px 16px; min-width: 110px; }
       .stat .getal { font-size: 1.5rem; }
