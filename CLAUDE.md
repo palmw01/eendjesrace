@@ -9,20 +9,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-# Install dependencies
-pip install -r requirements.txt
+# Install dependencies (first time)
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt pytest
 
 # Run locally (http://localhost:5000)
 python app.py
 
-# Run tests
-python -m pytest tests/test_app.py -v
+# Run tests (requires PYTHONPATH=. for the venv)
+PYTHONPATH=. .venv/bin/pytest tests/test_app.py -v
 # or without pytest:
-python tests/test_app.py
+PYTHONPATH=. .venv/bin/python tests/test_app.py
 
 # Run a single test class or method
-python -m pytest tests/test_app.py::TestWebhookStatussen -v
-python -m pytest tests/test_app.py::TestBerekenBedrag::test_vijf_eendjes_aanbieding -v
+PYTHONPATH=. .venv/bin/pytest tests/test_app.py::TestWebhookStatussen -v
+PYTHONPATH=. .venv/bin/pytest tests/test_app.py::TestBerekenBedrag::test_vijf_eendjes_aanbieding -v
 
 # Production (Procfile)
 gunicorn app:app
@@ -56,7 +57,7 @@ The entire backend lives in `app.py` (single file). Templates are in `templates/
 - **`bestellingen`**: orders — `voornaam`, `achternaam`, `email`, `telefoon`, `aantal`, `bedrag`, `transactiekosten` (0/1), `transactiekosten_bedrag`, `mollie_id`, `status` (aangemaakt/betaald/mislukt/geannuleerd/verlopen), `lot_van`/`lot_tot` (ticket range), `mail_verstuurd`, `pogingen`, `betaalwijze` (ideal/contant/overboeking)
 - **`teller`**: single row with `volgend_lot` (next ticket number), `max_eendjes` (total available, editable via admin), `max_per_bestelling` (per-order limit, editable via admin), `prijs_per_stuk`, `prijs_vijf_stuks`, `transactiekosten` (all editable via admin, seeded from env on first run), `notificatie_email` (optional admin copy address, editable via admin, empty = disabled)
 - **`webhook_log`**: audit log of webhook calls
-- **`beheerders`**: admin accounts — `gebruikersnaam` (unique), `wachtwoord_hash` (Werkzeug PBKDF2), `aangemaakt_op`. Seeded on first start from `ADMIN_USER`/`ADMIN_PASS` env vars **only if the table is empty**. Multiple accounts supported; manageable via the admin panel without redeployment.
+- **`beheerders`**: admin accounts — `gebruikersnaam` (unique), `wachtwoord_hash` (Werkzeug PBKDF2), `aangemaakt_op`, `laatste_inlog` (nullable, set on each successful login). Seeded on first start from `ADMIN_USER`/`ADMIN_PASS` env vars **only if the table is empty**. Multiple accounts supported; manageable via the admin panel without redeployment. The `laatste_inlog` column is shown in the beheerders table on `/admin/beheer`.
 
 ### Atomic Ticket Assignment
 
@@ -106,7 +107,7 @@ Admin routes:
 
 ## Testing Notes
 
-`tests/test_app.py` stubs out Mollie, Resend, Flask-WTF CSRF, and Flask-Limiter so tests run with only Flask installed. Tests cover pricing, input validation, database operations, atomic transactions, email sending, webhook processing, admin routes, `max_per_bestelling`/`max_eendjes` settings, price settings (`prijs_per_stuk`/`prijs_vijf_stuks`/`transactiekosten`) via admin, CSV injection escaping, CSV filename timestamp, CSV header columns, email header content (afbeelding/kleur/datum), notification email (instellen/validatie/versturen), email validation in wijzig_bestelling, opruimen, paginering, server-side statusfilter, CSP nonces, Permissions-Policy, session permanence, `saniteer_log`, legal pages (`/privacy`, `/voorwaarden`), footer content on `/betaald/<id>` and error pages (`fout.html`), collapsible `<details>` sections in admin, multi-account admin and password management (`TestBeheerderAccounts`), security headers (`TestSecurityHeadersAanvullend`), email formatting variants (`TestBevestigingsmailOpmaakvarianten`), input boundary values (`TestValideerInvoerGrenswaardes`), atomic ticket assignment edge cases (`TestWijsLotnummersToeAanvullend`), admin page username display, password change persistence, betaald-page fallback errors, bestellen edge cases, admin settings validation, handmatige bestelling telefoon, webhook audit log, SEO meta-tags/robots.txt/sitemap.xml (`TestSeoEnRobots`), beheer-paginasplitsing en filterbalk-layout (`TestAdminBeheerPagina`). The test database uses `/tmp/eendjes_test.db` (reset before each test class). `maak_db()` includes all teller columns and seeds the `beheerders` table. Total: 405 tests.
+`tests/test_app.py` stubs out Mollie, Resend, Flask-WTF CSRF, and Flask-Limiter so tests run with only Flask installed. Tests cover pricing, input validation, database operations, atomic transactions, email sending, webhook processing, admin routes, `max_per_bestelling`/`max_eendjes` settings, price settings (`prijs_per_stuk`/`prijs_vijf_stuks`/`transactiekosten`) via admin, CSV injection escaping, CSV filename timestamp, CSV header columns, email header content (afbeelding/kleur/datum), notification email (instellen/validatie/versturen), email validation in wijzig_bestelling, opruimen, paginering, server-side statusfilter, CSP nonces, Permissions-Policy, session permanence, `saniteer_log`, legal pages (`/privacy`, `/voorwaarden`), footer content on `/betaald/<id>` and error pages (`fout.html`), collapsible `<details>` sections in admin, multi-account admin and password management (`TestBeheerderAccounts`, including `laatste_inlog` tests), security headers (`TestSecurityHeadersAanvullend`), email formatting variants (`TestBevestigingsmailOpmaakvarianten`), input boundary values (`TestValideerInvoerGrenswaardes`), atomic ticket assignment edge cases (`TestWijsLotnummersToeAanvullend`), admin page username display, password change persistence, betaald-page fallback errors, bestellen edge cases, admin settings validation, handmatige bestelling telefoon, webhook audit log, SEO meta-tags/robots.txt/sitemap.xml (`TestSeoEnRobots`), beheer-paginasplitsing en filterbalk-layout (`TestAdminBeheerPagina`). The test database uses `/tmp/eendjes_test.db` (reset before each test class). `maak_db()` includes all teller columns and seeds the `beheerders` table (incl. `laatste_inlog`). `conftest.py` cleans up the test database + WAL/SHM files before pytest starts (required for Python 3.14 + SQLite WAL mode). Total: 408 tests.
 
 ## Key Patterns
 

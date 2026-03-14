@@ -19,6 +19,7 @@ Gebouwd met **Python/Flask**, **Mollie** (iDEAL-betalingen), **SQLite** en **Res
 | Beheerpagina met statistieken, zoeken, filter en CSV-export | ✅ |
 | Instellingen beheren via admin (max. eendjes, max. per bestelling, prijzen, notificatieadres) | ✅ |
 | Meerdere beheerdersaccounts aanmaken en verwijderen via admin | ✅ |
+| Laatste inlogdatum per beheerder bijhouden | ✅ |
 | Wachtwoord wijzigen via admin-topbar | ✅ |
 | Automatische database-backup naar Cloudflare R2 via Litestream | ✅ |
 | SEO-geoptimaliseerd (meta description, Open Graph, Twitter Card, JSON-LD, sitemap.xml, robots.txt) | ✅ |
@@ -197,9 +198,14 @@ Optioneel kan de koper de iDEAL-transactiekosten (standaard €0,32, instelbaar)
 ## Tests uitvoeren
 
 ```bash
-python -m pytest tests/test_app.py -v
+# Virtualenv aanmaken (eenmalig)
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt pytest
+
+# Tests draaien
+PYTHONPATH=. .venv/bin/pytest tests/test_app.py -v
 # of zonder pytest:
-python tests/test_app.py
+PYTHONPATH=. .venv/bin/python tests/test_app.py
 ```
 
-De testsuite stubt Mollie, Resend, Flask-WTF en Flask-Limiter — alleen Flask en Werkzeug hoeven geïnstalleerd te zijn. 405 tests.
+De testsuite stubt Mollie, Resend, Flask-WTF en Flask-Limiter. `conftest.py` zorgt voor automatische testdatabase-cleanup (vereist voor Python 3.14 + SQLite WAL mode). 408 tests.
