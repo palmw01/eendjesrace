@@ -13,11 +13,12 @@
     body { font-family: 'Nunito', sans-serif; background: #F0F4F8; color: #1A1A2E; padding: 24px; }
 
     .topbar {
-      display: flex; justify-content: space-between; align-items: center;
+      display: flex; justify-content: space-between; align-items: flex-start;
       margin-bottom: 24px; flex-wrap: wrap; gap: 12px;
     }
     .topbar-acties { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
     h1 { font-family: 'Fredoka One', cursive; font-size: clamp(1rem, 4.5vw, 2rem); color: #0077B6; }
+    .titel-sub { display: block; font-size: .75rem; color: #888; font-family: 'Nunito', sans-serif; font-weight: 700; margin-top: 2px; }
     .eend-inline { height: 1em; width: auto; vertical-align: middle; display: inline-block; }
     .uitloggen {
       padding: 8px 18px; background: #FFEBEE; color: #C62828;
@@ -241,8 +242,6 @@
       .knop-csv { display: none; }
       .csv-menu { display: block; flex-shrink: 0; }
 
-      .topbar { align-items: flex-start; }
-      .titel-sub { display: block; font-size: .75rem; color: #888; font-family: 'Nunito', sans-serif; font-weight: 700; margin-top: 2px; }
       .instelling-kaart { padding: 16px; margin-top: 28px; }
       .instelling-rij { flex-direction: column; align-items: flex-start; gap: 6px; }
       .instelling-label { width: auto; }
