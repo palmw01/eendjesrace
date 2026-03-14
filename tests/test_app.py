@@ -111,7 +111,8 @@ def maak_db():
     for ddl in [
         """CREATE TABLE bestellingen (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            naam TEXT NOT NULL, telefoon TEXT NOT NULL, email TEXT NOT NULL,
+            voornaam TEXT NOT NULL DEFAULT '', achternaam TEXT NOT NULL,
+            telefoon TEXT NOT NULL, email TEXT NOT NULL,
             aantal INTEGER NOT NULL, bedrag REAL NOT NULL,
             mollie_id TEXT UNIQUE,
             status TEXT NOT NULL DEFAULT 'aangemaakt',
@@ -175,12 +176,12 @@ def simuleer_mollie_betaling(status: str) -> MagicMock:
     return mock
 
 
-def doe_bestelling(client, naam="Jan Jansen", telefoon="0612345678",
+def doe_bestelling(client, voornaam="Jan", achternaam="Jansen", telefoon="0612345678",
                    email="jan@test.nl", aantal=2, transactiekosten=False):
     mock_b = simuleer_mollie_betaling("open")
     with patch("app.maak_mollie_client") as mc:
         mc.return_value.payments.create.return_value = mock_b
-        data = {"naam": naam, "telefoon": telefoon,
+        data = {"voornaam": voornaam, "achternaam": achternaam, "telefoon": telefoon,
                 "email": email, "aantal": str(aantal)}
         if transactiekosten:
             data["transactiekosten"] = "1"
@@ -251,21 +252,31 @@ class TestBerekenBedrag(unittest.TestCase):
 
 class TestValideerInvoer(unittest.TestCase):
 
-    def _ok(self, naam="Jan Jansen", tel="0612345678",
+    def _ok(self, voornaam="Jan", achternaam="Jansen", tel="0612345678",
             email="jan@test.nl", aantal=3):
-        return valideer_invoer(naam, tel, email, aantal)
+        return valideer_invoer(voornaam, achternaam, tel, email, aantal)
 
     def test_geldige_invoer_geen_fouten(self):
         self.assertEqual(self._ok(), [])
 
-    def test_naam_te_kort(self):
-        self.assertGreater(len(self._ok(naam="A")), 0)
+    def test_voornaam_te_kort(self):
+        self.assertGreater(len(self._ok(voornaam="A")), 0)
 
-    def test_naam_leeg(self):
-        self.assertGreater(len(self._ok(naam="")), 0)
+    def test_voornaam_leeg(self):
+        self.assertGreater(len(self._ok(voornaam="")), 0)
 
-    def test_naam_te_lang(self):
-        fouten = self._ok(naam="A" * 101)
+    def test_voornaam_te_lang(self):
+        fouten = self._ok(voornaam="A" * 101)
+        self.assertTrue(any("100" in f for f in fouten))
+
+    def test_achternaam_te_kort(self):
+        self.assertGreater(len(self._ok(achternaam="A")), 0)
+
+    def test_achternaam_leeg(self):
+        self.assertGreater(len(self._ok(achternaam="")), 0)
+
+    def test_achternaam_te_lang(self):
+        fouten = self._ok(achternaam="A" * 101)
         self.assertTrue(any("100" in f for f in fouten))
 
     def test_email_zonder_at(self):
@@ -297,7 +308,7 @@ class TestValideerInvoer(unittest.TestCase):
         self.assertTrue(any("100" in f for f in fouten))
 
     def test_meerdere_fouten_tegelijk(self):
-        fouten = valideer_invoer("", "", "geen-email", 0)
+        fouten = valideer_invoer("", "", "", "geen-email", 0)
         self.assertGreaterEqual(len(fouten), 3)
 
 
@@ -310,8 +321,8 @@ class TestWijsLotnummersToe(unittest.TestCase):
     def setUp(self):
         self.db = maak_db()
         self.db.execute(
-            "INSERT INTO bestellingen (naam,telefoon,email,aantal,bedrag) "
-            "VALUES (?,?,?,?,?)", ("Jan", "06", "jan@t.nl", 3, 7.50)
+            "INSERT INTO bestellingen (voornaam,achternaam,telefoon,email,aantal,bedrag) "
+            "VALUES (?,?,?,?,?,?)", ("Jan", "de Vries", "06", "jan@t.nl", 3, 7.50)
         )
 
     def tearDown(self):
@@ -335,8 +346,8 @@ class TestWijsLotnummersToe(unittest.TestCase):
 
     def test_opeenvolgende_bestellingen_unieke_nummers(self):
         self.db.execute(
-            "INSERT INTO bestellingen (naam,telefoon,email,aantal,bedrag) "
-            "VALUES (?,?,?,?,?)", ("Piet", "06", "piet@t.nl", 2, 5.00)
+            "INSERT INTO bestellingen (voornaam,achternaam,telefoon,email,aantal,bedrag) "
+            "VALUES (?,?,?,?,?,?)", ("Piet", "Jansen", "06", "piet@t.nl", 2, 5.00)
         )
         s1, e1 = wijs_lotnummers_toe(self.db, 1, 3)
         s2, e2 = wijs_lotnummers_toe(self.db, 2, 2)
@@ -374,35 +385,35 @@ class TestWijsLotnummersToe(unittest.TestCase):
 
 class TestEmailVeiligheid(unittest.TestCase):
 
-    def _stuur_en_vang_body(self, naam):
+    def _stuur_en_vang_body(self, voornaam="Jan", achternaam="Jansen"):
         verzonden = {}
         def nep_send(params):
             verzonden["html"] = params.get("html", "")
             return {"id": "test"}
         with patch("resend.Emails.send", side_effect=nep_send):
-            stuur_bevestigingsmail(naam, "test@test.nl", 2, 1, 2, 5.00)
+            stuur_bevestigingsmail(voornaam, achternaam, "test@test.nl", 2, 1, 2, 5.00)
         return verzonden.get("html", "")
 
-    def test_scripttag_in_naam_geescaped(self):
-        body = self._stuur_en_vang_body('<script>alert(1)</script>')
+    def test_scripttag_in_voornaam_geescaped(self):
+        body = self._stuur_en_vang_body(voornaam='<script>alert(1)</script>')
         self.assertNotIn("<script>", body)
 
     def test_html_entiteiten_aanwezig(self):
-        body = self._stuur_en_vang_body('<b>Naam</b>')
+        body = self._stuur_en_vang_body(achternaam='<b>Naam</b>')
         self.assertIn("&lt;b&gt;", body)
 
     def test_gewone_naam_verschijnt_in_body(self):
-        body = self._stuur_en_vang_body("Jan Jansen")
+        body = self._stuur_en_vang_body("Jan", "Jansen")
         self.assertIn("Jan Jansen", body)
 
     def test_resend_fout_geeft_false_geen_exception(self):
         with patch("resend.Emails.send", side_effect=Exception("API fout")):
-            resultaat = stuur_bevestigingsmail("Jan", "jan@t.nl", 1, 1, 1, 2.50)
+            resultaat = stuur_bevestigingsmail("Jan", "Jansen", "jan@t.nl", 1, 1, 1, 2.50)
         self.assertFalse(resultaat)
 
     def test_resend_geeft_true_bij_succes(self):
         with patch("resend.Emails.send", return_value={"id": "abc123"}):
-            resultaat = stuur_bevestigingsmail("Jan", "jan@t.nl", 1, 1, 1, 2.50)
+            resultaat = stuur_bevestigingsmail("Jan", "Jansen", "jan@t.nl", 1, 1, 1, 2.50)
         self.assertTrue(resultaat)
 
 
@@ -459,8 +470,11 @@ class TestBestellen(unittest.TestCase):
         self.assertEqual(r.status_code, 302)
         self.assertIn("mollie.com", r.headers["Location"])
 
-    def test_lege_naam_geeft_422(self):
-        self.assertEqual(doe_bestelling(self.client, naam="").status_code, 422)
+    def test_lege_voornaam_geeft_422(self):
+        self.assertEqual(doe_bestelling(self.client, voornaam="").status_code, 422)
+
+    def test_lege_achternaam_geeft_422(self):
+        self.assertEqual(doe_bestelling(self.client, achternaam="").status_code, 422)
 
     def test_ongeldig_email_geeft_422(self):
         self.assertEqual(doe_bestelling(self.client, email="geen-email").status_code, 422)
@@ -473,7 +487,7 @@ class TestBestellen(unittest.TestCase):
 
     def test_aantal_als_tekst_geeft_400(self):
         r = self.client.post("/bestellen", data={
-            "naam": "Jan", "telefoon": "0612345678",
+            "voornaam": "Jan", "achternaam": "Jansen", "telefoon": "0612345678",
             "email": "jan@test.nl", "aantal": "veel",
         })
         self.assertEqual(r.status_code, 400)
@@ -482,7 +496,7 @@ class TestBestellen(unittest.TestCase):
         with patch("app.maak_mollie_client") as mc:
             mc.return_value.payments.create.side_effect = MollieError("down")
             r = self.client.post("/bestellen", data={
-                "naam": "Jan", "telefoon": "0612345678",
+                "voornaam": "Jan", "achternaam": "Jansen", "telefoon": "0612345678",
                 "email": "jan@test.nl", "aantal": "1",
             })
         self.assertEqual(r.status_code, 503)
@@ -878,8 +892,8 @@ class TestBugRegressie(unittest.TestCase):
         """wijs_lotnummers_toe() moet ValueError gooien als einde > MAX_EENDJES."""
         db = maak_db()
         db.execute(
-            "INSERT INTO bestellingen (naam,telefoon,email,aantal,bedrag) "
-            "VALUES (?,?,?,?,?)", ("Jan", "06", "j@t.nl", 5, 10.00)
+            "INSERT INTO bestellingen (voornaam,achternaam,telefoon,email,aantal,bedrag) "
+            "VALUES (?,?,?,?,?,?)", ("Jan", "Jansen", "06", "j@t.nl", 5, 10.00)
         )
         # Stel teller zo in dat volgend_lot al op de grens zit
         db.execute("UPDATE teller SET volgend_lot=? WHERE id=1", (MAX_EENDJES,))
@@ -891,8 +905,8 @@ class TestBugRegressie(unittest.TestCase):
         """Teller mag NIET verhoogd worden als de ValueError gegooid wordt."""
         db = maak_db()
         db.execute(
-            "INSERT INTO bestellingen (naam,telefoon,email,aantal,bedrag) "
-            "VALUES (?,?,?,?,?)", ("Jan", "06", "j@t.nl", 5, 10.00)
+            "INSERT INTO bestellingen (voornaam,achternaam,telefoon,email,aantal,bedrag) "
+            "VALUES (?,?,?,?,?,?)", ("Jan", "Jansen", "06", "j@t.nl", 5, 10.00)
         )
         db.execute("UPDATE teller SET volgend_lot=? WHERE id=1", (MAX_EENDJES,))
         try:
@@ -907,8 +921,8 @@ class TestBugRegressie(unittest.TestCase):
         """Status mag NIET 'betaald' worden als er geen lotnummers beschikbaar zijn."""
         db = maak_db()
         db.execute(
-            "INSERT INTO bestellingen (naam,telefoon,email,aantal,bedrag) "
-            "VALUES (?,?,?,?,?)", ("Jan", "06", "j@t.nl", 5, 10.00)
+            "INSERT INTO bestellingen (voornaam,achternaam,telefoon,email,aantal,bedrag) "
+            "VALUES (?,?,?,?,?,?)", ("Jan", "Jansen", "06", "j@t.nl", 5, 10.00)
         )
         db.execute("UPDATE teller SET volgend_lot=? WHERE id=1", (MAX_EENDJES,))
         try:
@@ -1060,7 +1074,7 @@ class TestWijzigenVerwijderen(unittest.TestCase):
 
     def setUp(self):
         self.client, self.ctx = maak_flask_client()
-        doe_bestelling(self.client, naam="Jan Jansen", aantal=2)
+        doe_bestelling(self.client, voornaam="Jan", achternaam="Jansen", aantal=2)
         self._login()
 
     def tearDown(self):
@@ -1072,7 +1086,7 @@ class TestWijzigenVerwijderen(unittest.TestCase):
 
     def _wijzig(self, bestelling_id=1, **kwargs):
         data = {
-            "naam": "Jan Jansen", "telefoon": "0612345678",
+            "voornaam": "Jan", "achternaam": "Jansen", "telefoon": "0612345678",
             "email": "jan@test.nl", "status": "aangemaakt",
             "mail_verstuurd": "0",
         }
@@ -1094,22 +1108,28 @@ class TestWijzigenVerwijderen(unittest.TestCase):
     # ── wijzigen POST ─────────────────────────────────────────────────────────
 
     def test_wijzigen_post_redirect_naar_admin(self):
-        r = self._wijzig(naam="Piet Pietersen")
+        r = self._wijzig(voornaam="Piet", achternaam="Pietersen")
         self.assertEqual(r.status_code, 302)
         self.assertIn("/admin", r.headers["Location"])
 
     def test_wijzigen_naam_wordt_opgeslagen(self):
-        self._wijzig(naam="Piet Pietersen")
-        rij = App.get_db().execute("SELECT naam FROM bestellingen WHERE id=1").fetchone()
-        self.assertEqual(rij["naam"], "Piet Pietersen")
+        self._wijzig(voornaam="Piet", achternaam="Pietersen")
+        rij = App.get_db().execute("SELECT voornaam, achternaam FROM bestellingen WHERE id=1").fetchone()
+        self.assertEqual(rij["voornaam"], "Piet")
+        self.assertEqual(rij["achternaam"], "Pietersen")
 
     def test_wijzigen_status_wordt_opgeslagen(self):
         self._wijzig(status="betaald")
         rij = App.get_db().execute("SELECT status FROM bestellingen WHERE id=1").fetchone()
         self.assertEqual(rij["status"], "betaald")
 
-    def test_wijzigen_lege_naam_geeft_fout(self):
-        r = self._wijzig(naam="")
+    def test_wijzigen_lege_voornaam_geeft_fout(self):
+        r = self._wijzig(voornaam="")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(b"verplicht", r.data)
+
+    def test_wijzigen_lege_achternaam_geeft_fout(self):
+        r = self._wijzig(achternaam="")
         self.assertEqual(r.status_code, 200)
         self.assertIn(b"verplicht", r.data)
 
@@ -1236,7 +1256,7 @@ class TestTransactiekosten(unittest.TestCase):
             verzonden["html"] = params.get("html", "")
             return {"id": "test"}
         with patch("resend.Emails.send", side_effect=nep_send):
-            stuur_bevestigingsmail("Jan", "jan@t.nl", 2, 1, 2, 5.32, transactiekosten=True)
+            stuur_bevestigingsmail("Jan", "Jansen", "jan@t.nl", 2, 1, 2, 5.32, transactiekosten=True)
         self.assertIn("transactiekosten", verzonden.get("html", "").lower())
 
     def test_email_zonder_tk_vermeldt_geen_transactiekosten(self):
@@ -1245,7 +1265,7 @@ class TestTransactiekosten(unittest.TestCase):
             verzonden["html"] = params.get("html", "")
             return {"id": "test"}
         with patch("resend.Emails.send", side_effect=nep_send):
-            stuur_bevestigingsmail("Jan", "jan@t.nl", 2, 1, 2, 5.00, transactiekosten=False)
+            stuur_bevestigingsmail("Jan", "Jansen", "jan@t.nl", 2, 1, 2, 5.00, transactiekosten=False)
         self.assertNotIn("transactiekosten", verzonden.get("html", "").lower())
 
 
@@ -1266,23 +1286,23 @@ class TestMaxPerBestelling(unittest.TestCase):
     # ── valideer_invoer ───────────────────────────────────────────────────────
 
     def test_valideer_invoer_standaard_max_100(self):
-        fouten = valideer_invoer("Jan Jansen", "0612345678", "jan@test.nl", 100)
+        fouten = valideer_invoer("Jan", "Jansen", "0612345678", "jan@test.nl", 100)
         self.assertEqual(fouten, [])
 
     def test_valideer_invoer_101_met_standaard_geeft_fout(self):
-        fouten = valideer_invoer("Jan Jansen", "0612345678", "jan@test.nl", 101)
+        fouten = valideer_invoer("Jan", "Jansen", "0612345678", "jan@test.nl", 101)
         self.assertTrue(any("100" in f for f in fouten))
 
     def test_valideer_invoer_aangepast_max_50(self):
-        fouten = valideer_invoer("Jan Jansen", "0612345678", "jan@test.nl", 50, max_per_bestelling=50)
+        fouten = valideer_invoer("Jan", "Jansen", "0612345678", "jan@test.nl", 50, max_per_bestelling=50)
         self.assertEqual(fouten, [])
 
     def test_valideer_invoer_51_met_max_50_geeft_fout(self):
-        fouten = valideer_invoer("Jan Jansen", "0612345678", "jan@test.nl", 51, max_per_bestelling=50)
+        fouten = valideer_invoer("Jan", "Jansen", "0612345678", "jan@test.nl", 51, max_per_bestelling=50)
         self.assertTrue(any("50" in f for f in fouten))
 
     def test_valideer_invoer_foutmelding_bevat_max(self):
-        fouten = valideer_invoer("Jan Jansen", "0612345678", "jan@test.nl", 25, max_per_bestelling=20)
+        fouten = valideer_invoer("Jan", "Jansen", "0612345678", "jan@test.nl", 25, max_per_bestelling=20)
         self.assertTrue(any("20" in f for f in fouten))
 
     # ── /api/prijs reageert op max_per_bestelling ─────────────────────────────
@@ -1492,9 +1512,9 @@ class TestBeveiligingsVerbeteringen(unittest.TestCase):
         db = App.get_db()
         for i in range(51):
             db.execute(
-                "INSERT INTO bestellingen (naam, telefoon, email, aantal, bedrag) "
-                "VALUES (?,?,?,?,?)",
-                (f"Koper {i}", "0600000000", f"k{i}@test.nl", 1, 2.50)
+                "INSERT INTO bestellingen (voornaam, achternaam, telefoon, email, aantal, bedrag) "
+                "VALUES (?,?,?,?,?,?)",
+                ("Koper", f"{i}", "0600000000", f"k{i}@test.nl", 1, 2.50)
             )
         r = self.client.get("/admin?pagina=2")
         self.assertEqual(r.status_code, 200)
@@ -1507,9 +1527,9 @@ class TestBeveiligingsVerbeteringen(unittest.TestCase):
         statussen = ["betaald", "betaald", "aangemaakt", "mislukt", "verlopen", "geannuleerd"]
         for i, status in enumerate(statussen):
             db.execute(
-                "INSERT INTO bestellingen (naam, telefoon, email, aantal, bedrag, status) "
-                "VALUES (?,?,?,?,?,?)",
-                (f"Koper {i}", "0600000000", f"k{i}@test.nl", 1, 2.50, status)
+                "INSERT INTO bestellingen (voornaam, achternaam, telefoon, email, aantal, bedrag, status) "
+                "VALUES (?,?,?,?,?,?,?)",
+                ("Koper", f"{i}", "0600000000", f"k{i}@test.nl", 1, 2.50, status)
             )
 
     def test_statusfilter_betaald_toont_alleen_betaald(self):
@@ -1690,8 +1710,8 @@ class TestCsvInjectie(unittest.TestCase):
         # Sla BOM over en decodeer
         return r.data.decode("utf-8-sig")
 
-    def _bestel_met_naam(self, naam):
-        doe_bestelling(self.client, naam=naam)
+    def _bestel_met_naam(self, achternaam):
+        doe_bestelling(self.client, achternaam=achternaam)
 
     def test_formule_in_naam_wordt_geescaped(self):
         self._bestel_met_naam("=SUM(1+1)")
@@ -1728,28 +1748,28 @@ class TestCsvInjectie(unittest.TestCase):
         self.assertRegex(cd, r"bestellingen_\d{8}_\d{6}\.csv")
 
     def test_csv_ideal_bestelling_heeft_betaalwijze_ideal(self):
-        doe_bestelling(self.client, naam="iDEAL Koper")
+        doe_bestelling(self.client, voornaam="iDEAL", achternaam="Koper")
         csv_tekst = self._download_csv()
         self.assertIn('"ideal"', csv_tekst)
 
     def test_csv_handmatige_bestelling_heeft_betaalwijze_contant(self):
         self.client.post("/admin/handmatig", data={
-            "naam": "Contant Koper", "email": "", "telefoon": "",
+            "h_voornaam": "Contant", "h_achternaam": "Koper", "email": "", "telefoon": "",
             "aantal": "1", "betaalwijze": "contant",
         })
         csv_tekst = self._download_csv()
         self.assertIn('"contant"', csv_tekst)
 
     def test_csv_kolommen_tellen(self):
-        """Header moet exact 13 kolommen bevatten."""
+        """Header moet exact 14 kolommen bevatten."""
         csv_tekst = self._download_csv()
         header = csv_tekst.splitlines()[0]
-        self.assertEqual(header.count(";"), 12)  # 13 kolommen = 12 scheidingstekens
+        self.assertEqual(header.count(";"), 13)  # 14 kolommen = 13 scheidingstekens
 
     def test_csv_header_bevat_alle_kolomnamen(self):
         csv_tekst = self._download_csv()
         header = csv_tekst.splitlines()[0]
-        for kolom in ["ID", "Naam", "E-mail", "Telefoon", "Aantal", "Bedrag",
+        for kolom in ["ID", "Voornaam", "Achternaam", "E-mail", "Telefoon", "Aantal", "Bedrag",
                       "iDEAL-kosten", "Lot van", "Lot tot", "Status",
                       "Betaalwijze", "Mail verstuurd", "Aangemaakt op"]:
             self.assertIn(kolom, header)
@@ -1757,13 +1777,13 @@ class TestCsvInjectie(unittest.TestCase):
 
 class TestMailHeader(unittest.TestCase):
 
-    def _vang_mail_params(self, naam="Jan"):
+    def _vang_mail_params(self, voornaam="Jan", achternaam="Jansen"):
         verzonden = {}
         def nep_send(params):
             verzonden.update(params)
             return {"id": "test"}
         with patch("resend.Emails.send", side_effect=nep_send):
-            stuur_bevestigingsmail(naam, "jan@test.nl", 1, 1, 1, 2.50)
+            stuur_bevestigingsmail(voornaam, achternaam, "jan@test.nl", 1, 1, 1, 2.50)
         return verzonden
 
     def test_onderwerp_zonder_eend_emoji(self):
@@ -1828,7 +1848,7 @@ class TestNotificatieEmail(unittest.TestCase):
             return {"id": "test"}
         with patch("resend.Emails.send", side_effect=nep_send):
             from app import stuur_bevestigingsmail
-            stuur_bevestigingsmail("Jan", "jan@test.nl", 1, 1, 1, 2.50)
+            stuur_bevestigingsmail("Jan", "Jansen", "jan@test.nl", 1, 1, 1, 2.50)
         adressen = [p["to"][0] for p in verzonden]
         self.assertIn("jan@test.nl", adressen)
         self.assertIn("kopie@test.nl", adressen)
@@ -1842,7 +1862,7 @@ class TestNotificatieEmail(unittest.TestCase):
             return {"id": "test"}
         with patch("resend.Emails.send", side_effect=nep_send):
             from app import stuur_bevestigingsmail
-            stuur_bevestigingsmail("Jan", "jan@test.nl", 1, 1, 1, 2.50)
+            stuur_bevestigingsmail("Jan", "Jansen", "jan@test.nl", 1, 1, 1, 2.50)
         kopie = next(p for p in verzonden if p["to"][0] == "kopie@test.nl")
         self.assertIn("[Kopie]", kopie["subject"])
 
@@ -1855,7 +1875,7 @@ class TestNotificatieEmail(unittest.TestCase):
             return {"id": "test"}
         with patch("resend.Emails.send", side_effect=nep_send):
             from app import stuur_bevestigingsmail
-            stuur_bevestigingsmail("Jan", "jan@test.nl", 1, 1, 1, 2.50)
+            stuur_bevestigingsmail("Jan", "Jansen", "jan@test.nl", 1, 1, 1, 2.50)
         self.assertEqual(len(verzonden), 1)  # alleen naar klant
 
 
@@ -1876,12 +1896,12 @@ class TestHandmatigeBestellingen(unittest.TestCase):
 
     def test_handmatige_bestelling_contant(self):
         r = self.client.post("/admin/handmatig", data={
-            "naam": "Piet Pietersen", "email": "piet@test.nl",
+            "h_voornaam": "Piet", "h_achternaam": "Pietersen", "email": "piet@test.nl",
             "telefoon": "0612345678", "aantal": "2", "betaalwijze": "contant",
         }, follow_redirects=True)
         self.assertEqual(r.status_code, 200)
         db = App.get_db()
-        b = db.execute("SELECT * FROM bestellingen WHERE naam='Piet Pietersen'").fetchone()
+        b = db.execute("SELECT * FROM bestellingen WHERE voornaam='Piet' AND achternaam='Pietersen'").fetchone()
         self.assertIsNotNone(b)
         self.assertEqual(b["status"], "betaald")
         self.assertEqual(b["betaalwijze"], "contant")
@@ -1890,47 +1910,47 @@ class TestHandmatigeBestellingen(unittest.TestCase):
 
     def test_handmatige_bestelling_overboeking(self):
         r = self.client.post("/admin/handmatig", data={
-            "naam": "Klaas Klaassen", "email": "",
+            "h_voornaam": "Klaas", "h_achternaam": "Klaassen", "email": "",
             "telefoon": "", "aantal": "3", "betaalwijze": "overboeking",
         }, follow_redirects=True)
         self.assertEqual(r.status_code, 200)
         db = App.get_db()
-        b = db.execute("SELECT * FROM bestellingen WHERE naam='Klaas Klaassen'").fetchone()
+        b = db.execute("SELECT * FROM bestellingen WHERE voornaam='Klaas' AND achternaam='Klaassen'").fetchone()
         self.assertEqual(b["betaalwijze"], "overboeking")
         self.assertEqual(b["status"], "betaald")
 
     def test_handmatige_bestelling_zonder_email_geen_mail(self):
         with patch("app.stuur_bevestigingsmail") as mock_mail:
             self.client.post("/admin/handmatig", data={
-                "naam": "Geen Email", "email": "",
+                "h_voornaam": "Geen", "h_achternaam": "Email", "email": "",
                 "telefoon": "", "aantal": "1", "betaalwijze": "contant",
             })
             mock_mail.assert_not_called()
         # mail_verstuurd=1 zodat de admin-waarschuwing niet verschijnt
         db = App.get_db()
-        b = db.execute("SELECT mail_verstuurd FROM bestellingen WHERE naam='Geen Email'").fetchone()
+        b = db.execute("SELECT mail_verstuurd FROM bestellingen WHERE voornaam='Geen' AND achternaam='Email'").fetchone()
         self.assertEqual(b["mail_verstuurd"], 1)
 
     def test_handmatige_bestelling_met_email_stuurt_mail(self):
         with patch("app.stuur_bevestigingsmail", return_value=True) as mock_mail:
             self.client.post("/admin/handmatig", data={
-                "naam": "Met Email", "email": "met@test.nl",
+                "h_voornaam": "Met", "h_achternaam": "Email", "email": "met@test.nl",
                 "telefoon": "", "aantal": "1", "betaalwijze": "contant",
             })
             mock_mail.assert_called_once()
 
     def test_handmatige_bestelling_lotnummers_oplopend(self):
         self.client.post("/admin/handmatig", data={
-            "naam": "Eerste", "email": "", "telefoon": "",
+            "h_voornaam": "Eerste", "h_achternaam": "Persoon", "email": "", "telefoon": "",
             "aantal": "2", "betaalwijze": "contant",
         })
         self.client.post("/admin/handmatig", data={
-            "naam": "Tweede", "email": "", "telefoon": "",
+            "h_voornaam": "Tweede", "h_achternaam": "Persoon", "email": "", "telefoon": "",
             "aantal": "3", "betaalwijze": "contant",
         })
         db = App.get_db()
-        eerste = db.execute("SELECT lot_van, lot_tot FROM bestellingen WHERE naam='Eerste'").fetchone()
-        tweede = db.execute("SELECT lot_van, lot_tot FROM bestellingen WHERE naam='Tweede'").fetchone()
+        eerste = db.execute("SELECT lot_van, lot_tot FROM bestellingen WHERE voornaam='Eerste'").fetchone()
+        tweede = db.execute("SELECT lot_van, lot_tot FROM bestellingen WHERE voornaam='Tweede'").fetchone()
         self.assertEqual(eerste["lot_van"], 1)
         self.assertEqual(eerste["lot_tot"], 2)
         self.assertEqual(tweede["lot_van"], 3)
@@ -1938,7 +1958,7 @@ class TestHandmatigeBestellingen(unittest.TestCase):
 
     def test_handmatige_bestelling_naam_verplicht(self):
         r = self.client.post("/admin/handmatig", data={
-            "naam": "", "email": "", "telefoon": "",
+            "h_voornaam": "", "h_achternaam": "", "email": "", "telefoon": "",
             "aantal": "1", "betaalwijze": "contant",
         }, follow_redirects=True)
         self.assertEqual(r.status_code, 200)
@@ -1948,17 +1968,17 @@ class TestHandmatigeBestellingen(unittest.TestCase):
 
     def test_handmatige_bestelling_ongeldig_betaalwijze_valt_terug_op_contant(self):
         self.client.post("/admin/handmatig", data={
-            "naam": "Test User", "email": "", "telefoon": "",
+            "h_voornaam": "Test", "h_achternaam": "User", "email": "", "telefoon": "",
             "aantal": "1", "betaalwijze": "ideal",  # niet geldig voor handmatig
         })
         db = App.get_db()
-        b = db.execute("SELECT betaalwijze FROM bestellingen WHERE naam='Test User'").fetchone()
+        b = db.execute("SELECT betaalwijze FROM bestellingen WHERE voornaam='Test' AND achternaam='User'").fetchone()
         self.assertEqual(b["betaalwijze"], "contant")
 
     def test_ideal_bestelling_heeft_betaalwijze_ideal(self):
-        doe_bestelling(self.client, naam="iDEAL Koper", aantal=1)
+        doe_bestelling(self.client, voornaam="iDEAL", achternaam="Koper", aantal=1)
         db = App.get_db()
-        b = db.execute("SELECT betaalwijze FROM bestellingen WHERE naam='iDEAL Koper'").fetchone()
+        b = db.execute("SELECT betaalwijze FROM bestellingen WHERE voornaam='iDEAL' AND achternaam='Koper'").fetchone()
         self.assertEqual(b["betaalwijze"], "ideal")
 
     def test_csv_bevat_betaalwijze_kolom(self):
@@ -1969,7 +1989,7 @@ class TestHandmatigeBestellingen(unittest.TestCase):
         # Uitloggen
         uitgelogde_client, ctx2 = maak_flask_client()
         r = uitgelogde_client.post("/admin/handmatig", data={
-            "naam": "Hacker", "email": "", "telefoon": "",
+            "h_voornaam": "Hacker", "h_achternaam": "Test", "email": "", "telefoon": "",
             "aantal": "1", "betaalwijze": "contant",
         })
         self.assertIn(r.status_code, [302, 401, 403])
@@ -2421,7 +2441,7 @@ class TestHandmatigeBestellingenExtra(unittest.TestCase):
     def test_handmatige_bestelling_ongeldig_aantal_tekst(self):
         """Tekstwaarde voor aantal geeft foutmelding, geen crash."""
         r = self.client.post("/admin/handmatig", data={
-            "naam": "Test Persoon", "email": "", "telefoon": "",
+            "h_voornaam": "Test", "h_achternaam": "Persoon", "email": "", "telefoon": "",
             "aantal": "veel", "betaalwijze": "contant",
         }, follow_redirects=True)
         self.assertEqual(r.status_code, 200)
@@ -2431,7 +2451,7 @@ class TestHandmatigeBestellingenExtra(unittest.TestCase):
     def test_handmatige_bestelling_aantal_nul_geeft_fout(self):
         """Aantal = 0 wordt geweigerd."""
         r = self.client.post("/admin/handmatig", data={
-            "naam": "Test Persoon", "email": "", "telefoon": "",
+            "h_voornaam": "Test", "h_achternaam": "Persoon", "email": "", "telefoon": "",
             "aantal": "0", "betaalwijze": "contant",
         }, follow_redirects=True)
         self.assertEqual(r.status_code, 200)
@@ -2442,7 +2462,7 @@ class TestHandmatigeBestellingenExtra(unittest.TestCase):
         """Bij oversell wordt geen bestelling aangemaakt en de foutmelding getoond."""
         App.get_db().execute("UPDATE teller SET volgend_lot=? WHERE id=1", (MAX_EENDJES + 1,))
         r = self.client.post("/admin/handmatig", data={
-            "naam": "Oversell Test", "email": "", "telefoon": "",
+            "h_voornaam": "Oversell", "h_achternaam": "Test", "email": "", "telefoon": "",
             "aantal": "1", "betaalwijze": "contant",
         }, follow_redirects=True)
         self.assertEqual(r.status_code, 200)
@@ -2452,7 +2472,7 @@ class TestHandmatigeBestellingenExtra(unittest.TestCase):
     def test_handmatige_bestelling_ongeldig_email_geeft_fout(self):
         """Ongeldig e-mailadres bij handmatige bestelling wordt geweigerd."""
         r = self.client.post("/admin/handmatig", data={
-            "naam": "Test Persoon", "email": "geen-at-teken",
+            "h_voornaam": "Test", "h_achternaam": "Persoon", "email": "geen-at-teken",
             "telefoon": "", "aantal": "1", "betaalwijze": "contant",
         }, follow_redirects=True)
         self.assertEqual(r.status_code, 200)
@@ -2462,7 +2482,7 @@ class TestHandmatigeBestellingenExtra(unittest.TestCase):
     def test_handmatige_bestelling_naam_te_lang_geeft_fout(self):
         """Naam langer dan 100 tekens wordt geweigerd."""
         r = self.client.post("/admin/handmatig", data={
-            "naam": "A" * 101, "email": "", "telefoon": "",
+            "h_voornaam": "Aa", "h_achternaam": "A" * 101, "email": "", "telefoon": "",
             "aantal": "1", "betaalwijze": "contant",
         }, follow_redirects=True)
         self.assertEqual(r.status_code, 200)
@@ -2473,11 +2493,11 @@ class TestHandmatigeBestellingenExtra(unittest.TestCase):
         """Bij een succesvolle bestelling met e-mail wordt mail_verstuurd=1 als mail slaagt."""
         with patch("app.stuur_bevestigingsmail", return_value=True):
             self.client.post("/admin/handmatig", data={
-                "naam": "Met Email", "email": "met@test.nl",
+                "h_voornaam": "Met", "h_achternaam": "Email", "email": "met@test.nl",
                 "telefoon": "", "aantal": "1", "betaalwijze": "contant",
             })
         rij = App.get_db().execute(
-            "SELECT mail_verstuurd FROM bestellingen WHERE naam='Met Email'"
+            "SELECT mail_verstuurd FROM bestellingen WHERE voornaam='Met' AND achternaam='Email'"
         ).fetchone()
         self.assertEqual(rij["mail_verstuurd"], 1)
 
@@ -2496,24 +2516,30 @@ class TestAdminZoekfunctie(unittest.TestCase):
         # Vul database met testbestellingen
         db = App.get_db()
         db.execute(
-            "INSERT INTO bestellingen (naam, telefoon, email, aantal, bedrag, status, lot_van, lot_tot) "
-            "VALUES (?,?,?,?,?,?,?,?)",
-            ("Zoek Jansen", "0612345678", "zoek@test.nl", 2, 5.00, "betaald", 1, 2)
+            "INSERT INTO bestellingen (voornaam, achternaam, telefoon, email, aantal, bedrag, status, lot_van, lot_tot) "
+            "VALUES (?,?,?,?,?,?,?,?,?)",
+            ("Zoek", "Jansen", "0612345678", "zoek@test.nl", 2, 5.00, "betaald", 1, 2)
         )
         db.execute(
-            "INSERT INTO bestellingen (naam, telefoon, email, aantal, bedrag, status) "
-            "VALUES (?,?,?,?,?,?)",
-            ("Andere Persoon", "0687654321", "andere@test.nl", 1, 2.50, "aangemaakt")
+            "INSERT INTO bestellingen (voornaam, achternaam, telefoon, email, aantal, bedrag, status) "
+            "VALUES (?,?,?,?,?,?,?)",
+            ("Andere", "Persoon", "0687654321", "andere@test.nl", 1, 2.50, "aangemaakt")
         )
 
     def tearDown(self):
         self.ctx.pop()
 
-    def test_zoek_op_naam_vindt_resultaat(self):
+    def test_zoek_op_voornaam_vindt_resultaat(self):
         r = self.client.get("/admin?zoek=Zoek")
         self.assertEqual(r.status_code, 200)
-        self.assertIn("Zoek Jansen".encode(), r.data)
-        self.assertNotIn("Andere Persoon".encode(), r.data)
+        self.assertIn(b"Zoek", r.data)
+        self.assertNotIn(b"andere@test.nl", r.data)
+
+    def test_zoek_op_achternaam_vindt_resultaat(self):
+        r = self.client.get("/admin?zoek=Jansen")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(b"Jansen", r.data)
+        self.assertNotIn(b"andere@test.nl", r.data)
 
     def test_zoek_op_email_vindt_resultaat(self):
         r = self.client.get("/admin?zoek=zoek@test.nl")
@@ -2525,32 +2551,35 @@ class TestAdminZoekfunctie(unittest.TestCase):
         r = self.client.get("/admin?zoek=1")
         self.assertEqual(r.status_code, 200)
         # Lot_van=1 komt voor in de eerste bestelling
-        self.assertIn("Zoek Jansen".encode(), r.data)
+        self.assertIn(b"Zoek", r.data)
+        self.assertIn(b"Jansen", r.data)
 
     def test_zoek_op_lotnummer_binnen_bereik(self):
         """Zoeken op #2 vindt bestelling met lot_van=1, lot_tot=2."""
         r = self.client.get("/admin?zoek=2")
         self.assertEqual(r.status_code, 200)
-        self.assertIn("Zoek Jansen".encode(), r.data)
+        self.assertIn(b"Zoek", r.data)
+        self.assertIn(b"Jansen", r.data)
 
     def test_zoek_op_lotnummer_met_hekje(self):
         """Zoeken op #2 (met #) vindt bestelling met lot_van=1, lot_tot=2."""
         r = self.client.get("/admin?zoek=%232")
         self.assertEqual(r.status_code, 200)
-        self.assertIn("Zoek Jansen".encode(), r.data)
+        self.assertIn(b"Zoek", r.data)
+        self.assertIn(b"Jansen", r.data)
 
     def test_zoek_geen_resultaat_toont_lege_lijst(self):
         r = self.client.get("/admin?zoek=bestaaniet99999")
         self.assertEqual(r.status_code, 200)
-        self.assertNotIn("Zoek Jansen".encode(), r.data)
-        self.assertNotIn("Andere Persoon".encode(), r.data)
+        self.assertNotIn(b"zoek@test.nl", r.data)
+        self.assertNotIn(b"andere@test.nl", r.data)
 
     def test_zoek_gecombineerd_met_statusfilter(self):
         """Zoek en statusfilter samen werken correct."""
         r = self.client.get("/admin?zoek=Persoon&status=aangemaakt")
         self.assertEqual(r.status_code, 200)
-        self.assertIn("Andere Persoon".encode(), r.data)
-        self.assertNotIn("Zoek Jansen".encode(), r.data)
+        self.assertIn(b"Andere", r.data)
+        self.assertNotIn(b"zoek@test.nl", r.data)
 
     def test_zoek_te_lang_wordt_afgekapt(self):
         """Zoekterm langer dan 100 tekens wordt afgekapt zonder fout."""
@@ -2571,31 +2600,31 @@ class TestAdminSorteerfunctie(unittest.TestCase):
                          data={"gebruiker": "admin", "wachtwoord": "testpass12345"})
         db = App.get_db()
         db.execute(
-            "INSERT INTO bestellingen (naam, telefoon, email, aantal, bedrag, status, lot_van, lot_tot) "
-            "VALUES (?,?,?,?,?,?,?,?)",
-            ("Anna Bakker", "0600000001", "anna@test.nl", 5, 10.00, "betaald", 1, 5)
+            "INSERT INTO bestellingen (voornaam, achternaam, telefoon, email, aantal, bedrag, status, lot_van, lot_tot) "
+            "VALUES (?,?,?,?,?,?,?,?,?)",
+            ("Anna", "Bakker", "0600000001", "anna@test.nl", 5, 10.00, "betaald", 1, 5)
         )
         db.execute(
-            "INSERT INTO bestellingen (naam, telefoon, email, aantal, bedrag, status, lot_van, lot_tot) "
-            "VALUES (?,?,?,?,?,?,?,?)",
-            ("Boris Coster", "0600000002", "boris@test.nl", 2, 5.00, "betaald", 6, 7)
+            "INSERT INTO bestellingen (voornaam, achternaam, telefoon, email, aantal, bedrag, status, lot_van, lot_tot) "
+            "VALUES (?,?,?,?,?,?,?,?,?)",
+            ("Boris", "Coster", "0600000002", "boris@test.nl", 2, 5.00, "betaald", 6, 7)
         )
 
     def tearDown(self):
         self.ctx.pop()
 
-    def test_sorteer_op_naam_asc(self):
-        r = self.client.get("/admin?sorter=naam&richting=asc")
+    def test_sorteer_op_achternaam_asc(self):
+        r = self.client.get("/admin?sorter=achternaam&richting=asc")
         self.assertEqual(r.status_code, 200)
-        positie_anna = r.data.find(b"Anna Bakker")
-        positie_boris = r.data.find(b"Boris Coster")
+        positie_anna = r.data.find(b"Bakker")
+        positie_boris = r.data.find(b"Coster")
         self.assertLess(positie_anna, positie_boris)
 
-    def test_sorteer_op_naam_desc(self):
-        r = self.client.get("/admin?sorter=naam&richting=desc")
+    def test_sorteer_op_achternaam_desc(self):
+        r = self.client.get("/admin?sorter=achternaam&richting=desc")
         self.assertEqual(r.status_code, 200)
-        positie_anna = r.data.find(b"Anna Bakker")
-        positie_boris = r.data.find(b"Boris Coster")
+        positie_anna = r.data.find(b"Bakker")
+        positie_boris = r.data.find(b"Coster")
         self.assertGreater(positie_anna, positie_boris)
 
     def test_sorter_ongeldig_valt_terug_op_id(self):
@@ -2603,11 +2632,11 @@ class TestAdminSorteerfunctie(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
 
     def test_richting_ongeldig_valt_terug_op_desc(self):
-        r = self.client.get("/admin?sorter=naam&richting=DROP")
+        r = self.client.get("/admin?sorter=achternaam&richting=DROP")
         self.assertEqual(r.status_code, 200)
 
     def test_sorteerpijlen_zichtbaar_in_koppen(self):
-        r = self.client.get("/admin?sorter=naam&richting=asc")
+        r = self.client.get("/admin?sorter=voornaam&richting=asc")
         self.assertIn(b"sorteer", r.data)
 
 
@@ -2855,7 +2884,7 @@ class TestBevestigingsmailOpmaakvarianten(unittest.TestCase):
             verzonden["html"] = params.get("html", "")
             return {"id": "test"}
         with patch("resend.Emails.send", side_effect=nep_send):
-            stuur_bevestigingsmail("Jan", "jan@test.nl", aantal, lot_van, lot_tot, 5.00)
+            stuur_bevestigingsmail("Jan", "Jansen", "jan@test.nl", aantal, lot_van, lot_tot, 5.00)
         return verzonden.get("html", "")
 
     def test_een_lotnummer_tekst_enkelvoud(self):
@@ -2917,21 +2946,21 @@ class TestBevestigingsmailOpmaakvarianten(unittest.TestCase):
 
 class TestValideerInvoerGrenswaardes(unittest.TestCase):
 
-    def _ok(self, naam="Jan Jansen", tel="0612345678",
+    def _ok(self, voornaam="Jan", achternaam="Jansen", tel="0612345678",
             email="jan@test.nl", aantal=3, max_per_bestelling=100):
-        return valideer_invoer(naam, tel, email, aantal, max_per_bestelling)
+        return valideer_invoer(voornaam, achternaam, tel, email, aantal, max_per_bestelling)
 
     def test_naam_precies_2_tekens_geldig(self):
         """Naam van exact 2 tekens moet geldig zijn."""
-        self.assertEqual(self._ok(naam="AB"), [])
+        self.assertEqual(self._ok(voornaam="AB"), [])
 
     def test_naam_precies_100_tekens_geldig(self):
         """Naam van exact 100 tekens moet geldig zijn."""
-        self.assertEqual(self._ok(naam="A" * 100), [])
+        self.assertEqual(self._ok(voornaam="A" * 100), [])
 
     def test_naam_101_tekens_ongeldig(self):
         """Naam van 101 tekens moet ongeldig zijn."""
-        self.assertGreater(len(self._ok(naam="A" * 101)), 0)
+        self.assertGreater(len(self._ok(voornaam="A" * 101)), 0)
 
     def test_aantal_precies_max_per_bestelling_geldig(self):
         """Aantal precies gelijk aan max_per_bestelling is geldig."""
@@ -2972,10 +3001,10 @@ class TestWijsLotnummersToeAanvullend(unittest.TestCase):
     def tearDown(self):
         self.db.close()
 
-    def _voeg_bestelling_toe(self, naam="Jan", aantal=2, status="aangemaakt"):
+    def _voeg_bestelling_toe(self, voornaam="Jan", achternaam="Jansen", aantal=2, status="aangemaakt"):
         self.db.execute(
-            "INSERT INTO bestellingen (naam,telefoon,email,aantal,bedrag,status) "
-            "VALUES (?,?,?,?,?,?)", (naam, "06", "jan@t.nl", aantal, 5.00, status)
+            "INSERT INTO bestellingen (voornaam,achternaam,telefoon,email,aantal,bedrag,status) "
+            "VALUES (?,?,?,?,?,?,?)", (voornaam, achternaam, "06", "jan@t.nl", aantal, 5.00, status)
         )
         return self.db.execute("SELECT last_insert_rowid()").fetchone()[0]
 
@@ -3187,9 +3216,9 @@ class TestBestellenAanvullend(unittest.TestCase):
 
     def test_geldige_bestelling_slaat_betaalwijze_ideal_op(self):
         """Normale iDEAL-bestelling krijgt betaalwijze='ideal' in de database."""
-        doe_bestelling(self.client, naam="iDEAL Test")
+        doe_bestelling(self.client, voornaam="iDEAL", achternaam="Test")
         rij = App.get_db().execute(
-            "SELECT betaalwijze FROM bestellingen WHERE naam='iDEAL Test'"
+            "SELECT betaalwijze FROM bestellingen WHERE voornaam='iDEAL' AND achternaam='Test'"
         ).fetchone()
         self.assertEqual(rij["betaalwijze"], "ideal")
 
@@ -3197,7 +3226,7 @@ class TestBestellenAanvullend(unittest.TestCase):
         """Bij validatiefout (lege naam) moet de response de eerder ingevulde
         gegevens terugsturen (vorig-dict)."""
         r = self.client.post("/bestellen", data={
-            "naam": "",
+            "voornaam": "", "achternaam": "",
             "telefoon": "0612345678",
             "email": "jan@test.nl",
             "aantal": "2",
@@ -3206,7 +3235,7 @@ class TestBestellenAanvullend(unittest.TestCase):
 
     def test_naam_alleen_spaties_geeft_422(self):
         """Naam met alleen spaties (len < 2 na strip) geeft een 422."""
-        r = doe_bestelling(self.client, naam="   ")
+        r = doe_bestelling(self.client, voornaam="   ", achternaam="   ")
         self.assertEqual(r.status_code, 422)
 
     def test_te_veel_eendjes_bij_bijna_vol_geeft_409(self):
@@ -3218,12 +3247,13 @@ class TestBestellenAanvullend(unittest.TestCase):
 
     def test_bestelling_slaat_naam_op(self):
         """De naam wordt correct opgeslagen in de database."""
-        doe_bestelling(self.client, naam="Unieke Naam Test")
+        doe_bestelling(self.client, voornaam="Unieke", achternaam="Naam Test")
         rij = App.get_db().execute(
-            "SELECT naam FROM bestellingen WHERE naam='Unieke Naam Test'"
+            "SELECT voornaam, achternaam FROM bestellingen WHERE voornaam='Unieke' AND achternaam='Naam Test'"
         ).fetchone()
         self.assertIsNotNone(rij)
-        self.assertEqual(rij["naam"], "Unieke Naam Test")
+        self.assertEqual(rij["voornaam"], "Unieke")
+        self.assertEqual(rij["achternaam"], "Naam Test")
 
     def test_bestelling_slaat_email_lowercase_op(self):
         """E-mailadres wordt lowercase opgeslagen."""
@@ -3308,7 +3338,7 @@ class TestHandmatigeBestellingTelefoon(unittest.TestCase):
     def test_ongeldig_telefoonnummer_geeft_fout(self):
         """Ongeldig telefoonnummer bij handmatige bestelling wordt geweigerd."""
         r = self.client.post("/admin/handmatig", data={
-            "naam": "Test Persoon", "email": "",
+            "h_voornaam": "Test", "h_achternaam": "Persoon", "email": "",
             "telefoon": "abc-xyz",  # geen cijfers
             "aantal": "1", "betaalwijze": "contant",
         }, follow_redirects=True)
@@ -3319,26 +3349,26 @@ class TestHandmatigeBestellingTelefoon(unittest.TestCase):
     def test_geldig_telefoonnummer_met_spaties_en_plus(self):
         """Telefoonnummer met spaties, plus en streepjes is geldig."""
         r = self.client.post("/admin/handmatig", data={
-            "naam": "Test Persoon", "email": "",
+            "h_voornaam": "Test", "h_achternaam": "Persoon", "email": "",
             "telefoon": "+31 6-12345678",
             "aantal": "1", "betaalwijze": "contant",
         }, follow_redirects=True)
         self.assertEqual(r.status_code, 200)
         rij = App.get_db().execute(
-            "SELECT COUNT(*) AS n FROM bestellingen WHERE naam='Test Persoon'"
+            "SELECT COUNT(*) AS n FROM bestellingen WHERE voornaam='Test' AND achternaam='Persoon'"
         ).fetchone()
         self.assertEqual(rij["n"], 1)
 
     def test_handmatig_zonder_telefoon_is_geldig(self):
         """Lege telefoon bij handmatige bestelling is toegestaan."""
         r = self.client.post("/admin/handmatig", data={
-            "naam": "Geen Telefoon", "email": "",
+            "h_voornaam": "Geen", "h_achternaam": "Telefoon", "email": "",
             "telefoon": "",
             "aantal": "1", "betaalwijze": "contant",
         }, follow_redirects=True)
         self.assertEqual(r.status_code, 200)
         rij = App.get_db().execute(
-            "SELECT COUNT(*) AS n FROM bestellingen WHERE naam='Geen Telefoon'"
+            "SELECT COUNT(*) AS n FROM bestellingen WHERE voornaam='Geen' AND achternaam='Telefoon'"
         ).fetchone()
         self.assertEqual(rij["n"], 1)
 

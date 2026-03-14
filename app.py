@@ -113,12 +113,16 @@ def maak_mollie_client() -> Client:
 EMAIL_RE    = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 TELEFOON_RE = re.compile(r"^(?=.*\d)[\d\s\+\-\(\)]{6,20}$")
 
-def valideer_invoer(naam, telefoon, email, aantal, max_per_bestelling=100):
+def valideer_invoer(voornaam, achternaam, telefoon, email, aantal, max_per_bestelling=100):
     fouten = []
-    if not naam or len(naam.strip()) < 2:
-        fouten.append("Vul een geldige naam in (minimaal 2 tekens).")
-    if len(naam) > 100:
-        fouten.append("Naam mag maximaal 100 tekens zijn.")
+    if not voornaam or len(voornaam.strip()) < 2:
+        fouten.append("Vul een geldige voornaam in (minimaal 2 tekens).")
+    if len(voornaam) > 100:
+        fouten.append("Voornaam mag maximaal 100 tekens zijn.")
+    if not achternaam or len(achternaam.strip()) < 2:
+        fouten.append("Vul een geldige achternaam in (minimaal 2 tekens).")
+    if len(achternaam) > 100:
+        fouten.append("Achternaam mag maximaal 100 tekens zijn.")
     if not EMAIL_RE.match(email):
         fouten.append("Vul een geldig e-mailadres in.")
     if not TELEFOON_RE.match(telefoon):
@@ -159,7 +163,8 @@ def init_db():
     conn.execute("""
         CREATE TABLE IF NOT EXISTS bestellingen (
             id              INTEGER PRIMARY KEY AUTOINCREMENT,
-            naam            TEXT NOT NULL,
+            voornaam        TEXT NOT NULL DEFAULT '',
+            achternaam      TEXT NOT NULL,
             telefoon        TEXT NOT NULL,
             email           TEXT NOT NULL,
             aantal          INTEGER NOT NULL CHECK (aantal >= 1),
@@ -253,6 +258,51 @@ def init_db():
         conn.execute("ALTER TABLE bestellingen ADD COLUMN betaalwijze TEXT NOT NULL DEFAULT 'ideal'")
     except sqlite3.OperationalError:
         pass  # kolom bestaat al
+    # Migratie: naam → voornaam + achternaam
+    try:
+        cols = [r[1] for r in conn.execute("PRAGMA table_info(bestellingen)").fetchall()]
+        if 'naam' in cols and 'voornaam' not in cols:
+            conn.execute("BEGIN")
+            conn.execute("ALTER TABLE bestellingen RENAME TO _bestellingen_oud")
+            conn.execute("""CREATE TABLE bestellingen (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                voornaam        TEXT NOT NULL DEFAULT '',
+                achternaam      TEXT NOT NULL,
+                email           TEXT NOT NULL,
+                telefoon        TEXT NOT NULL DEFAULT '',
+                aantal          INTEGER NOT NULL CHECK (aantal >= 1 AND aantal <= 100),
+                bedrag          REAL NOT NULL,
+                transactiekosten INTEGER NOT NULL DEFAULT 0,
+                mollie_id       TEXT,
+                status          TEXT NOT NULL DEFAULT 'aangemaakt'
+                                CHECK (status IN
+                                  ('aangemaakt','betaald','mislukt','geannuleerd','verlopen')),
+                lot_van         INTEGER,
+                lot_tot         INTEGER,
+                mail_verstuurd  INTEGER NOT NULL DEFAULT 0,
+                pogingen        INTEGER NOT NULL DEFAULT 0,
+                betaalwijze     TEXT NOT NULL DEFAULT 'ideal',
+                aangemaakt_op   DATETIME DEFAULT (datetime('now','localtime')),
+                bijgewerkt_op   DATETIME DEFAULT (datetime('now','localtime'))
+            )""")
+            conn.execute("""INSERT INTO bestellingen
+                (id, voornaam, achternaam, email, telefoon, aantal, bedrag, transactiekosten,
+                 mollie_id, status, lot_van, lot_tot, mail_verstuurd, pogingen, betaalwijze,
+                 aangemaakt_op, bijgewerkt_op)
+                SELECT id,
+                    TRIM(CASE WHEN INSTR(naam, ' ') > 0 THEN SUBSTR(naam, 1, INSTR(naam, ' ') - 1) ELSE '' END),
+                    TRIM(CASE WHEN INSTR(naam, ' ') > 0 THEN SUBSTR(naam, INSTR(naam, ' ') + 1) ELSE naam END),
+                    email, telefoon, aantal, bedrag, transactiekosten,
+                    mollie_id, status, lot_van, lot_tot, mail_verstuurd, pogingen, betaalwijze,
+                    aangemaakt_op, bijgewerkt_op
+                FROM _bestellingen_oud""")
+            conn.execute("DROP TABLE _bestellingen_oud")
+            conn.execute("COMMIT")
+            app.logger.info("Migratie: naam gesplitst in voornaam + achternaam")
+    except Exception as e:
+        try: conn.execute("ROLLBACK")
+        except: pass
+        app.logger.warning(f"Migratie naam→voornaam/achternaam mislukt: {e}")
     # Seed-rij: alleen aanmaken als nog niet bestaat (alle kolommen zijn nu gegarandeerd aanwezig)
     conn.execute(
         "INSERT OR IGNORE INTO teller (id, volgend_lot, max_eendjes, max_per_bestelling, "
@@ -271,7 +321,8 @@ def init_db():
             conn.execute("""
                 CREATE TABLE bestellingen (
                     id              INTEGER PRIMARY KEY AUTOINCREMENT,
-                    naam            TEXT NOT NULL,
+                    voornaam        TEXT NOT NULL DEFAULT '',
+                    achternaam      TEXT NOT NULL,
                     telefoon        TEXT NOT NULL,
                     email           TEXT NOT NULL,
                     aantal          INTEGER NOT NULL CHECK (aantal >= 1),
@@ -284,12 +335,22 @@ def init_db():
                     lot_tot         INTEGER,
                     mail_verstuurd  INTEGER NOT NULL DEFAULT 0,
                     pogingen        INTEGER NOT NULL DEFAULT 0,
-                    transactiekosten INTEGER NOT NULL DEFAULT 0,
+                    transactiekosten         INTEGER NOT NULL DEFAULT 0,
+                    transactiekosten_bedrag  REAL    NOT NULL DEFAULT 0,
+                    betaalwijze     TEXT NOT NULL DEFAULT 'ideal',
                     aangemaakt_op   TEXT NOT NULL DEFAULT (datetime('now','localtime')),
                     bijgewerkt_op   TEXT NOT NULL DEFAULT (datetime('now','localtime'))
                 )
             """)
-            conn.execute("INSERT INTO bestellingen SELECT * FROM _bestellingen_oud")
+            oud_cols = {r[1] for r in conn.execute("PRAGMA table_info(_bestellingen_oud)").fetchall()}
+            insert_cols = [c for c in [
+                "id", "voornaam", "achternaam", "telefoon", "email", "aantal", "bedrag",
+                "mollie_id", "status", "lot_van", "lot_tot", "mail_verstuurd", "pogingen",
+                "transactiekosten", "transactiekosten_bedrag", "betaalwijze",
+                "aangemaakt_op", "bijgewerkt_op"
+            ] if c in oud_cols]
+            cols_str = ", ".join(insert_cols)
+            conn.execute(f"INSERT INTO bestellingen ({cols_str}) SELECT {cols_str} FROM _bestellingen_oud")
             conn.execute("DROP TABLE _bestellingen_oud")
             conn.execute("COMMIT")
         except Exception:
@@ -389,9 +450,9 @@ def wijs_lotnummers_toe(db, bestelling_id, aantal):
     return start, einde
 
 
-def stuur_bevestigingsmail(naam, email, aantal, lot_van, lot_tot, bedrag, transactiekosten=False, tk_bedrag=0.0):
+def stuur_bevestigingsmail(voornaam, achternaam, email, aantal, lot_van, lot_tot, bedrag, transactiekosten=False, tk_bedrag=0.0):
     """Geeft True bij succes, False bij fout — gooit nooit een exception."""
-    naam = html.escape(naam)  # voorkom XSS via naam in HTML e-mail
+    naam = html.escape(f"{voornaam} {achternaam}".strip())  # voorkom XSS via naam in HTML e-mail
     if lot_van == lot_tot:
         lotnr_tekst = f"lotnummer <strong>#{lot_van}</strong>"
     elif lot_tot - lot_van < 5:
@@ -607,11 +668,12 @@ def api_beschikbaar():
 @app.route("/bestellen", methods=["POST"])
 @limiter.limit("10 per minute")
 def bestellen():
-    naam             = request.form.get("naam", "").strip()
+    voornaam         = request.form.get("voornaam", "").strip()
+    achternaam       = request.form.get("achternaam", "").strip()
     telefoon         = request.form.get("telefoon", "").strip()
     email            = request.form.get("email", "").strip().lower()
     incl_tk          = request.form.get("transactiekosten") == "1"
-    vorig            = {"naam": naam, "telefoon": telefoon, "email": email, "transactiekosten": incl_tk}
+    vorig            = {"voornaam": voornaam, "achternaam": achternaam, "telefoon": telefoon, "email": email, "transactiekosten": incl_tk}
 
     try:
         aantal = int(request.form.get("aantal", 0))
@@ -624,7 +686,7 @@ def bestellen():
     # Validatie
     max_per_bestelling = get_max_per_bestelling()
     max_eendjes        = get_max_eendjes()
-    fouten = valideer_invoer(naam, telefoon, email, aantal, max_per_bestelling)
+    fouten = valideer_invoer(voornaam, achternaam, telefoon, email, aantal, max_per_bestelling)
     if fouten:
         db          = get_db()
         betaald     = db.execute("SELECT COALESCE(SUM(aantal),0) AS n FROM bestellingen WHERE status='betaald'").fetchone()["n"]
@@ -666,8 +728,8 @@ def bestellen():
 
         tk_bedrag = get_transactiekosten() if incl_tk else 0
         cursor = db.execute(
-            "INSERT INTO bestellingen (naam, telefoon, email, aantal, bedrag, transactiekosten, transactiekosten_bedrag, betaalwijze) VALUES (?,?,?,?,?,?,?,?)",
-            (naam, telefoon, email, aantal, bedrag, 1 if incl_tk else 0, tk_bedrag, "ideal"),
+            "INSERT INTO bestellingen (voornaam, achternaam, telefoon, email, aantal, bedrag, transactiekosten, transactiekosten_bedrag, betaalwijze) VALUES (?,?,?,?,?,?,?,?,?)",
+            (voornaam, achternaam, telefoon, email, aantal, bedrag, 1 if incl_tk else 0, tk_bedrag, "ideal"),
         )
         bestelling_id = cursor.lastrowid
         db.commit()
@@ -691,7 +753,7 @@ def bestellen():
         mollie   = maak_mollie_client()
         betaling = mollie.payments.create({
             "amount":      {"currency": "EUR", "value": f"{bedrag:.2f}"},
-            "description": f"Badeendjesrace – {aantal} eend{'je' if aantal==1 else 'jes'} ({naam})",
+            "description": f"Badeendjesrace – {aantal} eend{'je' if aantal==1 else 'jes'} ({f'{voornaam} {achternaam}'.strip()})",
             "redirectUrl": f"{BASE_URL}/betaald/{bestelling_id}",
             "webhookUrl":  f"{BASE_URL}/webhook",
             "metadata":    {"bestelling_id": str(bestelling_id)},
@@ -781,7 +843,7 @@ def webhook():
                 f"Betaald: id={bestelling_id}, loten={lot_van}–{lot_tot}, €{rij['bedrag']}"
             )
             mail_ok = stuur_bevestigingsmail(
-                rij["naam"], rij["email"], rij["aantal"],
+                rij["voornaam"], rij["achternaam"], rij["email"], rij["aantal"],
                 lot_van, lot_tot, rij["bedrag"], bool(rij["transactiekosten"]),
                 tk_bedrag=rij["transactiekosten_bedrag"],
             )
@@ -847,7 +909,7 @@ def betaald(bestelling_id):
             if betaling.is_paid():
                 lot_van, lot_tot = wijs_lotnummers_toe(db, bestelling_id, rij["aantal"])
                 mail_ok = stuur_bevestigingsmail(
-                    rij["naam"], rij["email"], rij["aantal"],
+                    rij["voornaam"], rij["achternaam"], rij["email"], rij["aantal"],
                     lot_van, lot_tot, rij["bedrag"], bool(rij["transactiekosten"]),
                 )
                 db.execute(
@@ -939,18 +1001,18 @@ def admin():
                 zoek_nummer = int(zoek_clean)
             if zoek_nummer is not None:
                 where_delen.append(
-                    "(naam LIKE ? OR email LIKE ? OR CAST(lot_van AS TEXT) LIKE ? OR CAST(lot_tot AS TEXT) LIKE ? OR (lot_van <= ? AND lot_tot >= ?))"
+                    "((voornaam LIKE ? OR achternaam LIKE ? OR (voornaam || ' ' || achternaam) LIKE ?) OR email LIKE ? OR CAST(lot_van AS TEXT) LIKE ? OR CAST(lot_tot AS TEXT) LIKE ? OR (lot_van <= ? AND lot_tot >= ?))"
                 )
-                params.extend([p, p, p, p, zoek_nummer, zoek_nummer])
+                params.extend([p, p, p, p, p, p, zoek_nummer, zoek_nummer])
             else:
                 where_delen.append(
-                    "(naam LIKE ? OR email LIKE ? OR CAST(lot_van AS TEXT) LIKE ? OR CAST(lot_tot AS TEXT) LIKE ?)"
+                    "((voornaam LIKE ? OR achternaam LIKE ? OR (voornaam || ' ' || achternaam) LIKE ?) OR email LIKE ? OR CAST(lot_van AS TEXT) LIKE ? OR CAST(lot_tot AS TEXT) LIKE ?)"
                 )
-                params.extend([p, p, p, p])
+                params.extend([p, p, p, p, p, p])
         where_sql = ("WHERE " + " AND ".join(where_delen)) if where_delen else ""
 
         GELDIGE_SORTERINGEN = {
-            "id": "id", "naam": "naam", "datum": "aangemaakt_op",
+            "id": "id", "voornaam": "voornaam", "achternaam": "achternaam", "datum": "aangemaakt_op",
             "aantal": "aantal", "bedrag": "bedrag", "lot": "lot_van", "status": "status",
         }
         sorter   = request.args.get("sorter", "id")
@@ -1203,7 +1265,7 @@ def mail_opnieuw(bestelling_id):
         if not rij:
             abort(404)
         ok = stuur_bevestigingsmail(
-            rij["naam"], rij["email"], rij["aantal"],
+            rij["voornaam"], rij["achternaam"], rij["email"], rij["aantal"],
             rij["lot_van"], rij["lot_tot"], rij["bedrag"],
             bool(rij["transactiekosten"]),
             tk_bedrag=rij["transactiekosten_bedrag"],
@@ -1227,7 +1289,7 @@ def export_csv():
     try:
         db = get_db()
         bestellingen = db.execute(
-            "SELECT id, naam, email, telefoon, aantal, bedrag, transactiekosten, "
+            "SELECT id, voornaam, achternaam, email, telefoon, aantal, bedrag, transactiekosten, "
             "lot_van, lot_tot, status, mail_verstuurd, aangemaakt_op, betaalwijze "
             "FROM bestellingen ORDER BY id ASC"
         ).fetchall()
@@ -1245,12 +1307,13 @@ def export_csv():
     uitvoer = io.StringIO()
     schrijver = csv.writer(uitvoer, delimiter=";", quoting=csv.QUOTE_ALL)
     schrijver.writerow([
-        "ID", "Naam", "E-mail", "Telefoon", "Aantal", "Bedrag (€)", "iDEAL-kosten",
+        "ID", "Voornaam", "Achternaam", "E-mail", "Telefoon", "Aantal", "Bedrag (€)", "iDEAL-kosten",
         "Lot van", "Lot tot", "Status", "Betaalwijze", "Mail verstuurd", "Aangemaakt op"
     ])
     for b in bestellingen:
         schrijver.writerow([
-            b["id"], csv_escape(b["naam"]), csv_escape(b["email"]), csv_escape(b["telefoon"]),
+            b["id"], csv_escape(b["voornaam"]), csv_escape(b["achternaam"]),
+            csv_escape(b["email"]), csv_escape(b["telefoon"]),
             b["aantal"], f"{b['bedrag']:.2f}", "ja" if b["transactiekosten"] else "nee",
             b["lot_van"] or "", b["lot_tot"] or "",
             b["status"], b["betaalwijze"] or "ideal",
@@ -1276,15 +1339,18 @@ def wijzig_bestelling(bestelling_id):
 
     fouten = []
     if request.method == "POST":
-        naam           = request.form.get("naam", "").strip()
+        voornaam       = request.form.get("voornaam", "").strip()
+        achternaam     = request.form.get("achternaam", "").strip()
         telefoon       = request.form.get("telefoon", "").strip()
         email          = request.form.get("email", "").strip().lower()
         status         = request.form.get("status", "").strip()
         mail_verstuurd = 1 if request.form.get("mail_verstuurd") == "1" else 0
 
         geldige_statussen = ("aangemaakt", "betaald", "mislukt", "geannuleerd", "verlopen")
-        if len(naam) < 2:
-            fouten.append("Naam is verplicht (minimaal 2 tekens).")
+        if len(voornaam) < 2:
+            fouten.append("Voornaam is verplicht (minimaal 2 tekens).")
+        if len(achternaam) < 2:
+            fouten.append("Achternaam is verplicht (minimaal 2 tekens).")
         if email and not EMAIL_RE.match(email):
             fouten.append("Vul een geldig e-mailadres in.")
         if status not in geldige_statussen:
@@ -1293,9 +1359,9 @@ def wijzig_bestelling(bestelling_id):
         if not fouten:
             try:
                 db.execute(
-                    "UPDATE bestellingen SET naam=?, telefoon=?, email=?, status=?, "
+                    "UPDATE bestellingen SET voornaam=?, achternaam=?, telefoon=?, email=?, status=?, "
                     "mail_verstuurd=?, bijgewerkt_op=datetime('now','localtime') WHERE id=?",
-                    (naam, telefoon, email, status, mail_verstuurd, bestelling_id),
+                    (voornaam, achternaam, telefoon, email, status, mail_verstuurd, bestelling_id),
                 )
                 db.commit()
             except sqlite3.Error as e:
@@ -1356,7 +1422,8 @@ def reset_database():
 @login_vereist
 def handmatige_bestelling():
     """Maak een handmatige bestelling aan (contant of overboeking) vanuit de admin."""
-    naam        = request.form.get("naam", "").strip()
+    voornaam    = request.form.get("h_voornaam", "").strip()
+    achternaam  = request.form.get("h_achternaam", "").strip()
     email       = request.form.get("email", "").strip().lower()
     telefoon    = request.form.get("telefoon", "").strip()
     betaalwijze = request.form.get("betaalwijze", "contant").strip()
@@ -1371,10 +1438,14 @@ def handmatige_bestelling():
         betaalwijze = "contant"
 
     fouten = []
-    if not naam or len(naam.strip()) < 2:
-        fouten.append("Naam is verplicht (minimaal 2 tekens).")
-    if len(naam) > 100:
-        fouten.append("Naam mag maximaal 100 tekens zijn.")
+    if not voornaam or len(voornaam.strip()) < 2:
+        fouten.append("Voornaam is verplicht (minimaal 2 tekens).")
+    if len(voornaam) > 100:
+        fouten.append("Voornaam mag maximaal 100 tekens zijn.")
+    if not achternaam or len(achternaam.strip()) < 2:
+        fouten.append("Achternaam is verplicht (minimaal 2 tekens).")
+    if len(achternaam) > 100:
+        fouten.append("Achternaam mag maximaal 100 tekens zijn.")
     if email and not EMAIL_RE.match(email):
         fouten.append("Ongeldig e-mailadres.")
     if telefoon and not TELEFOON_RE.match(telefoon):
@@ -1395,9 +1466,9 @@ def handmatige_bestelling():
     try:
         db = get_db()
         cursor = db.execute(
-            "INSERT INTO bestellingen (naam, telefoon, email, aantal, bedrag, betaalwijze) "
-            "VALUES (?,?,?,?,?,?)",
-            (naam, telefoon or "", email or "", aantal, bedrag, betaalwijze),
+            "INSERT INTO bestellingen (voornaam, achternaam, telefoon, email, aantal, bedrag, betaalwijze) "
+            "VALUES (?,?,?,?,?,?,?)",
+            (voornaam, achternaam, telefoon or "", email or "", aantal, bedrag, betaalwijze),
         )
         bestelling_id = cursor.lastrowid
         db.commit()
@@ -1421,11 +1492,11 @@ def handmatige_bestelling():
 
     app.logger.info(
         f"Handmatige bestelling aangemaakt: id={bestelling_id}, "
-        f"naam={saniteer_log(naam)}, lotnummers={lot_van}-{lot_tot}, betaalwijze={betaalwijze}"
+        f"voornaam={saniteer_log(voornaam)}, achternaam={saniteer_log(achternaam)}, lotnummers={lot_van}-{lot_tot}, betaalwijze={betaalwijze}"
     )
 
     if email:
-        mail_ok = stuur_bevestigingsmail(naam, email, aantal, lot_van, lot_tot, bedrag)
+        mail_ok = stuur_bevestigingsmail(voornaam, achternaam, email, aantal, lot_van, lot_tot, bedrag)
         if mail_ok:
             try:
                 db.execute("UPDATE bestellingen SET mail_verstuurd=1 WHERE id=?", (bestelling_id,))

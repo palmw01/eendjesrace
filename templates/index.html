@@ -463,9 +463,14 @@
     <form method="POST" action="/bestellen" id="bestelForm">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="form-groep">
-        <label for="naam">Naam</label>
-        <input type="text" id="naam" name="naam" placeholder="Jan Jansen" required autocomplete="name"
-               value="{{ vorig.naam if vorig else '' }}">
+        <label for="voornaam">Voornaam <span style="color:#C62828">*</span></label>
+        <input type="text" id="voornaam" name="voornaam" placeholder="Jan" required autocomplete="given-name"
+               maxlength="100" value="{{ vorig.voornaam if vorig else '' }}">
+      </div>
+      <div class="form-groep">
+        <label for="achternaam">Achternaam <span style="color:#C62828">*</span></label>
+        <input type="text" id="achternaam" name="achternaam" placeholder="Jansen" required autocomplete="family-name"
+               maxlength="100" value="{{ vorig.achternaam if vorig else '' }}">
       </div>
       <div class="form-groep">
         <label for="email">E-mailadres</label>

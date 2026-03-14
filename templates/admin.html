@@ -348,7 +348,8 @@
     <thead>
       <tr>
         {{ sorteer_th('#', 'id') }}
-        {{ sorteer_th('Naam', 'naam') }}
+        {{ sorteer_th('Voornaam', 'voornaam') }}
+        {{ sorteer_th('Achternaam', 'achternaam') }}
         <th>E-mail</th>
         <th>Telefoon</th>
         {{ sorteer_th('Aantal', 'aantal') }}
@@ -365,7 +366,8 @@
       {% for b in bestellingen %}
       <tr data-status="{{ b['status'] }}">
         <td>{{ b['id'] }}</td>
-        <td>{{ b['naam'] }}</td>
+        <td>{{ b['voornaam'] }}</td>
+        <td>{{ b['achternaam'] }}</td>
         <td>{{ b['email'] }}</td>
         <td>{{ b['telefoon'] }}</td>
         <td style="text-align:center">{{ b['aantal'] }}</td>
@@ -445,8 +447,12 @@
     <form method="POST" action="/admin/handmatig">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="instelling-rij">
-        <label class="instelling-label" for="h_naam">Naam <span style="color:#C62828">*</span></label>
-        <input class="instelling-input" type="text" id="h_naam" name="naam" placeholder="Voor- en achternaam" required maxlength="100">
+        <label class="instelling-label" for="h_voornaam">Voornaam <span style="color:#C62828">*</span></label>
+        <input class="instelling-input" type="text" id="h_voornaam" name="h_voornaam" placeholder="Voornaam" required maxlength="100">
+      </div>
+      <div class="instelling-rij">
+        <label class="instelling-label" for="h_achternaam">Achternaam <span style="color:#C62828">*</span></label>
+        <input class="instelling-input" type="text" id="h_achternaam" name="h_achternaam" placeholder="Achternaam" required maxlength="100">
       </div>
       <div class="instelling-rij">
         <label class="instelling-label" for="h_email">E-mailadres</label>

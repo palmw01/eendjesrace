@@ -74,9 +74,15 @@
     <form method="POST">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
-      <div class="veld">
-        <label for="naam">Naam</label>
-        <input type="text" id="naam" name="naam" value="{{ bestelling['naam'] }}" maxlength="100" required>
+      <div class="rij-twee">
+        <div class="veld">
+          <label for="voornaam">Voornaam <span style="color:#C62828">*</span></label>
+          <input type="text" id="voornaam" name="voornaam" value="{{ bestelling['voornaam'] }}" maxlength="100" required>
+        </div>
+        <div class="veld">
+          <label for="achternaam">Achternaam <span style="color:#C62828">*</span></label>
+          <input type="text" id="achternaam" name="achternaam" value="{{ bestelling['achternaam'] }}" maxlength="100" required>
+        </div>
       </div>
 
       <div class="rij-twee">
