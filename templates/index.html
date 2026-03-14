@@ -4,6 +4,22 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Badeendjesrace Wapenveld – Bestel je loten</title>
+  <meta name="description" content="Doe mee aan de Badeendjesrace in Wapenveld! Bestel lotnummers vanaf €2,50 per stuk en steun de Diaconie Hervormde gemeente Wapenveld. Meedoen is eenvoudig en veilig via iDEAL.">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="{{ base_url }}/">
+  <!-- Open Graph -->
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="nl_NL">
+  <meta property="og:url" content="{{ base_url }}/">
+  <meta property="og:title" content="Badeendjesrace Wapenveld – Bestel je loten">
+  <meta property="og:description" content="Doe mee aan de Badeendjesrace in Wapenveld! Bestel lotnummers vanaf €2,50 per stuk en steun de Diaconie Hervormde gemeente Wapenveld.">
+  <meta property="og:image" content="{{ base_url }}/static/img/eend.png">
+  <meta property="og:site_name" content="Badeendjesrace Wapenveld">
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Badeendjesrace Wapenveld – Bestel je loten">
+  <meta name="twitter:description" content="Doe mee aan de Badeendjesrace in Wapenveld! Bestel lotnummers vanaf €2,50 per stuk en steun de Diaconie Hervormde gemeente Wapenveld.">
+  <meta name="twitter:image" content="{{ base_url }}/static/img/eend.png">
   <link rel="icon" href="{{ url_for('static', filename='img/eend-favicon.png') }}">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
@@ -402,6 +418,36 @@
       margin-top: 16px;
     }
   </style>
+  <script type="application/ld+json" nonce="{{ g.csp_nonce }}">
+  {
+    "@context": "https://schema.org",
+    "@type": "Event",
+    "name": "Badeendjesrace Wapenveld",
+    "description": "Jaarlijkse badeendjesrace georganiseerd door de Diaconie Hervormde gemeente te Wapenveld. Bestel een lotnummer en doe mee!",
+    "organizer": {
+      "@type": "Organization",
+      "name": "Diaconie Hervormde gemeente te Wapenveld",
+      "url": "{{ base_url }}"
+    },
+    "url": "{{ base_url }}/",
+    "location": {
+      "@type": "Place",
+      "name": "Wapenveld",
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "Wapenveld",
+        "addressCountry": "NL"
+      }
+    },
+    "offers": {
+      "@type": "Offer",
+      "price": "2.50",
+      "priceCurrency": "EUR",
+      "url": "{{ base_url }}/",
+      "availability": "https://schema.org/InStock"
+    }
+  }
+  </script>
 </head>
 <body>
 

@@ -533,6 +533,11 @@ def genereer_csp_nonce():
     g.csp_nonce = secrets.token_hex(16)
 
 
+@app.context_processor
+def inject_base_url():
+    return {"base_url": BASE_URL}
+
+
 @app.after_request
 def security_headers(response):
     nonce = getattr(g, "csp_nonce", "")
@@ -570,6 +575,49 @@ def security_txt():
         f"Canonical: {BASE_URL}/.well-known/security.txt\n"
     )
     return Response(inhoud, mimetype="text/plain")
+
+
+# ─── robots.txt + sitemap.xml ─────────────────────────────────────────────────
+@app.route("/robots.txt")
+def robots_txt():
+    inhoud = (
+        "User-agent: *\n"
+        "Allow: /\n"
+        "Allow: /privacy\n"
+        "Allow: /voorwaarden\n"
+        "Disallow: /admin\n"
+        "Disallow: /bestellen\n"
+        "Disallow: /webhook\n"
+        "Disallow: /api/\n"
+        "Disallow: /betaald/\n"
+        f"Sitemap: {BASE_URL}/sitemap.xml\n"
+    )
+    return Response(inhoud, mimetype="text/plain")
+
+
+@app.route("/sitemap.xml")
+def sitemap_xml():
+    inhoud = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        "  <url>\n"
+        f"    <loc>{BASE_URL}/</loc>\n"
+        "    <changefreq>daily</changefreq>\n"
+        "    <priority>1.0</priority>\n"
+        "  </url>\n"
+        "  <url>\n"
+        f"    <loc>{BASE_URL}/privacy</loc>\n"
+        "    <changefreq>monthly</changefreq>\n"
+        "    <priority>0.3</priority>\n"
+        "  </url>\n"
+        "  <url>\n"
+        f"    <loc>{BASE_URL}/voorwaarden</loc>\n"
+        "    <changefreq>monthly</changefreq>\n"
+        "    <priority>0.3</priority>\n"
+        "  </url>\n"
+        "</urlset>\n"
+    )
+    return Response(inhoud, mimetype="application/xml")
 
 
 # ─── Foutpagina's ─────────────────────────────────────────────────────────────

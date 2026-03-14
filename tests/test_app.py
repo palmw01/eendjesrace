@@ -2260,6 +2260,143 @@ class TestSecurityTxt(unittest.TestCase):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# SEO — robots.txt, sitemap.xml, meta-tags, structured data
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestSeoEnRobots(unittest.TestCase):
+
+    def setUp(self):
+        self.client, self.ctx = maak_flask_client()
+
+    def tearDown(self):
+        self.ctx.pop()
+
+    # ── robots.txt ────────────────────────────────────────────────────────────
+
+    def test_robots_txt_geeft_200(self):
+        r = self.client.get("/robots.txt")
+        self.assertEqual(r.status_code, 200)
+
+    def test_robots_txt_mimetype_text_plain(self):
+        r = self.client.get("/robots.txt")
+        self.assertIn("text/plain", r.content_type)
+
+    def test_robots_txt_bevat_sitemap_verwijzing(self):
+        r = self.client.get("/robots.txt")
+        self.assertIn(b"Sitemap:", r.data)
+
+    def test_robots_txt_staat_homepage_toe(self):
+        r = self.client.get("/robots.txt")
+        self.assertIn(b"Allow: /", r.data)
+
+    def test_robots_txt_blokkeert_admin(self):
+        r = self.client.get("/robots.txt")
+        self.assertIn(b"Disallow: /admin", r.data)
+
+    def test_robots_txt_blokkeert_bestellen(self):
+        r = self.client.get("/robots.txt")
+        self.assertIn(b"Disallow: /bestellen", r.data)
+
+    def test_robots_txt_blokkeert_betaald(self):
+        r = self.client.get("/robots.txt")
+        self.assertIn(b"Disallow: /betaald/", r.data)
+
+    # ── sitemap.xml ───────────────────────────────────────────────────────────
+
+    def test_sitemap_xml_geeft_200(self):
+        r = self.client.get("/sitemap.xml")
+        self.assertEqual(r.status_code, 200)
+
+    def test_sitemap_xml_mimetype_application_xml(self):
+        r = self.client.get("/sitemap.xml")
+        self.assertIn("xml", r.content_type)
+
+    def test_sitemap_xml_bevat_homepage(self):
+        r = self.client.get("/sitemap.xml")
+        self.assertIn(b"<loc>", r.data)
+
+    def test_sitemap_xml_bevat_privacy(self):
+        r = self.client.get("/sitemap.xml")
+        self.assertIn(b"/privacy", r.data)
+
+    def test_sitemap_xml_bevat_voorwaarden(self):
+        r = self.client.get("/sitemap.xml")
+        self.assertIn(b"/voorwaarden", r.data)
+
+    def test_sitemap_xml_bevat_geen_admin(self):
+        r = self.client.get("/sitemap.xml")
+        self.assertNotIn(b"/admin", r.data)
+
+    # ── Homepage SEO-meta-tags ─────────────────────────────────────────────────
+
+    def test_homepage_bevat_meta_description(self):
+        r = self.client.get("/")
+        self.assertIn(b'<meta name="description"', r.data)
+
+    def test_homepage_bevat_canonical_url(self):
+        r = self.client.get("/")
+        self.assertIn(b'rel="canonical"', r.data)
+
+    def test_homepage_bevat_og_title(self):
+        r = self.client.get("/")
+        self.assertIn(b'property="og:title"', r.data)
+
+    def test_homepage_bevat_og_description(self):
+        r = self.client.get("/")
+        self.assertIn(b'property="og:description"', r.data)
+
+    def test_homepage_bevat_og_image(self):
+        r = self.client.get("/")
+        self.assertIn(b'property="og:image"', r.data)
+
+    def test_homepage_bevat_og_url(self):
+        r = self.client.get("/")
+        self.assertIn(b'property="og:url"', r.data)
+
+    def test_homepage_bevat_twitter_card(self):
+        r = self.client.get("/")
+        self.assertIn(b'name="twitter:card"', r.data)
+
+    def test_homepage_bevat_robots_index(self):
+        r = self.client.get("/")
+        self.assertIn(b'content="index, follow"', r.data)
+
+    def test_homepage_bevat_json_ld(self):
+        r = self.client.get("/")
+        self.assertIn(b'application/ld+json', r.data)
+
+    def test_homepage_json_ld_bevat_event_type(self):
+        r = self.client.get("/")
+        self.assertIn(b'"@type": "Event"', r.data)
+
+    # ── noindex op niet-openbare pagina's ─────────────────────────────────────
+
+    def test_foutpagina_bevat_noindex(self):
+        r = self.client.get("/bestaat-niet-xyz")
+        self.assertIn(b"noindex", r.data)
+
+    def test_admin_login_bevat_noindex(self):
+        r = self.client.get("/admin/login")
+        self.assertIn(b"noindex", r.data)
+
+    def test_privacy_bevat_noindex(self):
+        r = self.client.get("/privacy")
+        self.assertIn(b"noindex", r.data)
+
+    def test_voorwaarden_bevat_noindex(self):
+        r = self.client.get("/voorwaarden")
+        self.assertIn(b"noindex", r.data)
+
+    def test_privacy_bevat_canonical(self):
+        r = self.client.get("/privacy")
+        self.assertIn(b'rel="canonical"', r.data)
+
+    def test_voorwaarden_bevat_canonical(self):
+        r = self.client.get("/voorwaarden")
+        self.assertIn(b'rel="canonical"', r.data)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # ADMIN LOGIN GEBRUIKERSNAAM IN SESSIE
 #     Sessie slaat gebruikersnaam op en logout gebruikt die
 # ══════════════════════════════════════════════════════════════════════════════
