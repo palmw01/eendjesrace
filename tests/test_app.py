@@ -3723,6 +3723,107 @@ class TestAdminBeheerPagina(unittest.TestCase):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# ONDERHOUDSMODUS
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestOnderhoudsmodus(unittest.TestCase):
+
+    def setUp(self):
+        self.client, self.ctx = maak_flask_client()
+        self.client.post("/admin/login",
+                         data={"gebruiker": "admin", "wachtwoord": "testpass12345"})
+
+    def tearDown(self):
+        # Zet onderhoudsmodus altijd uit na elke test
+        self.client.post("/admin/instellingen", data={})
+        self.ctx.pop()
+
+    def _zet_modus(self, aan: bool):
+        data = {"onderhoudsmodus": "1"} if aan else {}
+        self.client.post("/admin/instellingen", data=data)
+
+    def test_onderhoudsmodus_standaard_uit(self):
+        """Onderhoudsmodus is standaard uitgeschakeld."""
+        from app import get_onderhoudsmodus
+        self.assertFalse(get_onderhoudsmodus())
+
+    def test_onderhoudsmodus_inschakelen_slaat_op(self):
+        """Na POST met onderhoudsmodus=1 retourneert get_onderhoudsmodus() True."""
+        from app import get_onderhoudsmodus
+        self._zet_modus(True)
+        self.assertTrue(get_onderhoudsmodus())
+
+    def test_onderhoudsmodus_uitschakelen_slaat_op(self):
+        """Na POST zonder onderhoudsmodus retourneert get_onderhoudsmodus() False."""
+        from app import get_onderhoudsmodus
+        self._zet_modus(True)
+        self._zet_modus(False)
+        self.assertFalse(get_onderhoudsmodus())
+
+    def test_publieke_route_geeft_503_als_modus_aan(self):
+        """/ geeft HTTP 503 als onderhoudsmodus is ingeschakeld."""
+        self._zet_modus(True)
+        r = self.client.get("/")
+        self.assertEqual(r.status_code, 503)
+
+    def test_publieke_route_geeft_200_als_modus_uit(self):
+        """/ geeft HTTP 200 als onderhoudsmodus is uitgeschakeld."""
+        self._zet_modus(False)
+        r = self.client.get("/")
+        self.assertEqual(r.status_code, 200)
+
+    def test_onderhoudspagina_bevat_bericht(self):
+        """Onderhoudspagina toont een informatief bericht."""
+        self._zet_modus(True)
+        r = self.client.get("/")
+        self.assertIn(b"terug", r.data.lower())
+
+    def test_onderhoudspagina_bevat_noindex(self):
+        """Onderhoudspagina heeft noindex meta-tag."""
+        self._zet_modus(True)
+        r = self.client.get("/")
+        self.assertIn(b"noindex", r.data)
+
+    def test_admin_bereikbaar_in_onderhoudsmodus(self):
+        """GET /admin is bereikbaar (200) als onderhoudsmodus aan is."""
+        self._zet_modus(True)
+        r = self.client.get("/admin")
+        self.assertEqual(r.status_code, 200)
+
+    def test_admin_beheer_bereikbaar_in_onderhoudsmodus(self):
+        """GET /admin/beheer is bereikbaar (200) als onderhoudsmodus aan is."""
+        self._zet_modus(True)
+        r = self.client.get("/admin/beheer")
+        self.assertEqual(r.status_code, 200)
+
+    def test_webhook_bereikbaar_in_onderhoudsmodus(self):
+        """POST /webhook retourneert geen 503 als onderhoudsmodus aan is."""
+        self._zet_modus(True)
+        r = self.client.post("/webhook", data={"id": "tr_test"})
+        self.assertNotEqual(r.status_code, 503)
+
+    def test_admin_beheer_toont_onderhoudsmodus_checkbox(self):
+        """Beheerpagina toont de onderhoudsmodus-checkbox."""
+        r = self.client.get("/admin/beheer")
+        self.assertIn(b"onderhoudsmodus", r.data.lower())
+
+    def test_inschakelen_toont_flashmelding(self):
+        """Inschakelen onderhoudsmodus geeft flash-bevestiging."""
+        r = self.client.post("/admin/instellingen",
+                             data={"onderhoudsmodus": "1"},
+                             follow_redirects=True)
+        self.assertIn(b"ngeschakeld", r.data)
+
+    def test_uitschakelen_toont_flashmelding(self):
+        """Uitschakelen onderhoudsmodus geeft flash-bevestiging."""
+        self._zet_modus(True)
+        r = self.client.post("/admin/instellingen",
+                             data={},
+                             follow_redirects=True)
+        self.assertIn(b"itgeschakeld", r.data)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # Uitvoeren als script
 # ══════════════════════════════════════════════════════════════════════════════
 

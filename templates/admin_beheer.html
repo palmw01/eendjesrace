@@ -225,6 +225,16 @@
         <label class="instelling-label" for="notificatie_email">Notificatie-e-mailadres (stille kopie bestellingen)</label>
         <input class="instelling-input" type="email" id="notificatie_email" name="notificatie_email" placeholder="bijv. beheer@voorbeeld.nl" value="{{ notificatie_email }}">
       </div>
+      <div class="instelling-rij" style="margin-top:8px;">
+        <span class="instelling-label">Onderhoudsmodus</span>
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+          <input type="checkbox" name="onderhoudsmodus" value="1" {% if onderhoudsmodus %}checked{% endif %}
+                 style="width:18px;height:18px;cursor:pointer;accent-color:#E65100;">
+          <span style="font-size:.9rem;color:{% if onderhoudsmodus %}#C62828{% else %}#555{% endif %};">
+            {% if onderhoudsmodus %}Aan — website toont onderhoudspagina{% else %}Uit — website is normaal bereikbaar{% endif %}
+          </span>
+        </label>
+      </div>
       <button type="submit" class="instelling-knop">Opslaan</button>
     </form>
   </details>

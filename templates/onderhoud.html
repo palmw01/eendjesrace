@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Even geduld – Badeendjesrace</title>
+  <link rel="icon" href="{{ url_for('static', filename='img/eend-favicon.png') }}">
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Nunito', sans-serif;
+      background: linear-gradient(180deg, #0096C7 0%, #023E8A 100%);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+    main {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+    }
+    .site-footer {
+      text-align: center;
+      color: rgba(255,255,255,0.90);
+      font-size: 0.85rem;
+      margin-top: 20px;
+      line-height: 1.8;
+    }
+    .site-footer p { color: inherit; }
+    .site-footer a { color: white; }
+    .site-footer a:hover { color: white; }
+    .kaart {
+      background: #FFFDF5;
+      border-radius: 24px;
+      padding: 48px 36px;
+      max-width: 460px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0,0,0,.3);
+    }
+    .eend {
+      width: 5rem; height: 5rem;
+      display: block; margin: 0 auto 16px;
+      animation: wiebelen 2s ease-in-out infinite;
+    }
+    @keyframes wiebelen {
+      0%, 100% { transform: rotate(-6deg); }
+      50%       { transform: rotate(6deg); }
+    }
+    h1 {
+      font-family: 'Fredoka One', cursive;
+      font-size: 2rem;
+      color: #0077B6;
+      margin-bottom: 12px;
+    }
+    p { color: #555; line-height: 1.6; font-size: 1rem; }
+    .label {
+      display: inline-block;
+      margin-top: 24px;
+      background: #FFF8E1;
+      border: 2px solid #FFD700;
+      border-radius: 12px;
+      padding: 12px 20px;
+      font-size: .9rem;
+      color: #E65100;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="kaart">
+      <img class="eend" src="{{ url_for('static', filename='img/eend.png') }}" alt="badeend">
+      <h1>We zijn zo terug!</h1>
+      <p>De website is tijdelijk niet beschikbaar. Probeer het later nog eens.</p>
+      <div class="label">
+        Badeendjesrace – Diaconie Hervormde gemeente te Wapenveld
+      </div>
+    </div>
+  </main>
+  <footer class="site-footer">
+    <p><strong style="color:rgba(255,255,255,0.85);">Diaconie Hervormde gemeente te Wapenveld</strong></p>
+    <p>Kerkstraat 2a · 8191 LV Wapenveld · KvK 76404862</p>
+    <p>
+      Contact: W.A.(Arnoud) van Guilik ·
+      <a href="tel:0627284249">06-27 28 42 49</a> ·
+      <a href="mailto:diaconie@hervormdwapenveld.nl">diaconie@hervormdwapenveld.nl</a>
+    </p>
+  </footer>
+</body>
+</html>

@@ -263,6 +263,10 @@ def init_db():
         conn.execute("ALTER TABLE beheerders ADD COLUMN laatste_inlog TEXT")
     except sqlite3.OperationalError:
         pass  # kolom bestaat al
+    try:
+        conn.execute("ALTER TABLE teller ADD COLUMN onderhoudsmodus INTEGER NOT NULL DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass  # kolom bestaat al
     # Migratie: naam → voornaam + achternaam
     try:
         cols = [r[1] for r in conn.execute("PRAGMA table_info(bestellingen)").fetchall()]
@@ -394,6 +398,11 @@ def get_transactiekosten():
 def get_notificatie_email():
     row = get_db().execute("SELECT notificatie_email FROM teller WHERE id = 1").fetchone()
     return row["notificatie_email"] if row else ""
+
+
+def get_onderhoudsmodus():
+    row = get_db().execute("SELECT onderhoudsmodus FROM teller WHERE id = 1").fetchone()
+    return bool(row["onderhoudsmodus"]) if row else False
 
 
 # ─── Business logica ──────────────────────────────────────────────────────────
@@ -536,6 +545,21 @@ def saniteer_log(tekst):
 @app.before_request
 def genereer_csp_nonce():
     g.csp_nonce = secrets.token_hex(16)
+
+
+@app.before_request
+def controleer_onderhoudsmodus():
+    """Toon onderhoudspagina (503) voor alle publieke routes als onderhoudsmodus aan is."""
+    # Admin-routes, statische bestanden en de Mollie-webhook blijven altijd bereikbaar.
+    if (request.path.startswith("/admin")
+            or request.path.startswith("/static")
+            or request.path == "/webhook"):
+        return
+    try:
+        if get_onderhoudsmodus():
+            return render_template("onderhoud.html"), 503
+    except Exception:
+        pass  # Bij DB-fout gewoon doorgaan
 
 
 @app.context_processor
@@ -1134,6 +1158,7 @@ def admin_beheer():
                                prijs_vijf_stuks=get_prijs_vijf_stuks(),
                                transactiekosten=get_transactiekosten(),
                                notificatie_email=get_notificatie_email(),
+                               onderhoudsmodus=get_onderhoudsmodus(),
                                beheerders=beheerders_lijst,
                                huidige_gebruiker=session.get("admin_gebruikersnaam"))
     except sqlite3.Error as e:
@@ -1213,6 +1238,11 @@ def admin_instellingen():
             else:
                 db.execute("UPDATE teller SET notificatie_email = ? WHERE id = 1", (notif_str,))
                 meldingen.append("Notificatie-e-mailadres bijgewerkt." if notif_str else "Notificatie-e-mailadres verwijderd.")
+
+        # onderhoudsmodus (checkbox: aanwezig = aan, afwezig = uit)
+        modus = 1 if request.form.get("onderhoudsmodus") else 0
+        db.execute("UPDATE teller SET onderhoudsmodus = ? WHERE id = 1", (modus,))
+        meldingen.append("Onderhoudsmodus ingeschakeld." if modus else "Onderhoudsmodus uitgeschakeld.")
 
         if fouten:
             for f in fouten:
