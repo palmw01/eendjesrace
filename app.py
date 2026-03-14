@@ -932,11 +932,21 @@ def admin():
             where_delen.append("status=?")
             params.append(status_filter)
         if zoekterm:
-            where_delen.append(
-                "(naam LIKE ? OR email LIKE ? OR CAST(lot_van AS TEXT) LIKE ? OR CAST(lot_tot AS TEXT) LIKE ?)"
-            )
             p = f"%{zoekterm}%"
-            params.extend([p, p, p, p])
+            zoek_nummer = None
+            zoek_clean = zoekterm.lstrip("#")
+            if zoek_clean.isdigit():
+                zoek_nummer = int(zoek_clean)
+            if zoek_nummer is not None:
+                where_delen.append(
+                    "(naam LIKE ? OR email LIKE ? OR CAST(lot_van AS TEXT) LIKE ? OR CAST(lot_tot AS TEXT) LIKE ? OR (lot_van <= ? AND lot_tot >= ?))"
+                )
+                params.extend([p, p, p, p, zoek_nummer, zoek_nummer])
+            else:
+                where_delen.append(
+                    "(naam LIKE ? OR email LIKE ? OR CAST(lot_van AS TEXT) LIKE ? OR CAST(lot_tot AS TEXT) LIKE ?)"
+                )
+                params.extend([p, p, p, p])
         where_sql = ("WHERE " + " AND ".join(where_delen)) if where_delen else ""
 
         totaal = db.execute(

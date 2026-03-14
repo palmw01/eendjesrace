@@ -2527,6 +2527,18 @@ class TestAdminZoekfunctie(unittest.TestCase):
         # Lot_van=1 komt voor in de eerste bestelling
         self.assertIn("Zoek Jansen".encode(), r.data)
 
+    def test_zoek_op_lotnummer_binnen_bereik(self):
+        """Zoeken op #2 vindt bestelling met lot_van=1, lot_tot=2."""
+        r = self.client.get("/admin?zoek=2")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("Zoek Jansen".encode(), r.data)
+
+    def test_zoek_op_lotnummer_met_hekje(self):
+        """Zoeken op #2 (met #) vindt bestelling met lot_van=1, lot_tot=2."""
+        r = self.client.get("/admin?zoek=%232")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("Zoek Jansen".encode(), r.data)
+
     def test_zoek_geen_resultaat_toont_lege_lijst(self):
         r = self.client.get("/admin?zoek=bestaaniet99999")
         self.assertEqual(r.status_code, 200)
