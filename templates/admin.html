@@ -255,9 +255,11 @@
     <div class="topbar-acties">
       {% if huidige_gebruiker %}
         <span style="font-size:.88rem;color:#555;">👤 {{ huidige_gebruiker }}</span>
-        <button type="button" id="btnWachtwoordWijzigen" style="padding:8px 14px;background:#E3F2FD;color:#1565C0;border:none;border-radius:99px;font-weight:700;font-size:.9rem;cursor:pointer;">🔑 Wachtwoord</button>
       {% endif %}
       <a href="/admin/beheer" style="padding:8px 18px;background:#F0F4F8;color:#0077B6;border-radius:99px;text-decoration:none;font-weight:700;font-size:.9rem;border:2px solid #E0E0E0;">⚙ Beheer</a>
+      {% if huidige_gebruiker %}
+        <button type="button" id="btnWachtwoordWijzigen" style="padding:8px 14px;background:#E3F2FD;color:#1565C0;border:none;border-radius:99px;font-weight:700;font-size:.9rem;cursor:pointer;">🔑 Wachtwoord</button>
+      {% endif %}
       <a href="/admin/logout" class="uitloggen">Uitloggen</a>
     </div>
     {% if huidige_gebruiker %}
