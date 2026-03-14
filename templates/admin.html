@@ -50,13 +50,7 @@
       width: 100%; display: block; text-decoration: none;
     }
 
-    @media (max-width: 600px) {
-      body { padding: 14px; }
-      h1 { font-size: 1.4rem; }
-      .topbar { flex-wrap: nowrap; align-items: center; }
-      .topbar-acties { display: none; }
-      .avatar-menu { display: block; }
-    }
+    /* Topbar-switching wordt afgehandeld via JS (ResizeObserver) */
 
     .waarschuwing {
       background: #FFF8E1; border: 2px solid #FFD700; border-radius: 12px;
@@ -613,6 +607,28 @@
     var btnSluit = document.getElementById('btnWachtwoordSluiten');
     var btnOpenAvatar = document.getElementById('btnWachtwoordWijzigenAvatar');
     var avatarMenu = document.getElementById('avatarMenu');
+    var topbarActies = document.querySelector('.topbar-acties');
+    var topbar = document.querySelector('.topbar');
+
+    // Dynamisch wisselen tussen topbar-acties en avatar op basis van beschikbare ruimte
+    function updateTopbar() {
+      if (!topbarActies || !avatarMenu || !topbar) return;
+      topbarActies.style.display = 'flex';
+      avatarMenu.style.display = 'none';
+      topbar.style.flexWrap = 'nowrap';
+      var past = topbar.scrollWidth <= topbar.clientWidth;
+      topbar.style.flexWrap = '';
+      if (past) {
+        topbarActies.style.display = '';
+        avatarMenu.style.display = 'none';
+      } else {
+        topbarActies.style.display = 'none';
+        avatarMenu.style.display = 'block';
+      }
+    }
+    updateTopbar();
+    new ResizeObserver(updateTopbar).observe(topbar);
+
     if (btnOpen) { btnOpen.addEventListener('click', function() { modal.showModal(); }); }
     if (btnOpenAvatar) { btnOpenAvatar.addEventListener('click', function() { if (avatarMenu) avatarMenu.removeAttribute('open'); modal.showModal(); }); }
     if (btnSluit) { btnSluit.addEventListener('click', function() { modal.close(); }); }
