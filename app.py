@@ -208,7 +208,8 @@ def init_db():
             id                INTEGER PRIMARY KEY AUTOINCREMENT,
             gebruikersnaam    TEXT NOT NULL UNIQUE,
             wachtwoord_hash   TEXT NOT NULL,
-            aangemaakt_op     TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+            aangemaakt_op     TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+            laatste_inlog     TEXT
         )
     """)
     if not conn.execute("SELECT 1 FROM beheerders LIMIT 1").fetchone():
@@ -256,6 +257,10 @@ def init_db():
         pass  # kolom bestaat al
     try:
         conn.execute("ALTER TABLE bestellingen ADD COLUMN betaalwijze TEXT NOT NULL DEFAULT 'ideal'")
+    except sqlite3.OperationalError:
+        pass  # kolom bestaat al
+    try:
+        conn.execute("ALTER TABLE beheerders ADD COLUMN laatste_inlog TEXT")
     except sqlite3.OperationalError:
         pass  # kolom bestaat al
     # Migratie: naam → voornaam + achternaam
@@ -1005,6 +1010,10 @@ def admin_login():
             session["admin_ingelogd"]       = True
             session["admin_gebruikersnaam"] = gebruiker
             session.permanent = True
+            db.execute(
+                "UPDATE beheerders SET laatste_inlog = datetime('now','localtime') WHERE gebruikersnaam = ?",
+                (gebruiker,)
+            )
             app.logger.info(f"Admin ingelogd: {saniteer_log(gebruiker)} vanaf {request.remote_addr}")
             return redirect(url_for("admin"))
         fout = "Onjuiste gebruikersnaam of wachtwoord."
@@ -1116,7 +1125,7 @@ def admin_beheer():
     try:
         db = get_db()
         beheerders_lijst = db.execute(
-            "SELECT id, gebruikersnaam, aangemaakt_op FROM beheerders ORDER BY id"
+            "SELECT id, gebruikersnaam, aangemaakt_op, laatste_inlog FROM beheerders ORDER BY id"
         ).fetchall()
         return render_template("admin_beheer.html",
                                max_eendjes=get_max_eendjes(),

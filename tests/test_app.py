@@ -143,7 +143,8 @@ def maak_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             gebruikersnaam TEXT NOT NULL UNIQUE,
             wachtwoord_hash TEXT NOT NULL,
-            aangemaakt_op TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+            aangemaakt_op TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+            laatste_inlog TEXT
         )""",
         f"INSERT INTO teller (id, volgend_lot, max_eendjes, max_per_bestelling, prijs_per_stuk, prijs_vijf_stuks, transactiekosten) VALUES (1, 1, {MAX_EENDJES}, 100, 2.50, 10.00, 0.32)",
         f"INSERT INTO beheerders (gebruikersnaam, wachtwoord_hash) VALUES ('admin', '{generate_password_hash('testpass12345')}')",
@@ -2208,6 +2209,24 @@ class TestBeheerderAccounts(unittest.TestCase):
         """Niet-overeenkomende nieuwe wachtwoorden geven foutmelding."""
         r = self._wijzig_wachtwoord("testpass12345", "nieuwwachtwoord99", "anderwachtwoord00")
         self.assertIn(b"overeen", r.data)
+
+    def test_laatste_inlog_wordt_gezet_bij_login(self):
+        """Na inloggen is laatste_inlog gevuld in de database."""
+        rij = App.get_db().execute(
+            "SELECT laatste_inlog FROM beheerders WHERE gebruikersnaam='admin'"
+        ).fetchone()
+        self.assertIsNotNone(rij["laatste_inlog"])
+
+    def test_laatste_inlog_tonen_in_beheer_pagina(self):
+        """Beheer-pagina toont de 'Laatste ingelogd' kolom."""
+        r = self.client.get("/admin/beheer")
+        self.assertIn(b"Laatste ingelogd", r.data)
+
+    def test_laatste_inlog_waarde_in_beheer_pagina(self):
+        """Beheer-pagina toont een datum in de laatste-inlogkolom na inloggen."""
+        r = self.client.get("/admin/beheer")
+        # Na login moet er een datum staan (minstens jaar 20xx)
+        self.assertIn(b"20", r.data)
 
 
 # ══════════════════════════════════════════════════════════════════════════════

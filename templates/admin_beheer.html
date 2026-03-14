@@ -239,6 +239,7 @@
           <th>#</th>
           <th>Gebruikersnaam</th>
           <th>Aangemaakt op</th>
+          <th>Laatste ingelogd</th>
           <th>Actie</th>
         </tr>
       </thead>
@@ -248,6 +249,7 @@
           <td>{{ b['id'] }}</td>
           <td>{{ b['gebruikersnaam'] }}{% if b['gebruikersnaam'] == huidige_gebruiker %} <span class="badge badge-betaald">jij</span>{% endif %}</td>
           <td style="color:#888;font-size:.85rem;">{{ b['aangemaakt_op'][:16] }}</td>
+          <td style="color:#888;font-size:.85rem;">{{ b['laatste_inlog'][:16] if b['laatste_inlog'] else '—' }}</td>
           <td>
             {% set is_eigen = (b['gebruikersnaam'] == huidige_gebruiker) %}
             {% set is_enige = (beheerders|length <= 1) %}
