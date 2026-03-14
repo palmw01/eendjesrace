@@ -21,6 +21,7 @@ Gebouwd met **Python/Flask**, **Mollie** (iDEAL-betalingen), **SQLite** en **Res
 | Meerdere beheerdersaccounts aanmaken en verwijderen via admin | ✅ |
 | Wachtwoord wijzigen via admin-topbar | ✅ |
 | Automatische database-backup naar Cloudflare R2 via Litestream | ✅ |
+| SEO-geoptimaliseerd (meta description, Open Graph, Twitter Card, JSON-LD, sitemap.xml, robots.txt) | ✅ |
 
 ---
 
@@ -139,6 +140,8 @@ De app ondersteunt meerdere beheerdersaccounts. Wachtwoorden worden gehasht opge
 | `/voorwaarden` | Algemene voorwaarden |
 | `/api/prijs` | Live prijsberekening (JSON) |
 | `/api/beschikbaar` | Actueel aantal beschikbare eendjes (JSON, elke 30s door homepage gebruikt) |
+| `/robots.txt` | Crawler-instructies (blokkeert admin/bestellen/betaald, verwijst naar sitemap) |
+| `/sitemap.xml` | XML-sitemap met openbare pagina's (`/`, `/privacy`, `/voorwaarden`) |
 | `/admin` | Beheerpagina — statistieken, bestellingen, zoeken, filter, CSV-download |
 | `/admin/export-csv` | Download alle bestellingen als CSV |
 | `/admin/bestelling/<id>/wijzigen` | Bewerk naam, e-mail, telefoon, status of mailstatus |
@@ -198,4 +201,4 @@ python -m pytest tests/test_app.py -v
 python tests/test_app.py
 ```
 
-De testsuite stubt Mollie, Resend, Flask-WTF en Flask-Limiter — alleen Flask en Werkzeug hoeven geïnstalleerd te zijn. 345 tests.
+De testsuite stubt Mollie, Resend, Flask-WTF en Flask-Limiter — alleen Flask en Werkzeug hoeven geïnstalleerd te zijn. 387 tests.
