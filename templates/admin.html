@@ -615,9 +615,13 @@
       if (!topbarActies || !avatarMenu || !topbar) return;
       topbarActies.style.display = 'flex';
       avatarMenu.style.display = 'none';
+      // Tijdelijk nowrap + geen shrink zodat scrollWidth de werkelijke breedte toont
       topbar.style.flexWrap = 'nowrap';
+      var kinderen = Array.from(topbar.children);
+      kinderen.forEach(function(el) { el.style.flexShrink = '0'; });
       var past = topbar.scrollWidth <= topbar.clientWidth;
       topbar.style.flexWrap = '';
+      kinderen.forEach(function(el) { el.style.flexShrink = ''; });
       if (past) {
         topbarActies.style.display = '';
         avatarMenu.style.display = 'none';
