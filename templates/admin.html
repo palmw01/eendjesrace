@@ -241,6 +241,8 @@
       .knop-csv { display: none; }
       .csv-menu { display: block; flex-shrink: 0; }
 
+      .topbar { align-items: flex-start; }
+      .titel-sub { display: block; font-size: .75rem; color: #888; font-family: 'Nunito', sans-serif; font-weight: 700; margin-top: 2px; }
       .instelling-kaart { padding: 16px; margin-top: 28px; }
       .instelling-rij { flex-direction: column; align-items: flex-start; gap: 6px; }
       .instelling-label { width: auto; }
@@ -251,7 +253,7 @@
 </head>
 <body>
   <div class="topbar">
-    <h1><img class="eend-inline" src="{{ url_for('static', filename='img/eend.png') }}" alt=""> Badeendjesrace – Beheer</h1>
+    <h1><img class="eend-inline" src="{{ url_for('static', filename='img/eend.png') }}" alt=""> Badeendjesrace<span class="titel-sub"> – Beheer</span></h1>
     <div class="topbar-acties">
       {% if huidige_gebruiker %}
         <span style="font-size:.88rem;color:#555;">👤 {{ huidige_gebruiker }}</span>
