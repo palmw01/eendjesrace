@@ -166,11 +166,21 @@
     }
     .knop-csv:hover { background: #C8E6C9; }
 
-    .filter-csv-rij {
-      display: flex; justify-content: space-between; align-items: center;
-      flex: 1; flex-wrap: wrap; gap: 8px;
+    .zoek-rij {
+      display: flex; gap: 10px; align-items: center; margin-bottom: 10px;
     }
-    .csv-menu { display: none; position: relative; }
+    .zoek-rij input[type="text"] {
+      flex: 1; padding: 10px 14px; border: 2px solid #E0E0E0; border-radius: 10px;
+      font-family: 'Nunito', sans-serif; font-size: .95rem;
+    }
+    .zoek-rij input[type="text"]:focus { outline: none; border-color: #0077B6; }
+
+    .filter-rij {
+      display: flex; align-items: center; gap: 8px;
+    }
+    .filter-rij .statusfilter { flex: 1; }
+
+    .csv-menu { display: none; position: relative; flex-shrink: 0; }
     .csv-knop {
       width: 38px; height: 38px; border-radius: 50%;
       background: #E8F5E9; color: #2E7D32;
@@ -206,11 +216,6 @@
     .filter-knop.actief { background: #0077B6; border-color: #0077B6; color: white; }
 
     .zoek { margin-bottom: 16px; }
-    .zoek input {
-      padding: 10px 14px; border: 2px solid #E0E0E0; border-radius: 10px;
-      font-family: 'Nunito', sans-serif; font-size: .95rem; width: 100%; max-width: 320px;
-    }
-    .zoek input:focus { outline: none; border-color: #0077B6; }
 
     .tabel-wrapper {
       overflow-x: auto; -webkit-overflow-scrolling: touch;
@@ -233,14 +238,11 @@
       table { font-size: .78rem; }
       th, td { padding: 7px 8px; }
 
-      /* Zoekbalk: stapel alles verticaal zodat statusfilter niet de pagina verbreedt */
-      .zoek { display: flex !important; flex-direction: column !important; align-items: stretch !important; }
-      .zoek input[type="text"] { max-width: 100%; min-width: 0; flex: none !important; }
-      .zoek button { width: 100%; }
-      .filter-csv-rij { flex-wrap: nowrap; align-items: flex-start; }
-      .statusfilter { width: auto; flex: 1; }
+      .zoek-rij { flex-wrap: wrap; }
+      .zoek-rij input[type="text"] { flex: 1 1 100%; }
+      .zoek-rij button, .zoek-rij a.filter-knop { flex: 1; text-align: center; }
       .knop-csv { display: none; }
-      .csv-menu { display: block; flex-shrink: 0; }
+      .csv-menu { display: block; }
 
       .instelling-kaart { padding: 16px; margin-top: 28px; }
       .instelling-rij { flex-direction: column; align-items: flex-start; gap: 6px; }
@@ -330,12 +332,17 @@
   </div>
 
   <!-- Zoekbalk + statusfilter -->
-  <form method="GET" action="/admin" class="zoek" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+  <form method="GET" action="/admin" class="zoek">
     {% if status_filter %}<input type="hidden" name="status" value="{{ status_filter }}">{% endif %}
-    <input type="text" name="zoek" value="{{ zoekterm }}" placeholder="🔍 Zoek op naam, e-mail of lotnummer…" style="flex:1;min-width:200px;">
-    <button type="submit" class="filter-knop actief">Zoeken</button>
-    {% if zoekterm %}<a href="/admin{% if status_filter %}?status={{ status_filter }}{% endif %}" class="filter-knop">✕ Wissen</a>{% endif %}
-    <div class="filter-csv-rij">
+    <!-- Rij 1: zoekbalk + acties + CSV -->
+    <div class="zoek-rij">
+      <input type="text" name="zoek" value="{{ zoekterm }}" placeholder="🔍 Zoek op naam, e-mail of lotnummer…">
+      <button type="submit" class="filter-knop actief">Zoeken</button>
+      {% if zoekterm %}<a href="/admin{% if status_filter %}?status={{ status_filter }}{% endif %}" class="filter-knop">✕ Wissen</a>{% endif %}
+      <a href="/admin/export-csv" class="knop-csv" style="margin-left:auto;">⬇ CSV downloaden</a>
+    </div>
+    <!-- Rij 2: statusfilters + CSV-icoon (mobiel) -->
+    <div class="filter-rij">
       <div class="statusfilter">
         <a href="/admin{% if zoekterm %}?zoek={{ zoekterm | urlencode }}{% endif %}" class="filter-knop {% if not status_filter %}actief{% endif %}">Alles</a>
         <a href="/admin?status=betaald{% if zoekterm %}&zoek={{ zoekterm | urlencode }}{% endif %}" class="filter-knop {% if status_filter == 'betaald' %}actief{% endif %}">Betaald</a>
@@ -344,7 +351,6 @@
         <a href="/admin?status=verlopen{% if zoekterm %}&zoek={{ zoekterm | urlencode }}{% endif %}" class="filter-knop {% if status_filter == 'verlopen' %}actief{% endif %}">Verlopen</a>
         <a href="/admin?status=geannuleerd{% if zoekterm %}&zoek={{ zoekterm | urlencode }}{% endif %}" class="filter-knop {% if status_filter == 'geannuleerd' %}actief{% endif %}">Geannuleerd</a>
       </div>
-      <a href="/admin/export-csv" class="knop-csv">⬇ CSV downloaden</a>
       <details class="csv-menu" id="csvMenu">
         <summary class="csv-knop">⬇</summary>
         <div class="csv-dropdown">
