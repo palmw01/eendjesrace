@@ -949,6 +949,18 @@ def admin():
                 params.extend([p, p, p, p])
         where_sql = ("WHERE " + " AND ".join(where_delen)) if where_delen else ""
 
+        GELDIGE_SORTERINGEN = {
+            "id": "id", "naam": "naam", "datum": "aangemaakt_op",
+            "aantal": "aantal", "bedrag": "bedrag", "lot": "lot_van", "status": "status",
+        }
+        sorter   = request.args.get("sorter", "id")
+        richting = request.args.get("richting", "desc")
+        if sorter not in GELDIGE_SORTERINGEN:
+            sorter = "id"
+        if richting not in ("asc", "desc"):
+            richting = "desc"
+        order_sql = f"ORDER BY {GELDIGE_SORTERINGEN[sorter]} {richting.upper()}"
+
         totaal = db.execute(
             f"SELECT COUNT(*) FROM bestellingen {where_sql}", params
         ).fetchone()[0]
@@ -957,7 +969,7 @@ def admin():
         pagina       = min(pagina, totaal_paginas)
         offset       = (pagina - 1) * PAGINA_GROOTTE
         bestellingen = db.execute(
-            f"SELECT * FROM bestellingen {where_sql} ORDER BY id DESC LIMIT ? OFFSET ?",
+            f"SELECT * FROM bestellingen {where_sql} {order_sql} LIMIT ? OFFSET ?",
             params + [PAGINA_GROOTTE, offset]
         ).fetchall()
         stats = db.execute("""
@@ -987,6 +999,8 @@ def admin():
                                totaal=totaal,
                                status_filter=status_filter,
                                zoekterm=zoekterm,
+                               sorter=sorter,
+                               richting=richting,
                                beheerders=beheerders_lijst,
                                huidige_gebruiker=session.get("admin_gebruikersnaam"))
     except sqlite3.Error as e:

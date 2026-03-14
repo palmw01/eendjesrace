@@ -2560,6 +2560,58 @@ class TestAdminZoekfunctie(unittest.TestCase):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# ADMIN SORTEERFUNCTIE
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestAdminSorteerfunctie(unittest.TestCase):
+
+    def setUp(self):
+        self.client, self.ctx = maak_flask_client()
+        self.client.post("/admin/login",
+                         data={"gebruiker": "admin", "wachtwoord": "testpass12345"})
+        db = App.get_db()
+        db.execute(
+            "INSERT INTO bestellingen (naam, telefoon, email, aantal, bedrag, status, lot_van, lot_tot) "
+            "VALUES (?,?,?,?,?,?,?,?)",
+            ("Anna Bakker", "0600000001", "anna@test.nl", 5, 10.00, "betaald", 1, 5)
+        )
+        db.execute(
+            "INSERT INTO bestellingen (naam, telefoon, email, aantal, bedrag, status, lot_van, lot_tot) "
+            "VALUES (?,?,?,?,?,?,?,?)",
+            ("Boris Coster", "0600000002", "boris@test.nl", 2, 5.00, "betaald", 6, 7)
+        )
+
+    def tearDown(self):
+        self.ctx.pop()
+
+    def test_sorteer_op_naam_asc(self):
+        r = self.client.get("/admin?sorter=naam&richting=asc")
+        self.assertEqual(r.status_code, 200)
+        positie_anna = r.data.find(b"Anna Bakker")
+        positie_boris = r.data.find(b"Boris Coster")
+        self.assertLess(positie_anna, positie_boris)
+
+    def test_sorteer_op_naam_desc(self):
+        r = self.client.get("/admin?sorter=naam&richting=desc")
+        self.assertEqual(r.status_code, 200)
+        positie_anna = r.data.find(b"Anna Bakker")
+        positie_boris = r.data.find(b"Boris Coster")
+        self.assertGreater(positie_anna, positie_boris)
+
+    def test_sorter_ongeldig_valt_terug_op_id(self):
+        r = self.client.get("/admin?sorter=injectie&richting=asc")
+        self.assertEqual(r.status_code, 200)
+
+    def test_richting_ongeldig_valt_terug_op_desc(self):
+        r = self.client.get("/admin?sorter=naam&richting=DROP")
+        self.assertEqual(r.status_code, 200)
+
+    def test_sorteerpijlen_zichtbaar_in_koppen(self):
+        r = self.client.get("/admin?sorter=naam&richting=asc")
+        self.assertIn(b"sorteer", r.data)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # FOUTPAGINA'S — HTTP 400, 403, 500
 # ══════════════════════════════════════════════════════════════════════════════
 

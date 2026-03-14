@@ -213,6 +213,12 @@
       border-radius: 14px; box-shadow: 0 2px 12px rgba(0,0,0,.07);
     }
     .tabel-wrapper table { border-radius: 0; box-shadow: none; }
+    th a.sorteer {
+      color: inherit; text-decoration: none; display: flex; align-items: center; gap: 4px; white-space: nowrap;
+    }
+    th a.sorteer:hover { opacity: .8; }
+    .sorteer-pijl { font-size: .75em; opacity: .5; }
+    .sorteer-pijl.actief { opacity: 1; }
 
     @media (max-width: 700px) {
       body { padding: 14px; max-width: 100%; }
@@ -326,21 +332,32 @@
   </form>
 
   <!-- Bestellingen tabel -->
+  {% set sf = ('&status=' ~ status_filter) if status_filter else '' %}
+  {% set zf = ('&zoek=' ~ (zoekterm | urlencode)) if zoekterm else '' %}
+  {% macro sorteer_th(label, kolom) %}
+    {% if sorter == kolom %}
+      {% set nieuwe_richting = 'asc' if richting == 'desc' else 'desc' %}
+      {% set pijl = '↓' if richting == 'desc' else '↑' %}
+      <th><a class="sorteer" href="/admin?sorter={{ kolom }}&richting={{ nieuwe_richting }}{{ sf }}{{ zf }}">{{ label }}<span class="sorteer-pijl actief">{{ pijl }}</span></a></th>
+    {% else %}
+      <th><a class="sorteer" href="/admin?sorter={{ kolom }}&richting=asc{{ sf }}{{ zf }}">{{ label }}<span class="sorteer-pijl">⇅</span></a></th>
+    {% endif %}
+  {% endmacro %}
   <div class="tabel-wrapper">
   <table id="tabel">
     <thead>
       <tr>
-        <th>#</th>
-        <th>Naam</th>
+        {{ sorteer_th('#', 'id') }}
+        {{ sorteer_th('Naam', 'naam') }}
         <th>E-mail</th>
         <th>Telefoon</th>
-        <th>Aantal</th>
-        <th>Bedrag</th>
-        <th>Loten</th>
-        <th>Status</th>
+        {{ sorteer_th('Aantal', 'aantal') }}
+        {{ sorteer_th('Bedrag', 'bedrag') }}
+        {{ sorteer_th('Loten', 'lot') }}
+        {{ sorteer_th('Status', 'status') }}
         <th>Betaald via</th>
         <th>Mail</th>
-        <th>Datum</th>
+        {{ sorteer_th('Datum', 'datum') }}
         <th>Acties</th>
       </tr>
     </thead>
@@ -404,15 +421,16 @@
     </span>
     {% set sf = ('&status=' ~ status_filter) if status_filter else '' %}
     {% set zf = ('&zoek=' ~ (zoekterm | urlencode)) if zoekterm else '' %}
+    {% set srt = ('&sorter=' ~ sorter ~ '&richting=' ~ richting) if (sorter != 'id' or richting != 'desc') else '' %}
     {% if pagina > 1 %}
-    <a href="/admin?pagina={{ pagina - 1 }}{{ sf }}{{ zf }}" class="filter-knop">← Vorige</a>
+    <a href="/admin?pagina={{ pagina - 1 }}{{ sf }}{{ zf }}{{ srt }}" class="filter-knop">← Vorige</a>
     {% endif %}
     {% for p in range(1, totaal_paginas + 1) %}
-    <a href="/admin?pagina={{ p }}{{ sf }}{{ zf }}"
+    <a href="/admin?pagina={{ p }}{{ sf }}{{ zf }}{{ srt }}"
        class="filter-knop {% if p == pagina %}actief{% endif %}">{{ p }}</a>
     {% endfor %}
     {% if pagina < totaal_paginas %}
-    <a href="/admin?pagina={{ pagina + 1 }}{{ sf }}{{ zf }}" class="filter-knop">Volgende →</a>
+    <a href="/admin?pagina={{ pagina + 1 }}{{ sf }}{{ zf }}{{ srt }}" class="filter-knop">Volgende →</a>
     {% endif %}
   </div>
   {% endif %}
