@@ -13,7 +13,7 @@
       font-family: 'Nunito', sans-serif;
       background: linear-gradient(180deg, #0096C7 0%, #023E8A 100%);
       min-height: 100vh;
-      display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px;
+      display: flex; flex-direction: column; align-items: center; padding: 20px;
     }
     .kaart {
       background: #FFFDF5; border-radius: 24px; padding: 40px 32px;
@@ -59,9 +59,11 @@
     }
     .site-footer a { color: rgba(255,255,255,0.7); }
     .site-footer a:hover { color: white; }
+    main { flex: 1; display: flex; align-items: center; justify-content: center; width: 100%; }
   </style>
 </head>
 <body>
+  <main>
   <div class="kaart">
 
     {% if status_klasse == 'succes' %}
@@ -146,6 +148,7 @@
     <br>
     <a href="/" class="terug">← Terug naar de Badeendjesrace</a>
   </div>
+  </main>
   <footer class="site-footer">
     <p><strong style="color:rgba(255,255,255,0.85);">Diaconie Hervormde gemeente te Wapenveld</strong></p>
     <p>Kerkstraat 2a · 8191 LV Wapenveld · KvK 76404862</p>

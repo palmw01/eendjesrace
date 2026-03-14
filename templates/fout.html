@@ -16,8 +16,14 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
       padding: 20px;
+    }
+    main {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
     }
     .site-footer {
       text-align: center;
@@ -81,6 +87,7 @@
   </style>
 </head>
 <body>
+  <main>
   <div class="kaart">
     <img class="eend" src="{{ url_for('static', filename='img/eend.png') }}" alt="badeend">
     <div class="code">{{ code }}</div>
@@ -108,6 +115,7 @@
       {% endif %}
     </div>
   </div>
+  </main>
   <footer class="site-footer">
     <p><strong style="color:rgba(255,255,255,0.85);">Diaconie Hervormde gemeente te Wapenveld</strong></p>
     <p>Kerkstraat 2a · 8191 LV Wapenveld · KvK 76404862</p>
