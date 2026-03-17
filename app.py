@@ -843,7 +843,10 @@ def bestellen():
         app.logger.info(
             f"Betaling aangemaakt: id={bestelling_id}, mollie={betaling.id}, €{bedrag}"
         )
-        return redirect(betaling.checkout_url)
+        checkout_url = betaling.checkout_url
+        resp = Response(status=302)
+        resp.headers["Location"] = checkout_url
+        return resp
 
     except MollieError as e:
         app.logger.error(f"Mollie API-fout: {e}")

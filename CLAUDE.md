@@ -123,3 +123,5 @@ Admin routes:
 ### Mollie API v3
 
 `mollie-api-python` v3 does **not** have `is_failed()`, `is_canceled()`, or `is_expired()` methods. Check payment status via `betaling.status` string directly (`"failed"`, `"canceled"`, `"expired"`). Only `is_paid()`, `is_pending()`, and `is_open()` exist.
+
+**iDEAL 2.0 checkout redirect**: In live mode, `betaling.checkout_url` returns an iDEAL 2.0 URL of the form `https://pay.ideal.nl/transactions/https://tx.ideal.nl/...` — with a full URL embedded in the path. Flask's `redirect()` (via Werkzeug) percent-encodes the embedded `://` and `/`, producing a double-encoded broken URL. **Fix**: use `Response(status=302)` with `resp.headers["Location"] = betaling.checkout_url` directly, bypassing Werkzeug's URL encoding. This is already implemented in `/bestellen`.
