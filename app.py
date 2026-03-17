@@ -583,7 +583,7 @@ def security_headers(response):
         f"script-src 'self' 'nonce-{nonce}'; "
         "img-src 'self' data:; "
         "base-uri 'self'; "
-        "form-action 'self' https://www.mollie.com; "
+        "form-action 'self' https://www.mollie.com https://pay.ideal.nl; "
         "frame-ancestors 'none';"
     )
     if app.config["SESSION_COOKIE_SECURE"]:
