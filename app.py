@@ -430,6 +430,7 @@ def wijs_lotnummers_toe(db, bestelling_id, aantal):
         ).fetchone()
         if bestaand and bestaand["status"] == "betaald":
             db.execute("ROLLBACK")
+            app.logger.info(f"Lotnummers al toegewezen (idempotent): bestelling {bestelling_id}, loten={bestaand['lot_van']}–{bestaand['lot_tot']}")
             return bestaand["lot_van"], bestaand["lot_tot"]
 
         teller     = db.execute("SELECT volgend_lot, max_eendjes FROM teller WHERE id = 1").fetchone()
@@ -454,6 +455,7 @@ def wijs_lotnummers_toe(db, bestelling_id, aantal):
             (start, einde, bestelling_id),
         )
         db.commit()
+        app.logger.info(f"Lotnummers toegewezen: bestelling {bestelling_id}, loten={start}–{einde}")
     except Exception:
         # Zorg dat de transactie altijd gesloten wordt bij een onverwachte fout
         try:
@@ -760,6 +762,11 @@ def bestellen():
             titel="Ongeldig aantal",
             bericht="Het opgegeven aantal is niet geldig."), 400
 
+    app.logger.info(
+        f"Bestelling ontvangen: {saniteer_log(voornaam)} {saniteer_log(achternaam)}, "
+        f"aantal={aantal}, email={saniteer_log(email)}, incl_tk={incl_tk}"
+    )
+
     # Validatie
     max_per_bestelling = get_max_per_bestelling()
     max_eendjes        = get_max_eendjes()
@@ -797,9 +804,9 @@ def bestellen():
                                    beschikbaar=beschikbaar,
                                    max_eendjes=max_eendjes,
                                    max_per_bestelling=max_per_bestelling,
-                                   transactiekosten=TRANSACTIEKOSTEN,
-                                   prijs_per_stuk=PRIJS_PER_STUK,
-                                   prijs_vijf_stuks=PRIJS_VIJF_STUKS,
+                                   transactiekosten=get_transactiekosten(),
+                                   prijs_per_stuk=get_prijs_per_stuk(),
+                                   prijs_vijf_stuks=get_prijs_vijf_stuks(),
                                    fouten=[f"Er zijn nog maar {beschikbaar} eendjes beschikbaar."],
                                    vorig=vorig), 409
 
@@ -844,6 +851,7 @@ def bestellen():
             f"Betaling aangemaakt: id={bestelling_id}, mollie={betaling.id}, €{bedrag}"
         )
         checkout_url = betaling.checkout_url
+        app.logger.info(f"Redirect naar Mollie checkout: id={bestelling_id}")
         resp = Response(status=302)
         resp.headers["Location"] = checkout_url
         return resp
@@ -983,6 +991,7 @@ def betaald(bestelling_id):
 
     # Fallback: als webhook nog niet binnengekomen is, check zelf bij Mollie
     if rij["status"] == "aangemaakt" and rij["mollie_id"] and MOLLIE_API_KEY:
+        app.logger.info(f"Fallback statuscheck gestart: bestelling {bestelling_id}, mollie={rij['mollie_id']}")
         try:
             mollie   = maak_mollie_client()
             betaling = mollie.payments.get(rij["mollie_id"])
@@ -991,12 +1000,14 @@ def betaald(bestelling_id):
                 mail_ok = stuur_bevestigingsmail(
                     rij["voornaam"], rij["achternaam"], rij["email"], rij["aantal"],
                     lot_van, lot_tot, rij["bedrag"], bool(rij["transactiekosten"]),
+                    tk_bedrag=rij["transactiekosten_bedrag"],
                 )
                 db.execute(
                     "UPDATE bestellingen SET mail_verstuurd=?, pogingen=pogingen+1 WHERE id=?",
                     (1 if mail_ok else 0, bestelling_id),
                 )
                 db.commit()
+                app.logger.info(f"Fallback succesvol: bestelling {bestelling_id}, loten={lot_van}–{lot_tot}")
                 rij = db.execute("SELECT * FROM bestellingen WHERE id=?", (bestelling_id,)).fetchone()
         except ValueError as e:
             # wijs_lotnummers_toe deed zelf al ROLLBACK; status blijft 'aangemaakt'

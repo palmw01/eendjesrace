@@ -52,6 +52,14 @@ The entire backend lives in `app.py` (single file). Templates are in `templates/
 3. Mollie calls `/webhook` (async) on payment status change → assigns ticket numbers + sends confirmation email
 4. `/betaald/<id>` is a fallback for when the webhook is delayed — polls Mollie directly
 
+**Logging checkpoints** (all via `app.logger.info`):
+- `/bestellen`: order received (naam, aantal, email, incl_tk)
+- `/bestellen`: payment created (bestelling_id, mollie_id, bedrag)
+- `/bestellen`: redirect to Mollie checkout
+- `wijs_lotnummers_toe()`: ticket range assigned (start–einde) or idempotent return
+- `/webhook`: all status changes (paid/pending/open/failed/canceled/expired)
+- `/betaald`: fallback triggered + outcome
+
 ### Database (SQLite, `eendjes.db`, 4 tables)
 
 - **`bestellingen`**: orders — `voornaam`, `achternaam`, `email`, `telefoon`, `aantal`, `bedrag`, `transactiekosten` (0/1), `transactiekosten_bedrag`, `mollie_id`, `status` (aangemaakt/betaald/mislukt/geannuleerd/verlopen), `lot_van`/`lot_tot` (ticket range), `mail_verstuurd`, `pogingen`, `betaalwijze` (ideal/contant/overboeking)
@@ -125,3 +133,7 @@ Admin routes:
 `mollie-api-python` v3 does **not** have `is_failed()`, `is_canceled()`, or `is_expired()` methods. Check payment status via `betaling.status` string directly (`"failed"`, `"canceled"`, `"expired"`). Only `is_paid()`, `is_pending()`, and `is_open()` exist.
 
 **iDEAL 2.0 checkout redirect**: In live mode, `betaling.checkout_url` returns an iDEAL 2.0 URL of the form `https://pay.ideal.nl/transactions/https://tx.ideal.nl/...` — with a full URL embedded in the path. Flask's `redirect()` (via Werkzeug) percent-encodes the embedded `://` and `/`, producing a double-encoded broken URL. **Fix**: use `Response(status=302)` with `resp.headers["Location"] = betaling.checkout_url` directly, bypassing Werkzeug's URL encoding. This is already implemented in `/bestellen`.
+
+**Price getters in 409 response**: The `/bestellen` 409 (sold out) render must use `get_transactiekosten()` / `get_prijs_per_stuk()` / `get_prijs_vijf_stuks()` — not the module-level constants — so live DB prices are shown after an admin update.
+
+**`tk_bedrag` in fallback**: The `/betaald` fallback call to `stuur_bevestigingsmail()` must pass `tk_bedrag=rij["transactiekosten_bedrag"]` so the email shows the correct total when the iDEAL fee is included and the webhook was delayed.
