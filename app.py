@@ -1716,12 +1716,13 @@ def setup():
 # (Procfile: gunicorn app:app) de tabellen nooit aanmaakte en direct crashte
 # met "no such table: bestellingen".  Door het hier op module-niveau aan te
 # roepen wordt de DB altijd geïnitialiseerd, ongeacht hoe de app gestart wordt.
-with app.app_context():
-    init_db()
-
-
 if __name__ == "__main__":
     if not MOLLIE_API_KEY:
         raise SystemExit("❌  MOLLIE_API_KEY is niet ingesteld.")
+
+with app.app_context():
+    init_db()
+
+if __name__ == "__main__":
     debug = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
     app.run(debug=debug, port=5000)
