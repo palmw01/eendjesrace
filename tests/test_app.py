@@ -3824,6 +3824,91 @@ class TestOnderhoudsmodus(unittest.TestCase):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# Setup-pagina (eerste beheerdersaccount)
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestSetupPagina(unittest.TestCase):
+
+    def setUp(self):
+        self.client, self.ctx = maak_flask_client()
+        # Zet een nep-token zodat de setup-route actief is
+        App._setup_token = "testtoken123"
+
+    def tearDown(self):
+        App._setup_token = None
+        self.ctx.pop()
+
+    def test_setup_zonder_token_geeft_404(self):
+        """GET /setup zonder token geeft 404."""
+        r = self.client.get("/setup")
+        self.assertEqual(r.status_code, 404)
+
+    def test_setup_met_verkeerd_token_geeft_404(self):
+        """GET /setup met verkeerd token geeft 404."""
+        r = self.client.get("/setup?token=fouttoken")
+        self.assertEqual(r.status_code, 404)
+
+    def test_setup_met_juist_token_geeft_200(self):
+        """GET /setup met juist token toont het formulier."""
+        r = self.client.get("/setup?token=testtoken123")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(b"Account aanmaken", r.data)
+
+    def test_setup_formulier_bevat_uitleg(self):
+        """Setup-pagina toont een uitlegblok."""
+        r = self.client.get("/setup?token=testtoken123")
+        self.assertIn(b"beheerdersaccount", r.data)
+
+    def test_setup_te_kort_wachtwoord_geeft_fout(self):
+        """POST met te kort wachtwoord toont foutmelding."""
+        r = self.client.post("/setup?token=testtoken123", data={
+            "token": "testtoken123",
+            "gebruikersnaam": "beheerder",
+            "wachtwoord": "tekortp",
+            "bevestiging": "tekortp",
+        })
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(b"12 tekens", r.data)
+
+    def test_setup_niet_overeenkomende_wachtwoorden_geeft_fout(self):
+        """POST met niet-overeenkomende wachtwoorden toont foutmelding."""
+        r = self.client.post("/setup?token=testtoken123", data={
+            "token": "testtoken123",
+            "gebruikersnaam": "beheerder",
+            "wachtwoord": "langgoed12345",
+            "bevestiging": "anderswachtwoord",
+        })
+        self.assertIn(b"niet overeen", r.data)
+
+    def test_setup_geldig_maakt_account_en_redirectt(self):
+        """Geldige POST maakt account aan en redirectt naar login."""
+        r = self.client.post("/setup?token=testtoken123", data={
+            "token": "testtoken123",
+            "gebruikersnaam": "nieuwbeheerder",
+            "wachtwoord": "veiligwacht12",
+            "bevestiging": "veiligwacht12",
+        }, follow_redirects=False)
+        self.assertEqual(r.status_code, 302)
+        self.assertIn("/admin/login", r.headers["Location"])
+
+    def test_setup_token_wordt_gewist_na_aanmaken(self):
+        """Na succesvol aanmaken is het setup-token None."""
+        self.client.post("/setup?token=testtoken123", data={
+            "token": "testtoken123",
+            "gebruikersnaam": "nieuwbeheerder",
+            "wachtwoord": "veiligwacht12",
+            "bevestiging": "veiligwacht12",
+        })
+        self.assertIsNone(App._setup_token)
+
+    def test_setup_niet_beschikbaar_als_token_none(self):
+        """Als _setup_token None is geeft /setup 404."""
+        App._setup_token = None
+        r = self.client.get("/setup?token=testtoken123")
+        self.assertEqual(r.status_code, 404)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # Recente wijzigingen: vallende eendjes, accordion, afzendernaam, projectblokje
 # ══════════════════════════════════════════════════════════════════════════════
 

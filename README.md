@@ -81,7 +81,7 @@ De app draait op http://localhost:5000. De SQLite-database (`eendjes.db`) wordt 
 | `RESEND_API_KEY` | Ja | Resend API-sleutel voor transactionele e-mail |
 | `SECRET_KEY` | Ja | Willekeurige geheime sleutel voor sessies (gebruik een lange random string) |
 | `RESEND_FROM` | Ja | Geverifieerd afzenderadres (bijv. `noreply@jouwdomein.nl`) |
-| `ADMIN_PASS` | Eerste start | Initieel admin-wachtwoord (minimaal 12 tekens). Alleen vereist als de database nog leeg is. Kan worden verwijderd zodra er een beheerdersaccount bestaat. |
+| `ADMIN_PASS` | Nee | Initieel admin-wachtwoord (minimaal 12 tekens). Als dit niet ingesteld is én er geen accounts bestaan, start de app in setup-modus: een eenmalig token wordt gelogd naar de console en `/setup?token=…` toont een formulier. |
 | `ADMIN_USER` | Eerste start | Initiële admin-gebruikersnaam (standaard: `admin`). Kan worden verwijderd na eerste start. |
 | `DATABASE` | Nee | Pad naar de SQLite-database. Zet op `/app/data/eendjes.db` als volume op `/app/data` gemount is. |
 | `HTTPS` | Nee | Zet op `true` in productie — beveiligt sessie-cookies |
@@ -234,4 +234,4 @@ PYTHONPATH=. .venv/bin/pytest tests/test_app.py -v
 PYTHONPATH=. .venv/bin/python tests/test_app.py
 ```
 
-De testsuite stubt Mollie, Resend, Flask-WTF en Flask-Limiter. `conftest.py` zorgt voor automatische testdatabase-cleanup (vereist voor Python 3.14 + SQLite WAL mode). **442 tests.**
+De testsuite stubt Mollie, Resend, Flask-WTF en Flask-Limiter. `conftest.py` zorgt voor automatische testdatabase-cleanup (vereist voor Python 3.14 + SQLite WAL mode). **451 tests.**

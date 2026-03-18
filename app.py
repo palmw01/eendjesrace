@@ -87,6 +87,9 @@ AFZENDER_NAAM    = "Badeendjesrace Wapenveld"
 ADMIN_GEBRUIKER  = os.environ.get("ADMIN_USER", "admin")
 ADMIN_WACHTWOORD = os.environ.get("ADMIN_PASS", "")
 
+# Eenmalig setup-token (in-memory); None = geen setup nodig of al gedaan
+_setup_token: str | None = None
+
 DATABASE         = os.environ.get("DATABASE", "eendjes.db")
 
 # ─── Mollie client factory ────────────────────────────────────────────────────
@@ -213,15 +216,23 @@ def init_db():
         )
     """)
     if not conn.execute("SELECT 1 FROM beheerders LIMIT 1").fetchone():
-        if not ADMIN_WACHTWOORD or len(ADMIN_WACHTWOORD) < 12:
-            raise SystemExit(
-                "❌  ADMIN_PASS is niet ingesteld of te kort (minimaal 12 tekens). "
-                "Vereist voor initiële database-setup."
+        if ADMIN_WACHTWOORD and len(ADMIN_WACHTWOORD) >= 12:
+            conn.execute(
+                "INSERT INTO beheerders (gebruikersnaam, wachtwoord_hash) VALUES (?, ?)",
+                (ADMIN_GEBRUIKER, generate_password_hash(ADMIN_WACHTWOORD))
             )
-        conn.execute(
-            "INSERT INTO beheerders (gebruikersnaam, wachtwoord_hash) VALUES (?, ?)",
-            (ADMIN_GEBRUIKER, generate_password_hash(ADMIN_WACHTWOORD))
-        )
+        else:
+            global _setup_token
+            if _setup_token is None:
+                _setup_token = secrets.token_urlsafe(32)
+            print(
+                f"\n{'=' * 60}\n"
+                f"⚠️  Geen beheerdersaccounts gevonden.\n"
+                f"   Stel een initieel account in via:\n"
+                f"   {BASE_URL}/setup?token={_setup_token}\n"
+                f"{'=' * 60}\n",
+                flush=True,
+            )
     # Migraties eerst — zodat kolommen bestaan vóór de INSERT
     try:
         conn.execute("ALTER TABLE bestellingen ADD COLUMN transactiekosten INTEGER NOT NULL DEFAULT 0")
@@ -568,6 +579,7 @@ def controleer_onderhoudsmodus():
     # Admin-routes, statische bestanden en de Mollie-webhook blijven altijd bereikbaar.
     if (request.path.startswith("/admin")
             or request.path.startswith("/static")
+            or request.path.startswith("/setup")
             or request.path == "/webhook"):
         return
     try:
@@ -1662,6 +1674,43 @@ def voorwaarden():
     return render_template("voorwaarden.html")
 
 
+@app.route("/setup", methods=["GET", "POST"])
+@limiter.limit("10 per minute")
+def setup():
+    """Eenmalige setup-pagina voor het aanmaken van het eerste beheerdersaccount."""
+    global _setup_token
+    if _setup_token is None:
+        abort(404)
+    token = request.args.get("token", "") or request.form.get("token", "")
+    if not token or not secrets.compare_digest(token, _setup_token):
+        abort(404)
+
+    fouten = []
+    if request.method == "POST":
+        gebruikersnaam = request.form.get("gebruikersnaam", "").strip()
+        wachtwoord     = request.form.get("wachtwoord", "")
+        bevestiging    = request.form.get("bevestiging", "")
+        if not gebruikersnaam:
+            fouten.append("Gebruikersnaam is verplicht.")
+        if len(wachtwoord) < 12:
+            fouten.append("Wachtwoord moet minimaal 12 tekens lang zijn.")
+        if wachtwoord and wachtwoord != bevestiging:
+            fouten.append("Wachtwoorden komen niet overeen.")
+        if not fouten:
+            db = get_db()
+            db.execute(
+                "INSERT INTO beheerders (gebruikersnaam, wachtwoord_hash) VALUES (?, ?)",
+                (gebruikersnaam, generate_password_hash(wachtwoord))
+            )
+            _setup_token = None
+            app.logger.info(
+                f"Initieel beheerdersaccount aangemaakt via setup: {saniteer_log(gebruikersnaam)}"
+            )
+            return redirect(url_for("admin_login"))
+
+    return render_template("setup.html", token=token, fouten=fouten)
+
+
 # ─── Database initialisatie (ook voor gunicorn) ───────────────────────────────
 # BUG-FIX: init_db() stond alleen in if __name__ == "__main__", waardoor gunicorn
 # (Procfile: gunicorn app:app) de tabellen nooit aanmaakte en direct crashte
@@ -1674,14 +1723,5 @@ with app.app_context():
 if __name__ == "__main__":
     if not MOLLIE_API_KEY:
         raise SystemExit("❌  MOLLIE_API_KEY is niet ingesteld.")
-    # ADMIN_PASS alleen vereist als de beheerders-tabel nog leeg is (eerste start).
-    # Zodra er accounts in de DB staan, kan ADMIN_PASS weggelaten worden.
-    with sqlite3.connect(DATABASE) as _c:
-        leeg = not _c.execute("SELECT 1 FROM beheerders LIMIT 1").fetchone()
-    if leeg:
-        if not ADMIN_WACHTWOORD:
-            raise SystemExit("❌  ADMIN_PASS is niet ingesteld. Vereist voor eerste start.")
-        if len(ADMIN_WACHTWOORD) < 12:
-            raise SystemExit("❌  ADMIN_PASS moet minimaal 12 tekens lang zijn.")
     debug = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
     app.run(debug=debug, port=5000)
