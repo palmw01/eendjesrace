@@ -4148,6 +4148,85 @@ class TestSponsorStrip(unittest.TestCase):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# INSTELLINGEN TRANSACTIEVEILIGHEID
+#     Transactie-atomiciteit en DB-foutafhandeling in POST /admin/instellingen
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestAdminInstellingenTransactie(unittest.TestCase):
+    """Tests voor de transactie-veiligheid van POST /admin/instellingen."""
+
+    def setUp(self):
+        self.client, self.ctx = maak_flask_client()
+        self.client.post("/admin/login",
+                         data={"gebruiker": "admin", "wachtwoord": "testpass12345"})
+
+    def tearDown(self):
+        self.ctx.pop()
+
+    def test_alle_instellingen_worden_in_één_request_opgeslagen(self):
+        """Alle velden in één POST worden allemaal opgeslagen (atomisch commit)."""
+        self.client.post("/admin/instellingen", data={
+            "max_eendjes": "2500",
+            "max_per_bestelling": "75",
+            "prijs_per_stuk": "3.00",
+            "prijs_vijf_stuks": "13.00",
+            "transactiekosten": "0.40",
+        })
+        rij = App.get_db().execute("SELECT * FROM teller WHERE id=1").fetchone()
+        self.assertEqual(rij["max_eendjes"], 2500)
+        self.assertEqual(rij["max_per_bestelling"], 75)
+        self.assertAlmostEqual(rij["prijs_per_stuk"], 3.00, places=2)
+        self.assertAlmostEqual(rij["prijs_vijf_stuks"], 13.00, places=2)
+        self.assertAlmostEqual(rij["transactiekosten"], 0.40, places=2)
+
+    def test_één_ongeldig_veld_voorkomt_opslag_van_alle_velden(self):
+        """Als één veld ongeldig is, worden géén velden opgeslagen (all-or-nothing)."""
+        origineel = dict(App.get_db().execute("SELECT * FROM teller WHERE id=1").fetchone())
+        # prijs_per_stuk=0 is ongeldig; de rest is geldig
+        self.client.post("/admin/instellingen", data={
+            "max_eendjes": "2500",
+            "max_per_bestelling": "75",
+            "prijs_per_stuk": "0",   # ongeldig
+            "prijs_vijf_stuks": "13.00",
+            "transactiekosten": "0.40",
+        })
+        rij = App.get_db().execute("SELECT * FROM teller WHERE id=1").fetchone()
+        self.assertEqual(rij["max_eendjes"], origineel["max_eendjes"])
+        self.assertEqual(rij["max_per_bestelling"], origineel["max_per_bestelling"])
+        self.assertAlmostEqual(rij["prijs_vijf_stuks"], origineel["prijs_vijf_stuks"], places=2)
+        self.assertAlmostEqual(rij["transactiekosten"], origineel["transactiekosten"], places=2)
+
+    def test_db_fout_bij_update_geeft_foutmelding_en_geen_gedeeltelijke_opslag(self):
+        """Als de DB-update mislukt, wordt een foutmelding getoond en niets opgeslagen."""
+        import sqlite3 as _sqlite3
+
+        real_db = App.get_db()
+        origineel_max = real_db.execute(
+            "SELECT max_eendjes FROM teller WHERE id=1"
+        ).fetchone()["max_eendjes"]
+        origineel_execute = real_db.execute
+
+        def execute_met_fout(sql, *args, **kwargs):
+            if "UPDATE teller SET" in sql:
+                raise _sqlite3.OperationalError("gesimuleerde DB-fout")
+            return origineel_execute(sql, *args, **kwargs)
+
+        mock_db = MagicMock(wraps=real_db)
+        mock_db.execute = execute_met_fout
+
+        with patch("app.get_db", return_value=mock_db):
+            r = self.client.post("/admin/instellingen",
+                                 data={"max_eendjes": "2000"},
+                                 follow_redirects=True)
+
+        self.assertIn(b"Fout bij opslaan", r.data)
+        huidig_max = real_db.execute(
+            "SELECT max_eendjes FROM teller WHERE id=1"
+        ).fetchone()["max_eendjes"]
+        self.assertEqual(huidig_max, origineel_max)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # Uitvoeren als script
 # ══════════════════════════════════════════════════════════════════════════════
 

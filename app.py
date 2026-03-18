@@ -330,7 +330,7 @@ def init_db():
             app.logger.info("Migratie: naam gesplitst in voornaam + achternaam")
     except Exception as e:
         try: conn.execute("ROLLBACK")
-        except: pass
+        except Exception: pass
         app.logger.warning(f"Migratie naam→voornaam/achternaam mislukt: {e}")
     # Seed-rij: alleen aanmaken als nog niet bestaat (alle kolommen zijn nu gegarandeerd aanwezig)
     conn.execute(
@@ -922,8 +922,8 @@ def webhook():
         db = get_db()
         db.execute("INSERT INTO webhook_log (mollie_id, ip) VALUES (?,?)", (mollie_id, client_ip))
         db.commit()
-    except sqlite3.Error:
-        pass
+    except sqlite3.Error as log_err:
+        app.logger.warning(f"Webhook: auditlog-schrijffout voor {saniteer_log(mollie_id)}: {log_err}")
 
     # Haal betaalstatus op bij Mollie (we vertrouwen nooit alleen op de POST-data)
     try:
@@ -1323,11 +1323,21 @@ def admin_instellingen():
             for f in fouten:
                 flash(f, "fout")
         else:
-            # Alleen opslaan als alle velden geldig zijn
-            for kolom, waarde in updates.items():
-                db.execute(f"UPDATE teller SET {kolom} = ? WHERE id = 1", (waarde,))
-            if meldingen:
-                flash(" ".join(meldingen), "info")
+            # Alleen opslaan als alle velden geldig zijn — atomisch
+            try:
+                db.execute("BEGIN")
+                for kolom, waarde in updates.items():
+                    db.execute(f"UPDATE teller SET {kolom} = ? WHERE id = 1", (waarde,))
+                db.execute("COMMIT")
+                if meldingen:
+                    flash(" ".join(meldingen), "info")
+            except sqlite3.Error as db_err:
+                try:
+                    db.execute("ROLLBACK")
+                except Exception:
+                    pass
+                app.logger.error(f"Fout bij opslaan instellingen: {db_err}")
+                flash("Fout bij opslaan instellingen.", "fout")
 
     except (ValueError, TypeError):
         flash("Ongeldig getal opgegeven.", "fout")
