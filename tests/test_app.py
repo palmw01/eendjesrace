@@ -3833,9 +3833,14 @@ class TestSetupPagina(unittest.TestCase):
         self.client, self.ctx = maak_flask_client()
         # Zet een nep-token zodat de setup-route actief is
         App._setup_token = "testtoken123"
+        # Verwijder eventueel achtergebleven tokenbestand
+        if os.path.exists(App._SETUP_TOKEN_BESTAND):
+            os.remove(App._SETUP_TOKEN_BESTAND)
 
     def tearDown(self):
         App._setup_token = None
+        if os.path.exists(App._SETUP_TOKEN_BESTAND):
+            os.remove(App._SETUP_TOKEN_BESTAND)
         self.ctx.pop()
 
     def test_setup_zonder_token_geeft_404(self):
@@ -3906,6 +3911,18 @@ class TestSetupPagina(unittest.TestCase):
         App._setup_token = None
         r = self.client.get("/setup?token=testtoken123")
         self.assertEqual(r.status_code, 404)
+
+    def test_setup_verwijdert_tokenbestand_na_aanmaken(self):
+        """Na succesvol aanmaken wordt het .setup_token bestand verwijderd."""
+        with open(App._SETUP_TOKEN_BESTAND, "w") as f:
+            f.write("testtoken123")
+        self.client.post("/setup?token=testtoken123", data={
+            "token": "testtoken123",
+            "gebruikersnaam": "nieuwbeheerder",
+            "wachtwoord": "veiligwacht12",
+            "bevestiging": "veiligwacht12",
+        })
+        self.assertFalse(os.path.exists(App._SETUP_TOKEN_BESTAND))
 
 
 # ══════════════════════════════════════════════════════════════════════════════

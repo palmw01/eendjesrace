@@ -74,8 +74,8 @@ Bij de **allereerste start** (lege database, geen `ADMIN_PASS` ingesteld) active
 Open de URL in je browser. Je ziet een formulier om een gebruikersnaam en wachtwoord (minimaal 12 tekens) in te stellen. Na het aanmaken word je doorgestuurd naar de login.
 
 **Kenmerken van de setup-modus:**
-- Het token is willekeurig gegenereerd en alleen geldig zolang de app draait (herstart = nieuw token)
-- De setup-pagina geeft 404 zodra er een account bestaat — ook met het juiste token
+- Het token wordt opgeslagen in `.setup_token` (staat in `.gitignore`) zodat alle gunicorn-workers hetzelfde token delen
+- De setup-pagina geeft 404 zodra er een account bestaat — ook met het juiste token; `.setup_token` wordt dan automatisch verwijderd
 - Alternatief: stel `ADMIN_PASS` (minimaal 12 tekens) in `config.json` in voor automatisch aanmaken bij eerste start
 
 ---
@@ -253,4 +253,4 @@ PYTHONPATH=. .venv/bin/pytest tests/test_app.py -v
 PYTHONPATH=. .venv/bin/python tests/test_app.py
 ```
 
-De testsuite stubt Mollie, Resend, Flask-WTF en Flask-Limiter. `conftest.py` zorgt voor automatische testdatabase-cleanup (vereist voor Python 3.14 + SQLite WAL mode). **451 tests.**
+De testsuite stubt Mollie, Resend, Flask-WTF en Flask-Limiter. `conftest.py` zorgt voor automatische testdatabase-cleanup (vereist voor Python 3.14 + SQLite WAL mode). **452 tests.**

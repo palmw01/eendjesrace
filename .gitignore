@@ -1,6 +1,7 @@
 # Configuratie met wachtwoorden — nooit committen
 .env
 config.json
+.setup_token
 
 # Database
 *.db

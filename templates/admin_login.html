@@ -53,6 +53,12 @@
     <h1>🔒 Admin</h1>
     <p class="sub">Badeendjesrace – beheerders login</p>
 
+    {% with berichten = get_flashed_messages(with_categories=true) %}
+      {% for _, bericht in berichten %}
+      <div class="fout-melding" style="background:#E8F5E9;border-color:#A5D6A7;color:#2E7D32;">✅ {{ bericht }}</div>
+      {% endfor %}
+    {% endwith %}
+
     {% if fout %}
     <div class="fout-melding">⚠️ {{ fout }}</div>
     {% endif %}

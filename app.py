@@ -87,8 +87,10 @@ AFZENDER_NAAM    = "Badeendjesrace Wapenveld"
 ADMIN_GEBRUIKER  = os.environ.get("ADMIN_USER", "admin")
 ADMIN_WACHTWOORD = os.environ.get("ADMIN_PASS", "")
 
-# Eenmalig setup-token (in-memory); None = geen setup nodig of al gedaan
+# Eenmalig setup-token; opgeslagen naast de database zodat alle gunicorn-workers
+# hetzelfde token zien. None = geen setup nodig of al gedaan.
 _setup_token: str | None = None
+_SETUP_TOKEN_BESTAND = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".setup_token")
 
 DATABASE         = os.environ.get("DATABASE", "eendjes.db")
 
@@ -182,6 +184,7 @@ def init_db():
             pogingen        INTEGER NOT NULL DEFAULT 0,
             transactiekosten         INTEGER NOT NULL DEFAULT 0,
             transactiekosten_bedrag  REAL    NOT NULL DEFAULT 0,
+            betaalwijze     TEXT NOT NULL DEFAULT 'ideal',
             aangemaakt_op   TEXT NOT NULL DEFAULT (datetime('now','localtime')),
             bijgewerkt_op   TEXT NOT NULL DEFAULT (datetime('now','localtime'))
         )
@@ -223,8 +226,14 @@ def init_db():
             )
         else:
             global _setup_token
+            # Lees bestaand token uit bestand (andere workers hebben het al aangemaakt)
+            if os.path.exists(_SETUP_TOKEN_BESTAND):
+                with open(_SETUP_TOKEN_BESTAND) as _f:
+                    _setup_token = _f.read().strip() or None
             if _setup_token is None:
                 _setup_token = secrets.token_urlsafe(32)
+                with open(_SETUP_TOKEN_BESTAND, "w") as _f:
+                    _f.write(_setup_token)
             print(
                 f"\n{'=' * 60}\n"
                 f"⚠️  Geen beheerdersaccounts gevonden.\n"
@@ -1703,9 +1712,12 @@ def setup():
                 (gebruikersnaam, generate_password_hash(wachtwoord))
             )
             _setup_token = None
+            if os.path.exists(_SETUP_TOKEN_BESTAND):
+                os.remove(_SETUP_TOKEN_BESTAND)
             app.logger.info(
                 f"Initieel beheerdersaccount aangemaakt via setup: {saniteer_log(gebruikersnaam)}"
             )
+            flash("Account aangemaakt! Je kunt nu inloggen.", "succes")
             return redirect(url_for("admin_login"))
 
     return render_template("setup.html", token=token, fouten=fouten)
@@ -1716,9 +1728,15 @@ def setup():
 # (Procfile: gunicorn app:app) de tabellen nooit aanmaakte en direct crashte
 # met "no such table: bestellingen".  Door het hier op module-niveau aan te
 # roepen wordt de DB altijd geïnitialiseerd, ongeacht hoe de app gestart wordt.
-if __name__ == "__main__":
-    if not MOLLIE_API_KEY:
+if not MOLLIE_API_KEY:
+    if __name__ == "__main__":
         raise SystemExit("❌  MOLLIE_API_KEY is niet ingesteld.")
+    else:
+        # Gunicorn-start: waarschuw maar crash niet — betalingen zullen falen
+        import logging as _logging
+        _logging.getLogger(__name__).warning(
+            "MOLLIE_API_KEY is niet ingesteld. Betalingen via iDEAL zullen falen."
+        )
 
 with app.app_context():
     init_db()
