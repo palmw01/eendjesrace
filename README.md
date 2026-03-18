@@ -31,35 +31,52 @@ Gebouwd met **Python/Flask**, **Mollie** (iDEAL-betalingen), **SQLite** en **Res
 
 ## Lokaal draaien
 
-### 1. Pakketten installeren
+### 1. Virtualenv aanmaken en pakketten installeren
 
 ```bash
-pip install -r requirements.txt
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt pytest
 ```
 
-### 2. Configuratie
+### 2. Configuratie via `config.json`
 
-Maak een `.env`-bestand of stel omgevingsvariabelen in:
+Maak een `config.json` aan in de projectmap (wordt automatisch ingeladen en staat in `.gitignore`):
 
-```bash
-export MOLLIE_API_KEY="test_xxxxxxxxxxxxxxxxxxxx"
-export BASE_URL="http://localhost:5000"
-export RESEND_API_KEY="re_xxxxxxxxxxxxxxxxxxxx"
-export RESEND_FROM="noreply@jouwdomein.nl"
-export ADMIN_USER="admin"
-export ADMIN_PASS="kieseen sterk wachtwoord"   # minimaal 12 tekens
-export SECRET_KEY="willekeurige lange string"
+```json
+{
+  "MOLLIE_API_KEY": "test_xxxxxxxxxxxxxxxxxxxx",
+  "BASE_URL": "http://localhost:5000"
+}
 ```
 
-> `ADMIN_USER` en `ADMIN_PASS` zijn alleen nodig bij de **eerste start** (lege database). Zodra er beheerdersaccounts in de database staan, kunnen ze worden weggelaten.
+> Voor lokaal testen volstaat `MOLLIE_API_KEY: "test_dummy"` — betalingen werken dan niet maar de rest van de app wel.
 
 ### 3. Starten
 
 ```bash
-python app.py
+.venv/bin/python app.py
 ```
 
 De app draait op http://localhost:5000. De SQLite-database (`eendjes.db`) wordt automatisch aangemaakt.
+
+### 4. Eerste beheerdersaccount instellen
+
+Bij de **allereerste start** (lege database, geen `ADMIN_PASS` ingesteld) activeert de app automatisch de **setup-modus**. In de terminal verschijnt:
+
+```
+============================================================
+⚠️  Geen beheerdersaccounts gevonden.
+   Stel een initieel account in via:
+   http://localhost:5000/setup?token=<eenmalig-token>
+============================================================
+```
+
+Open de URL in je browser. Je ziet een formulier om een gebruikersnaam en wachtwoord (minimaal 12 tekens) in te stellen. Na het aanmaken word je doorgestuurd naar de login.
+
+**Kenmerken van de setup-modus:**
+- Het token is willekeurig gegenereerd en alleen geldig zolang de app draait (herstart = nieuw token)
+- De setup-pagina geeft 404 zodra er een account bestaat — ook met het juiste token
+- Alternatief: stel `ADMIN_PASS` (minimaal 12 tekens) in `config.json` in voor automatisch aanmaken bij eerste start
 
 ---
 
@@ -72,6 +89,8 @@ De app draait op http://localhost:5000. De SQLite-database (`eendjes.db`) wordt 
 5. Kopieer de publieke Railway-URL en zet die als `BASE_URL`
 6. Zorg dat er **geen Custom Start Command** is ingesteld — Railway gebruikt dan automatisch de `Procfile` (`web: bash start.sh`)
 
+> **Eerste deploy zonder `ADMIN_PASS`:** De app start in setup-modus. Ga in Railway naar **Deployments → View Logs** en zoek naar de setup-URL (`/setup?token=…`). Open die URL in je browser om het eerste beheerdersaccount aan te maken. De URL is daarna ongeldig.
+
 ### Omgevingsvariabelen
 
 | Variabele | Verplicht | Omschrijving |
@@ -82,7 +101,7 @@ De app draait op http://localhost:5000. De SQLite-database (`eendjes.db`) wordt 
 | `SECRET_KEY` | Ja | Willekeurige geheime sleutel voor sessies (gebruik een lange random string) |
 | `RESEND_FROM` | Ja | Geverifieerd afzenderadres (bijv. `noreply@jouwdomein.nl`) |
 | `ADMIN_PASS` | Nee | Initieel admin-wachtwoord (minimaal 12 tekens). Als dit niet ingesteld is én er geen accounts bestaan, start de app in setup-modus: een eenmalig token wordt gelogd naar de console en `/setup?token=…` toont een formulier. |
-| `ADMIN_USER` | Eerste start | Initiële admin-gebruikersnaam (standaard: `admin`). Kan worden verwijderd na eerste start. |
+| `ADMIN_USER` | Nee | Initiële admin-gebruikersnaam bij automatisch aanmaken (standaard: `admin`). Alleen relevant als `ADMIN_PASS` ook ingesteld is. |
 | `DATABASE` | Nee | Pad naar de SQLite-database. Zet op `/app/data/eendjes.db` als volume op `/app/data` gemount is. |
 | `HTTPS` | Nee | Zet op `true` in productie — beveiligt sessie-cookies |
 | `LITESTREAM_ACCESS_KEY_ID` | Nee | Cloudflare R2 Access Key ID voor automatische database-backup |

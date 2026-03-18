@@ -36,7 +36,7 @@ gunicorn app:app
 | `MOLLIE_API_KEY` | Mollie test/live API key |
 | `BASE_URL` | Public domain (used for webhook + redirect URLs) |
 | `RESEND_API_KEY` | Resend API key for transactional email |
-| `ADMIN_PASS` | Initial admin password — minimum 12 characters. **Only required on first start** (when the `beheerders` table is empty). Can be removed from env once accounts exist in the DB. |
+| `ADMIN_PASS` | Optional. If set (min. 12 chars) and the `beheerders` table is empty, the account is created automatically on first start. If not set and no accounts exist, the app starts in **setup mode**: a one-time token is printed to stdout and `GET /setup?token=<token>` shows a form to create the first account. Once an account exists this variable is no longer used. |
 | `ADMIN_USER` | Initial admin username (default: `admin`). Only used on first start. |
 
 Key optional variables: `RESEND_FROM` (verified sender address), `MAX_EENDJES` (default 3000, seeds the DB on first run), `DATABASE` (default `eendjes.db`), `HTTPS` (set `true` in production), `SECRET_KEY`, `LOG_DIR` (default `logs`), `FLASK_DEBUG` (set `true` for debug mode), `SECURITY_CONTACT` (e.g. `mailto:admin@example.com`, used in `/.well-known/security.txt`; falls back to `RESEND_FROM`), `PRIJS_PER_STUK` (default 2.50, seeds the DB on first run), `PRIJS_VIJF_STUKS` (default 10.00, seeds the DB on first run), `TRANSACTIEKOSTEN` (default 0.32, seeds the DB on first run). All three prices are editable via the admin panel after first run. `LITESTREAM_ACCESS_KEY_ID` + `LITESTREAM_SECRET_ACCESS_KEY` enable automatic SQLite backup to Cloudflare R2 via Litestream (see `start.sh` and `litestream.yml`).
