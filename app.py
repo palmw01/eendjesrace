@@ -692,6 +692,11 @@ def index():
             "SELECT COALESCE(SUM(aantal),0) AS n FROM bestellingen WHERE status='betaald'"
         ).fetchone()["n"]
         max_eendjes = get_max_eendjes()
+        sponsors_map = os.path.join(app.static_folder, "img", "sponsors")
+        sponsor_bestanden = sorted(
+            f for f in os.listdir(sponsors_map)
+            if f.lower().endswith((".png", ".jpg", ".jpeg", ".svg", ".webp"))
+        ) if os.path.isdir(sponsors_map) else []
         return render_template("index.html",
                                verkocht=betaald,
                                beschikbaar=max(0, max_eendjes - betaald),
@@ -699,7 +704,8 @@ def index():
                                max_per_bestelling=get_max_per_bestelling(),
                                transactiekosten=get_transactiekosten(),
                                prijs_per_stuk=get_prijs_per_stuk(),
-                               prijs_vijf_stuks=get_prijs_vijf_stuks())
+                               prijs_vijf_stuks=get_prijs_vijf_stuks(),
+                               sponsor_bestanden=sponsor_bestanden)
     except sqlite3.Error as e:
         app.logger.error(f"DB-fout index: {e}")
         abort(500)

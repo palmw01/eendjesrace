@@ -3824,6 +3824,86 @@ class TestOnderhoudsmodus(unittest.TestCase):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# Sponsorstrip
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestSponsorStrip(unittest.TestCase):
+
+    def setUp(self):
+        self.client, self.ctx = maak_flask_client()
+
+    def tearDown(self):
+        self.ctx.pop()
+
+    def _get_index(self, bestanden):
+        """Haal de homepage op met gesimuleerde sponsorbestanden."""
+        with patch("app.os.path.isdir", return_value=True), \
+             patch("app.os.listdir", return_value=bestanden):
+            return self.client.get("/")
+
+    def test_geen_sponsors_geen_sectie(self):
+        """Als de sponsormap leeg is, verschijnt er geen sponsorsectie."""
+        r = self._get_index([])
+        self.assertEqual(r.status_code, 200)
+        self.assertNotIn(b"Mogelijk gemaakt door onze sponsors", r.data)
+
+    def test_map_bestaat_niet_geen_sectie(self):
+        """Als de sponsormap niet bestaat, verschijnt er geen sponsorsectie."""
+        with patch("app.os.path.isdir", return_value=False):
+            r = self.client.get("/")
+        self.assertEqual(r.status_code, 200)
+        self.assertNotIn(b"Mogelijk gemaakt door onze sponsors", r.data)
+
+    def test_een_sponsor_toont_statische_layout(self):
+        """Met 1 sponsor wordt de statische layout getoond (geen scrollanimatie)."""
+        r = self._get_index(["bakker.png"])
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(b'class="sponsor-rij-statisch"', r.data)
+        self.assertNotIn(b'class="sponsor-baan"', r.data)
+
+    def test_vier_sponsors_toont_statische_layout(self):
+        """Met precies 4 sponsors wordt de statische layout getoond."""
+        r = self._get_index(["a.png", "b.png", "c.jpg", "d.svg"])
+        self.assertIn(b'class="sponsor-rij-statisch"', r.data)
+        self.assertNotIn(b'class="sponsor-baan"', r.data)
+
+    def test_vijf_sponsors_toont_scroll_layout(self):
+        """Met 5 sponsors wordt de scrollende layout getoond."""
+        r = self._get_index(["a.png", "b.png", "c.jpg", "d.svg", "e.webp"])
+        self.assertIn(b'class="sponsor-baan"', r.data)
+        self.assertNotIn(b'class="sponsor-rij-statisch"', r.data)
+
+    def test_niet_ondersteund_bestandstype_wordt_genegeerd(self):
+        """Bestanden met een niet-ondersteund type (.gif, .pdf) worden genegeerd."""
+        r = self._get_index(["logo.gif", "doc.pdf", "foto.png"])
+        # Alleen foto.png telt mee → 1 sponsor → statische layout
+        self.assertIn(b'class="sponsor-rij-statisch"', r.data)
+        self.assertNotIn(b"logo.gif", r.data)
+        self.assertNotIn(b"doc.pdf", r.data)
+
+    def test_volgorde_is_alfabetisch(self):
+        """Sponsors worden alfabetisch op bestandsnaam weergegeven."""
+        r = self._get_index(["zebra.png", "appel.png", "midden.png"])
+        data = r.data.decode()
+        pos_a = data.find("appel.png")
+        pos_m = data.find("midden.png")
+        pos_z = data.find("zebra.png")
+        self.assertLess(pos_a, pos_m)
+        self.assertLess(pos_m, pos_z)
+
+    def test_scroll_layout_bevat_duplicaten_voor_loop(self):
+        """De scrollende layout toont elk logo tweemaal voor een naadloze loop."""
+        r = self._get_index(["a.png", "b.png", "c.jpg", "d.svg", "e.webp"])
+        data = r.data.decode()
+        self.assertEqual(data.count("img/sponsors/a.png"), 2)
+
+    def test_sponsor_titel_zichtbaar_bij_sponsors(self):
+        """De sectietitel 'sponsors' is zichtbaar als er sponsors zijn."""
+        r = self._get_index(["logo.png"])
+        self.assertIn(b"Mogelijk gemaakt door onze sponsors", r.data)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # Uitvoeren als script
 # ══════════════════════════════════════════════════════════════════════════════
 
