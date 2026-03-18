@@ -26,6 +26,7 @@ Gebouwd met **Python/Flask**, **Mollie** (iDEAL-betalingen), **SQLite** en **Res
 | Sponsorstrip op homepage (automatisch geladen uit `static/img/sponsors/`, ≤4 statisch / ≥5 scrollend) | ✅ |
 | Vallende badeendjes animatie op betaald-pagina na succesvolle betaling | ✅ |
 | Onderhoudsmodus (admin toggle, toont 503 voor publieke routes) | ✅ |
+| Bevestigingspagina met niet-raadbare URL (Mollie-ID) — bestellingen niet optelbaar | ✅ |
 
 ---
 
@@ -158,7 +159,8 @@ De app ondersteunt meerdere beheerdersaccounts. Wachtwoorden worden gehasht opge
 | URL | Omschrijving |
 |---|---|
 | `/` | Bestelformulier voor kopers |
-| `/betaald/<id>` | Bevestigingspagina na betaling |
+| `/betaald/<mollie_id>` | Bevestigingspagina na betaling (URL bevat Mollie-betaal-ID, niet-raadbaar) |
+| `/betaald/r/<id>` | Tussenroute voor Mollie redirect — stuurt door naar `/betaald/<mollie_id>` |
 | `/privacy` | Privacyverklaring (AVG) |
 | `/voorwaarden` | Algemene voorwaarden |
 | `/api/prijs` | Live prijsberekening (JSON) |
@@ -225,6 +227,7 @@ eendjesrace/
 | **Log injection** | `saniteer_log()` verwijdert newlines uit alle gelogde gebruikersinvoer |
 | **Fingerprinting** | `Server`-header onderdrukt |
 | **iDEAL 2.0 redirect** | `pay.ideal.nl` in CSP `form-action` (Firefox blokkeert redirect anders) |
+| **Bestellingenopsomming** | `/betaald/<mollie_id>` gebruikt het niet-raadbare Mollie-betaal-ID — oplopende order-IDs worden nooit blootgesteld in de browser-URL |
 
 ---
 
@@ -253,4 +256,4 @@ PYTHONPATH=. .venv/bin/pytest tests/test_app.py -v
 PYTHONPATH=. .venv/bin/python tests/test_app.py
 ```
 
-De testsuite stubt Mollie, Resend, Flask-WTF en Flask-Limiter. `conftest.py` zorgt voor automatische testdatabase-cleanup (vereist voor Python 3.14 + SQLite WAL mode). **452 tests.**
+De testsuite stubt Mollie, Resend, Flask-WTF en Flask-Limiter. `conftest.py` zorgt voor automatische testdatabase-cleanup (vereist voor Python 3.14 + SQLite WAL mode). **455 tests.**

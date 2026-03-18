@@ -50,7 +50,10 @@ The entire backend lives in `app.py` (single file). Templates are in `templates/
 1. Public form (`/`, `templates/index.html`) → POST to `/bestellen`
 2. `/bestellen` validates input, creates Mollie iDEAL payment, stores order with status `aangemaakt`, redirects user to Mollie
 3. Mollie calls `/webhook` (async) on payment status change → assigns ticket numbers + sends confirmation email
-4. `/betaald/<id>` is a fallback for when the webhook is delayed — polls Mollie directly
+4. Mollie redirects user to `/betaald/r/<bestelling_id>` (tussenroute), which redirects to `/betaald/<mollie_id>`
+5. `/betaald/<mollie_id>` is the confirmation page; also acts as fallback if the webhook is delayed — polls Mollie directly
+
+**URL security**: The Mollie `redirectUrl` points to `/betaald/r/<bestelling_id>` (internal, never shown to users). That route looks up the `mollie_id` from the DB and redirects to `/betaald/<mollie_id>` (e.g. `tr_abc123xyz`). This prevents enumeration: integer order IDs are never exposed in the browser URL.
 
 **Logging checkpoints** (all via `app.logger.info`):
 - `/bestellen`: order received (naam, aantal, email, incl_tk)
@@ -58,7 +61,7 @@ The entire backend lives in `app.py` (single file). Templates are in `templates/
 - `/bestellen`: redirect to Mollie checkout
 - `wijs_lotnummers_toe()`: ticket range assigned (start–einde) or idempotent return
 - `/webhook`: all status changes (paid/pending/open/failed/canceled/expired)
-- `/betaald`: fallback triggered + outcome
+- `/betaald/<mollie_id>`: fallback triggered + outcome
 
 ### Database (SQLite, `eendjes.db`, 4 tables)
 
@@ -117,7 +120,7 @@ Admin routes:
 
 ## Testing Notes
 
-`tests/test_app.py` stubs out Mollie, Resend, Flask-WTF CSRF, and Flask-Limiter so tests run with only Flask installed. Tests cover pricing, input validation, database operations, atomic transactions, email sending, webhook processing, admin routes, `max_per_bestelling`/`max_eendjes` settings, price settings (`prijs_per_stuk`/`prijs_vijf_stuks`/`transactiekosten`) via admin, CSV injection escaping, CSV filename timestamp, CSV header columns, email header content (afbeelding/kleur/datum), notification email (instellen/validatie/versturen), email validation in wijzig_bestelling, opruimen, paginering, server-side statusfilter, CSP nonces, Permissions-Policy, session permanence, `saniteer_log`, legal pages (`/privacy`, `/voorwaarden`), footer content on `/betaald/<id>` and error pages (`fout.html`), collapsible `<details>` sections in admin, multi-account admin and password management (`TestBeheerderAccounts`, including `laatste_inlog` tests), security headers (`TestSecurityHeadersAanvullend`), email formatting variants (`TestBevestigingsmailOpmaakvarianten`), input boundary values (`TestValideerInvoerGrenswaardes`), atomic ticket assignment edge cases (`TestWijsLotnummersToeAanvullend`), admin page username display, password change persistence, betaald-page fallback errors, bestellen edge cases, admin settings validation, handmatige bestelling telefoon, webhook audit log, SEO meta-tags/robots.txt/sitemap.xml (`TestSeoEnRobots`), beheer-paginasplitsing en filterbalk-layout (`TestAdminBeheerPagina`), onderhoudsmodus aan/uit/503/admin-bypass/webhook-bypass (`TestOnderhoudsmodus`), sponsorstrip statisch/scroll/volgorde/bestandstype-filter (`TestSponsorStrip`), vallende eendjes animatie/accordion/afzendernaam/projectblokje (`TestRecenteWijzigingen`), setup-pagina token/validatie/aanmaken/invalidatie/tokenbestand (`TestSetupPagina`). The test database uses `/tmp/eendjes_test.db` (reset before each test class). `maak_db()` includes all teller columns and seeds the `beheerders` table (incl. `laatste_inlog`). `conftest.py` cleans up the test database + WAL/SHM files before pytest starts (required for Python 3.14 + SQLite WAL mode). Total: 452 tests.
+`tests/test_app.py` stubs out Mollie, Resend, Flask-WTF CSRF, and Flask-Limiter so tests run with only Flask installed. Tests cover pricing, input validation, database operations, atomic transactions, email sending, webhook processing, admin routes, `max_per_bestelling`/`max_eendjes` settings, price settings (`prijs_per_stuk`/`prijs_vijf_stuks`/`transactiekosten`) via admin, CSV injection escaping, CSV filename timestamp, CSV header columns, email header content (afbeelding/kleur/datum), notification email (instellen/validatie/versturen), email validation in wijzig_bestelling, opruimen, paginering, server-side statusfilter, CSP nonces, Permissions-Policy, session permanence, `saniteer_log`, legal pages (`/privacy`, `/voorwaarden`), footer content on `/betaald/<mollie_id>` and error pages (`fout.html`), collapsible `<details>` sections in admin, multi-account admin and password management (`TestBeheerderAccounts`, including `laatste_inlog` tests), security headers (`TestSecurityHeadersAanvullend`), email formatting variants (`TestBevestigingsmailOpmaakvarianten`), input boundary values (`TestValideerInvoerGrenswaardes`), atomic ticket assignment edge cases (`TestWijsLotnummersToeAanvullend`), admin page username display, password change persistence, betaald-page fallback errors, bestellen edge cases, admin settings validation, handmatige bestelling telefoon, webhook audit log, SEO meta-tags/robots.txt/sitemap.xml (`TestSeoEnRobots`), beheer-paginasplitsing en filterbalk-layout (`TestAdminBeheerPagina`), onderhoudsmodus aan/uit/503/admin-bypass/webhook-bypass (`TestOnderhoudsmodus`), sponsorstrip statisch/scroll/volgorde/bestandstype-filter (`TestSponsorStrip`), vallende eendjes animatie/accordion/afzendernaam/projectblokje (`TestRecenteWijzigingen`), setup-pagina token/validatie/aanmaken/invalidatie/tokenbestand (`TestSetupPagina`), betaald-tussenroute redirect/onbekend-id/null-mollie_id (`TestBetaaldRedirect`). The test database uses `/tmp/eendjes_test.db` (reset before each test class). `maak_db()` includes all teller columns and seeds the `beheerders` table (incl. `laatste_inlog`). `conftest.py` cleans up the test database + WAL/SHM files before pytest starts (required for Python 3.14 + SQLite WAL mode). Total: 455 tests.
 
 ### Sponsorstrip
 
@@ -131,7 +134,7 @@ Logo's toevoegen: afbeelding in `static/img/sponsors/` plaatsen — geen code aa
 
 ### Vallende eendjes animatie
 
-Op de betaald-pagina (`/betaald/<id>`) vallen bij `status_klasse == 'succes'` 28 badeendjes van boven het scherm naar beneden. Geïmplementeerd via:
+Op de betaald-pagina (`/betaald/<mollie_id>`) vallen bij `status_klasse == 'succes'` 28 badeendjes van boven het scherm naar beneden. Geïmplementeerd via:
 - CSS `@keyframes valEend` (altijd aanwezig in `<style>`)
 - JavaScript (met CSP-nonce) dat `<img class="vallend-eendje">` elementen aanmaakt met willekeurige x-positie (%), grootte (28–48px), duur (2.4–4.6s) en vertraging (0–3s). Elementen verwijderen zichzelf na `animationend`.
 - Animatie speelt eenmalig af (geen `infinite`), werkt op desktop en mobiel via `position: fixed` en `%`-breedte.
