@@ -691,39 +691,39 @@ class TestBetaaldPagina(unittest.TestCase):
 
     def test_betaald_geeft_200(self):
         self._zet_status("betaald", lot_van=1, lot_tot=2)
-        self.assertEqual(self.client.get("/betaald/1").status_code, 200)
+        self.assertEqual(self.client.get("/betaald/tr_x").status_code, 200)
 
     def test_betaald_bevat_succes(self):
         self._zet_status("betaald", lot_van=1, lot_tot=2)
-        self.assertIn(b"succes", self.client.get("/betaald/1").data)
+        self.assertIn(b"succes", self.client.get("/betaald/tr_x").data)
 
     def test_mislukt_geeft_200(self):
         self._zet_status("mislukt")
-        self.assertEqual(self.client.get("/betaald/1").status_code, 200)
+        self.assertEqual(self.client.get("/betaald/tr_x").status_code, 200)
 
     def test_mislukt_bevat_fout(self):
         self._zet_status("mislukt")
-        self.assertIn(b"fout", self.client.get("/betaald/1").data)
+        self.assertIn(b"fout", self.client.get("/betaald/tr_x").data)
 
     def test_geannuleerd_geeft_200(self):
         self._zet_status("geannuleerd")
-        self.assertEqual(self.client.get("/betaald/1").status_code, 200)
+        self.assertEqual(self.client.get("/betaald/tr_x").status_code, 200)
 
     def test_verlopen_geeft_200(self):
         self._zet_status("verlopen")
-        self.assertEqual(self.client.get("/betaald/1").status_code, 200)
+        self.assertEqual(self.client.get("/betaald/tr_x").status_code, 200)
 
     def test_aangemaakt_wacht_pagina(self):
         self._zet_status("aangemaakt")
         mock_b = simuleer_mollie_betaling("open")
         with patch("app.maak_mollie_client") as mc:
             mc.return_value.payments.get.return_value = mock_b
-            r = self.client.get("/betaald/1")
+            r = self.client.get("/betaald/tr_x")
         self.assertEqual(r.status_code, 200)
         self.assertIn(b"wacht", r.data)
 
     def test_niet_bestaand_id_redirect(self):
-        r = self.client.get("/betaald/99999")
+        r = self.client.get("/betaald/tr_nonexistent")
         self.assertEqual(r.status_code, 302)
 
     def test_fallback_paid_wijst_loten_toe(self):
@@ -733,7 +733,7 @@ class TestBetaaldPagina(unittest.TestCase):
         with patch("app.maak_mollie_client") as mc, \
              patch("app.stuur_bevestigingsmail", return_value=True):
             mc.return_value.payments.get.return_value = mock_b
-            self.client.get("/betaald/1")
+            self.client.get("/betaald/tr_fallback")
         rij = App.get_db().execute(
             "SELECT status, lot_van FROM bestellingen WHERE id=1"
         ).fetchone()
@@ -742,19 +742,52 @@ class TestBetaaldPagina(unittest.TestCase):
 
     def test_betaald_footer_bevat_organisatienaam(self):
         self._zet_status("betaald", lot_van=1, lot_tot=1)
-        r = self.client.get("/betaald/1")
+        r = self.client.get("/betaald/tr_x")
         self.assertIn("Diaconie Hervormde gemeente te Wapenveld".encode(), r.data)
 
     def test_betaald_footer_bevat_kvk(self):
         self._zet_status("betaald", lot_van=1, lot_tot=1)
-        r = self.client.get("/betaald/1")
+        r = self.client.get("/betaald/tr_x")
         self.assertIn(b"76404862", r.data)
 
     def test_betaald_footer_bevat_contactgegevens(self):
         self._zet_status("betaald", lot_van=1, lot_tot=1)
-        r = self.client.get("/betaald/1")
+        r = self.client.get("/betaald/tr_x")
         self.assertIn(b"diaconie@hervormdwapenveld.nl", r.data)
         self.assertIn(b"Kerkstraat", r.data)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 8b. /betaald/r/<id> tussenroute (Mollie redirectUrl → mollie_id-URL)
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestBetaaldRedirect(unittest.TestCase):
+
+    def setUp(self):
+        self.client, self.ctx = maak_flask_client()
+
+    def tearDown(self):
+        self.ctx.pop()
+
+    def test_redirect_stuurt_door_naar_mollie_id_url(self):
+        """Tussenroute /betaald/r/<id> stuurt door naar /betaald/<mollie_id>."""
+        doe_bestelling(self.client, aantal=1)
+        stel_mollie_id_in(1, "tr_redirect_test")
+        r = self.client.get("/betaald/r/1")
+        self.assertEqual(r.status_code, 302)
+        self.assertIn(b"tr_redirect_test", r.headers["Location"].encode())
+
+    def test_redirect_onbekend_id_gaat_naar_index(self):
+        """Tussenroute met onbekend id stuurt door naar /."""
+        r = self.client.get("/betaald/r/99999")
+        self.assertEqual(r.status_code, 302)
+
+    def test_redirect_zonder_mollie_id_gaat_naar_index(self):
+        """Tussenroute zonder mollie_id (NULL) stuurt door naar /."""
+        doe_bestelling(self.client)
+        App.get_db().execute("UPDATE bestellingen SET mollie_id=NULL WHERE id=1")
+        r = self.client.get("/betaald/r/1")
+        self.assertEqual(r.status_code, 302)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1029,12 +1062,12 @@ class TestBugRegressie(unittest.TestCase):
             "SELECT lot_van, lot_tot FROM bestellingen WHERE mollie_id='tr_race'"
         ).fetchone()
 
-        # Dan roept /betaald/<id> de fallback aan (status is al 'betaald')
+        # Dan roept /betaald/<mollie_id> de fallback aan (status is al 'betaald')
         mock_b = simuleer_mollie_betaling("paid")
         with patch("app.maak_mollie_client") as mc, \
              patch("app.stuur_bevestigingsmail", return_value=True):
             mc.return_value.payments.get.return_value = mock_b
-            self.client.get("/betaald/1")
+            self.client.get("/betaald/tr_race")
 
         loten_na_fallback = App.get_db().execute(
             "SELECT lot_van, lot_tot FROM bestellingen WHERE mollie_id='tr_race'"
@@ -1058,7 +1091,7 @@ class TestBugRegressie(unittest.TestCase):
         with patch("app.maak_mollie_client") as mc, \
              patch("app.stuur_bevestigingsmail", return_value=True):
             mc.return_value.payments.get.return_value = mock_b
-            r = self.client.get("/betaald/1")
+            r = self.client.get("/betaald/tr_fallback_oversell")
 
         self.assertEqual(r.status_code, 200)
         rij = App.get_db().execute(
@@ -2844,15 +2877,15 @@ class TestBetaaldPaginaExtra(unittest.TestCase):
     def tearDown(self):
         self.ctx.pop()
 
-    def test_aangemaakt_zonder_mollie_id_toont_wachtpagina(self):
-        """Bestelling met status 'aangemaakt' maar zonder mollie_id toont wachtpagina
-        zonder Mollie-aanroep te doen (geen mollie_id = geen fallback check)."""
+    def test_aangemaakt_zonder_mollie_id_redirect_via_tussenroute(self):
+        """Bestelling met status 'aangemaakt' maar zonder mollie_id: tussenroute
+        /betaald/r/<id> stuurt door naar / omdat mollie_id ontbreekt."""
         doe_bestelling(self.client)
-        # Verwijder mollie_id zodat de fallback niet getriggerd wordt
+        # Verwijder mollie_id zodat de tussenroute geen mollie_id kan opzoeken
         App.get_db().execute("UPDATE bestellingen SET mollie_id=NULL WHERE id=1")
-        r = self.client.get("/betaald/1")
-        self.assertEqual(r.status_code, 200)
-        self.assertIn(b"wacht", r.data)
+        r = self.client.get("/betaald/r/1")
+        self.assertEqual(r.status_code, 302)
+        self.assertIn("/", r.headers["Location"])
 
     def test_betaald_geeft_lotnummers_weer(self):
         """Succespagina toont de toegewezen lotnummers."""
@@ -2861,7 +2894,7 @@ class TestBetaaldPaginaExtra(unittest.TestCase):
             "UPDATE bestellingen SET status='betaald', mollie_id='tr_x', "
             "lot_van=5, lot_tot=6 WHERE id=1"
         )
-        r = self.client.get("/betaald/1")
+        r = self.client.get("/betaald/tr_x")
         self.assertEqual(r.status_code, 200)
         self.assertIn(b"5", r.data)
         self.assertIn(b"6", r.data)
@@ -3324,7 +3357,7 @@ class TestBetaaldPaginaFallbackFout(unittest.TestCase):
         stel_mollie_id_in(1, "tr_fallback_fout")
         with patch("app.maak_mollie_client") as mc:
             mc.return_value.payments.get.side_effect = Exception("Mollie onbereikbaar")
-            r = self.client.get("/betaald/1")
+            r = self.client.get("/betaald/tr_fallback_fout")
         self.assertEqual(r.status_code, 200)
         self.assertIn(b"wacht", r.data)
 
@@ -3334,7 +3367,7 @@ class TestBetaaldPaginaFallbackFout(unittest.TestCase):
         stel_mollie_id_in(1, "tr_fallback_molliefout")
         with patch("app.maak_mollie_client") as mc:
             mc.return_value.payments.get.side_effect = MollieError("timeout")
-            r = self.client.get("/betaald/1")
+            r = self.client.get("/betaald/tr_fallback_molliefout")
         self.assertEqual(r.status_code, 200)
 
     def test_betaald_status_geannuleerd_toont_waarschuwing(self):
@@ -3343,7 +3376,7 @@ class TestBetaaldPaginaFallbackFout(unittest.TestCase):
         App.get_db().execute(
             "UPDATE bestellingen SET status='geannuleerd', mollie_id='tr_ann' WHERE id=1"
         )
-        r = self.client.get("/betaald/1")
+        r = self.client.get("/betaald/tr_ann")
         self.assertEqual(r.status_code, 200)
         self.assertIn(b"waarsch", r.data)
 
@@ -3353,7 +3386,7 @@ class TestBetaaldPaginaFallbackFout(unittest.TestCase):
         App.get_db().execute(
             "UPDATE bestellingen SET status='verlopen', mollie_id='tr_exp' WHERE id=1"
         )
-        r = self.client.get("/betaald/1")
+        r = self.client.get("/betaald/tr_exp")
         self.assertEqual(r.status_code, 200)
         self.assertIn(b"waarsch", r.data)
 
@@ -3957,7 +3990,7 @@ class TestRecenteWijzigingen(unittest.TestCase):
     def test_vallende_eendjes_script_aanwezig_bij_succes(self):
         """Animatiescript (maakEendje) wordt alleen ingeladen bij status 'betaald'."""
         self._zet_betaald()
-        r = self.client.get("/betaald/1")
+        r = self.client.get("/betaald/tr_x")
         self.assertIn(b"maakEendje", r.data)
 
     def test_vallende_eendjes_script_afwezig_bij_mislukt(self):
@@ -3966,7 +3999,7 @@ class TestRecenteWijzigingen(unittest.TestCase):
         App.get_db().execute(
             "UPDATE bestellingen SET status='mislukt', mollie_id='tr_x' WHERE id=1"
         )
-        r = self.client.get("/betaald/1")
+        r = self.client.get("/betaald/tr_x")
         self.assertNotIn(b"maakEendje", r.data)
 
     def test_vallende_eendjes_script_afwezig_bij_geannuleerd(self):
@@ -3975,13 +4008,13 @@ class TestRecenteWijzigingen(unittest.TestCase):
         App.get_db().execute(
             "UPDATE bestellingen SET status='geannuleerd', mollie_id='tr_x' WHERE id=1"
         )
-        r = self.client.get("/betaald/1")
+        r = self.client.get("/betaald/tr_x")
         self.assertNotIn(b"maakEendje", r.data)
 
     def test_projectzin_zichtbaar_op_betaald_pagina_bij_succes(self):
         """Projectvermelding 'Ik geloof, ik deel' zichtbaar op betaald-pagina."""
         self._zet_betaald()
-        r = self.client.get("/betaald/1")
+        r = self.client.get("/betaald/tr_x")
         self.assertIn("Ik geloof, ik deel".encode(), r.data)
 
     # --- Accordion "Hoe werkt de race?" ---

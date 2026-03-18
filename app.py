@@ -878,7 +878,7 @@ def bestellen():
         betaling = mollie.payments.create({
             "amount":      {"currency": "EUR", "value": f"{bedrag:.2f}"},
             "description": f"Badeendjesrace – {aantal} eend{'je' if aantal==1 else 'jes'} ({f'{voornaam} {achternaam}'.strip()})",
-            "redirectUrl": f"{BASE_URL}/betaald/{bestelling_id}",
+            "redirectUrl": f"{BASE_URL}/betaald/r/{bestelling_id}",
             "webhookUrl":  f"{BASE_URL}/webhook",
             "metadata":    {"bestelling_id": str(bestelling_id)},
         })
@@ -1014,20 +1014,38 @@ def webhook():
     return "", 200
 
 
-@app.route("/betaald/<int:bestelling_id>")
-def betaald(bestelling_id):
+@app.route("/betaald/r/<int:bestelling_id>")
+def betaald_redirect(bestelling_id):
+    """
+    Tussenlandingspagina voor Mollie-redirectUrl: stuurt door naar /betaald/<mollie_id>
+    zodat de publieke URL niet-raadbaar is.
+    """
+    try:
+        db  = get_db()
+        rij = db.execute("SELECT mollie_id FROM bestellingen WHERE id=?", (bestelling_id,)).fetchone()
+    except sqlite3.Error:
+        abort(500)
+    if not rij or not rij["mollie_id"]:
+        return redirect(url_for("index"))
+    return redirect(url_for("betaald", mollie_id=rij["mollie_id"]))
+
+
+@app.route("/betaald/<mollie_id>")
+def betaald(mollie_id):
     """
     Landingspagina na terugkeer van Mollie.
     Webhook kan iets later komen dan deze redirect — dus fallback-check.
     """
     try:
         db  = get_db()
-        rij = db.execute("SELECT * FROM bestellingen WHERE id=?", (bestelling_id,)).fetchone()
+        rij = db.execute("SELECT * FROM bestellingen WHERE mollie_id=?", (mollie_id,)).fetchone()
     except sqlite3.Error:
         abort(500)
 
     if not rij:
         return redirect(url_for("index"))
+
+    bestelling_id = rij["id"]
 
     # Fallback: als webhook nog niet binnengekomen is, check zelf bij Mollie
     if rij["status"] == "aangemaakt" and rij["mollie_id"] and MOLLIE_API_KEY:
