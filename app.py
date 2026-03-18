@@ -1246,6 +1246,9 @@ def admin_instellingen():
         meldingen = []
         fouten    = []
 
+        # Verzamel en valideer alle waarden eerst; sla pas op als er geen fouten zijn
+        updates = {}
+
         # max_eendjes
         max_e_str = request.form.get("max_eendjes", "").strip()
         if max_e_str:
@@ -1258,18 +1261,18 @@ def admin_instellingen():
             elif max_e < 1:
                 fouten.append("Totaal maximum moet minimaal 1 zijn.")
             else:
-                db.execute("UPDATE teller SET max_eendjes = ? WHERE id = 1", (max_e,))
+                updates["max_eendjes"] = max_e
                 meldingen.append(f"Totaal maximum bijgewerkt naar {max_e}.")
 
         # max_per_bestelling
         max_p_str = request.form.get("max_per_bestelling", "").strip()
         if max_p_str:
             max_p      = int(max_p_str)
-            max_eendjes = int(max_e_str) if max_e_str and not fouten else get_max_eendjes()
+            max_eendjes = updates.get("max_eendjes") or get_max_eendjes()
             if not (1 <= max_p <= max_eendjes):
                 fouten.append(f"Maximum per bestelling moet tussen 1 en {max_eendjes} liggen.")
             else:
-                db.execute("UPDATE teller SET max_per_bestelling = ? WHERE id = 1", (max_p,))
+                updates["max_per_bestelling"] = max_p
                 meldingen.append(f"Maximum per bestelling bijgewerkt naar {max_p}.")
 
         # prijs_per_stuk
@@ -1279,7 +1282,7 @@ def admin_instellingen():
             if prijs_stuk <= 0:
                 fouten.append("Prijs per eendje moet groter dan 0 zijn.")
             else:
-                db.execute("UPDATE teller SET prijs_per_stuk = ? WHERE id = 1", (prijs_stuk,))
+                updates["prijs_per_stuk"] = prijs_stuk
                 meldingen.append(f"Prijs per eendje bijgewerkt naar € {prijs_stuk:.2f}.")
 
         # prijs_vijf_stuks
@@ -1289,7 +1292,7 @@ def admin_instellingen():
             if prijs_vijf <= 0:
                 fouten.append("Prijs voor 5 eendjes moet groter dan 0 zijn.")
             else:
-                db.execute("UPDATE teller SET prijs_vijf_stuks = ? WHERE id = 1", (prijs_vijf,))
+                updates["prijs_vijf_stuks"] = prijs_vijf
                 meldingen.append(f"Prijs voor 5 eendjes bijgewerkt naar € {prijs_vijf:.2f}.")
 
         # transactiekosten
@@ -1299,7 +1302,7 @@ def admin_instellingen():
             if tk < 0:
                 fouten.append("Transactiekosten mogen niet negatief zijn.")
             else:
-                db.execute("UPDATE teller SET transactiekosten = ? WHERE id = 1", (tk,))
+                updates["transactiekosten"] = tk
                 meldingen.append(f"Transactiekosten bijgewerkt naar € {tk:.2f}.")
 
         # notificatie_email
@@ -1308,19 +1311,23 @@ def admin_instellingen():
             if notif_str and not EMAIL_RE.match(notif_str):
                 fouten.append("Notificatie-e-mailadres is ongeldig.")
             else:
-                db.execute("UPDATE teller SET notificatie_email = ? WHERE id = 1", (notif_str,))
+                updates["notificatie_email"] = notif_str
                 meldingen.append("Notificatie-e-mailadres bijgewerkt." if notif_str else "Notificatie-e-mailadres verwijderd.")
 
         # onderhoudsmodus (checkbox: aanwezig = aan, afwezig = uit)
         modus = 1 if request.form.get("onderhoudsmodus") else 0
-        db.execute("UPDATE teller SET onderhoudsmodus = ? WHERE id = 1", (modus,))
+        updates["onderhoudsmodus"] = modus
         meldingen.append("Onderhoudsmodus ingeschakeld." if modus else "Onderhoudsmodus uitgeschakeld.")
 
         if fouten:
             for f in fouten:
                 flash(f, "fout")
-        if meldingen:
-            flash(" ".join(meldingen), "info")
+        else:
+            # Alleen opslaan als alle velden geldig zijn
+            for kolom, waarde in updates.items():
+                db.execute(f"UPDATE teller SET {kolom} = ? WHERE id = 1", (waarde,))
+            if meldingen:
+                flash(" ".join(meldingen), "info")
 
     except (ValueError, TypeError):
         flash("Ongeldig getal opgegeven.", "fout")
@@ -1746,6 +1753,12 @@ def setup():
 # (Procfile: gunicorn app:app) de tabellen nooit aanmaakte en direct crashte
 # met "no such table: bestellingen".  Door het hier op module-niveau aan te
 # roepen wordt de DB altijd geïnitialiseerd, ongeacht hoe de app gestart wordt.
+if not RESEND_FROM:
+    import logging as _logging
+    _logging.getLogger(__name__).warning(
+        "RESEND_FROM is niet ingesteld. Bevestigingsmails zullen falen."
+    )
+
 if not MOLLIE_API_KEY:
     if __name__ == "__main__":
         raise SystemExit("❌  MOLLIE_API_KEY is niet ingesteld.")
