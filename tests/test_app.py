@@ -1841,6 +1841,28 @@ class TestMailHeader(unittest.TestCase):
         params = self._vang_mail_params()
         self.assertIn("30 mei 2026", params.get("html", ""))
 
+    def test_mail_html_bevat_locatie(self):
+        params = self._vang_mail_params()
+        self.assertIn("Manenbergerbrug", params.get("html", ""))
+
+    def test_mail_html_bevat_tijd(self):
+        params = self._vang_mail_params()
+        self.assertIn("19:30", params.get("html", ""))
+
+    def test_mail_html_praktische_info_icoon_niet_agenda(self):
+        """Header van praktische-infoblok mag niet hetzelfde icoon als de datumregel gebruiken."""
+        params = self._vang_mail_params()
+        html = params.get("html", "")
+        # ℹ️ (U+2139 + variatie-selector) wordt gebruikt als header-icoon
+        self.assertIn("&#x2139;", html)
+        # De kop "Praktische informatie" mag niet met het agenda-icoon (&#x1F4C5;) beginnen
+        import re
+        kop = re.search(r'Praktische informatie', html)
+        self.assertIsNotNone(kop)
+        voor_kop = html[:kop.start()]
+        # Zoek het dichtstbijzijnde icoon vóór de koptekst
+        self.assertNotIn("&#x1F4C5;", voor_kop.split('<p style="margin:0 0 6px')[-1])
+
 
 class TestNotificatieEmail(unittest.TestCase):
 
