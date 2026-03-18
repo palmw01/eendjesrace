@@ -500,7 +500,7 @@ def stuur_bevestigingsmail(voornaam, achternaam, email, aantal, lot_van, lot_tot
     mail_html = f"""
     <html><body style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#333;padding-top:24px;">
       <div style="background:#0077B6;padding:32px 24px;border-radius:12px 12px 0 0;text-align:center;">
-        <img src="{BASE_URL}/static/img/eend.png" alt="Badeend" style="height:80px;display:block;margin:0 auto 12px;">
+        <img src="{BASE_URL}/static/img/eend.png" alt="Badeend" width="80" height="80" style="width:80px;height:80px;display:block;margin:0 auto 12px;">
         <h1 style="margin:0;color:#FFD700;font-size:28px;letter-spacing:1px;text-shadow:2px 2px 0 rgba(0,0,0,0.25);">Badeendjesrace!</h1>
         <p style="margin:6px 0 0;color:#90E0EF;font-size:15px;">{AFZENDER_NAAM}</p>
         <p style="margin:10px 0 0;display:inline-block;padding:4px 16px;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);border-radius:99px;color:#ffffff;font-size:13px;letter-spacing:0.5px;">📅 Zaterdag 30 mei 2026</p>
