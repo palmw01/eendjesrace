@@ -23,6 +23,9 @@ Gebouwd met **Python/Flask**, **Mollie** (iDEAL-betalingen), **SQLite** en **Res
 | Wachtwoord wijzigen via admin-topbar | ✅ |
 | Automatische database-backup naar Cloudflare R2 via Litestream | ✅ |
 | SEO-geoptimaliseerd (meta description, Open Graph, Twitter Card, JSON-LD, sitemap.xml, robots.txt) | ✅ |
+| Sponsorstrip op homepage (automatisch geladen uit `static/img/sponsors/`, ≤4 statisch / ≥5 scrollend) | ✅ |
+| Vallende badeendjes animatie op betaald-pagina na succesvolle betaling | ✅ |
+| Onderhoudsmodus (admin toggle, toont 503 voor publieke routes) | ✅ |
 
 ---
 
@@ -170,16 +173,39 @@ eendjesrace/
 ├── nixpacks.toml           # Railway build-config (installeert curl)
 ├── README.md
 ├── CLAUDE.md               # Instructies voor Claude Code
+├── static/
+│   └── img/
+│       ├── sponsors/       # Sponsorlogo's (png/jpg/svg/webp) — automatisch geladen
+│       └── eend.png        # Badeend-afbeelding
 └── templates/
     ├── index.html          # Bestelformulier
-    ├── betaald.html        # Bevestigingspagina
+    ├── betaald.html        # Bevestigingspagina (incl. vallende eendjes animatie)
     ├── privacy.html        # Privacyverklaring (AVG)
     ├── voorwaarden.html    # Algemene voorwaarden
-    ├── admin.html          # Beheerpagina
+    ├── admin.html          # Bestellingenpagina
+    ├── admin_beheer.html   # Beheerpagina (instellingen, beheerders, gevaarzone)
     ├── wijzigen.html       # Bestelling bewerken
     ├── admin_login.html    # Admin-login
+    ├── onderhoud.html      # Onderhoudspagina (503)
     └── fout.html           # Foutpagina's (404, 500, …)
 ```
+
+---
+
+## Beveiliging
+
+| Aanvalsvector | Maatregel |
+|---|---|
+| **Order injection** (bestelling zonder betaling) | Lotnummers worden uitsluitend toegewezen na verificatie bij de Mollie API — nooit op basis van POST-data |
+| **Webhook spoofing** | Webhook vertrouwt alleen op `mollie.payments.get()` via authenticated API-call; de POST-body bevat enkel het `id` |
+| **Admin-toegang** | Sessie-login met PBKDF2-wachtwoordhash, rate limiting (5/min), 4-uurs sessieverval, HTTPS-only cookie in productie |
+| **CSRF** | Flask-WTF CSRFProtect op alle formulieren; webhook is bewust uitgezonderd (Mollie kan geen token meesturen) |
+| **SQL injection** | Alle queries gebruiken parameterized statements (`?`); sorteervelden gewhitelisted |
+| **XSS** | CSP met per-request nonce voor scripts; `html.escape()` op gebruikersinvoer in e-mails |
+| **Clickjacking** | `X-Frame-Options: DENY` + `frame-ancestors 'none'` in CSP |
+| **Log injection** | `saniteer_log()` verwijdert newlines uit alle gelogde gebruikersinvoer |
+| **Fingerprinting** | `Server`-header onderdrukt |
+| **iDEAL 2.0 redirect** | `pay.ideal.nl` in CSP `form-action` (Firefox blokkeert redirect anders) |
 
 ---
 
@@ -208,4 +234,4 @@ PYTHONPATH=. .venv/bin/pytest tests/test_app.py -v
 PYTHONPATH=. .venv/bin/python tests/test_app.py
 ```
 
-De testsuite stubt Mollie, Resend, Flask-WTF en Flask-Limiter. `conftest.py` zorgt voor automatische testdatabase-cleanup (vereist voor Python 3.14 + SQLite WAL mode). 421 tests.
+De testsuite stubt Mollie, Resend, Flask-WTF en Flask-Limiter. `conftest.py` zorgt voor automatische testdatabase-cleanup (vereist voor Python 3.14 + SQLite WAL mode). **442 tests.**

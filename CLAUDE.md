@@ -117,16 +117,32 @@ Admin routes:
 
 ## Testing Notes
 
-`tests/test_app.py` stubs out Mollie, Resend, Flask-WTF CSRF, and Flask-Limiter so tests run with only Flask installed. Tests cover pricing, input validation, database operations, atomic transactions, email sending, webhook processing, admin routes, `max_per_bestelling`/`max_eendjes` settings, price settings (`prijs_per_stuk`/`prijs_vijf_stuks`/`transactiekosten`) via admin, CSV injection escaping, CSV filename timestamp, CSV header columns, email header content (afbeelding/kleur/datum), notification email (instellen/validatie/versturen), email validation in wijzig_bestelling, opruimen, paginering, server-side statusfilter, CSP nonces, Permissions-Policy, session permanence, `saniteer_log`, legal pages (`/privacy`, `/voorwaarden`), footer content on `/betaald/<id>` and error pages (`fout.html`), collapsible `<details>` sections in admin, multi-account admin and password management (`TestBeheerderAccounts`, including `laatste_inlog` tests), security headers (`TestSecurityHeadersAanvullend`), email formatting variants (`TestBevestigingsmailOpmaakvarianten`), input boundary values (`TestValideerInvoerGrenswaardes`), atomic ticket assignment edge cases (`TestWijsLotnummersToeAanvullend`), admin page username display, password change persistence, betaald-page fallback errors, bestellen edge cases, admin settings validation, handmatige bestelling telefoon, webhook audit log, SEO meta-tags/robots.txt/sitemap.xml (`TestSeoEnRobots`), beheer-paginasplitsing en filterbalk-layout (`TestAdminBeheerPagina`), onderhoudsmodus aan/uit/503/admin-bypass/webhook-bypass (`TestOnderhoudsmodus`), sponsorstrip statisch/scroll/volgorde/bestandstype-filter (`TestSponsorStrip`). The test database uses `/tmp/eendjes_test.db` (reset before each test class). `maak_db()` includes all teller columns and seeds the `beheerders` table (incl. `laatste_inlog`). `conftest.py` cleans up the test database + WAL/SHM files before pytest starts (required for Python 3.14 + SQLite WAL mode). Total: 430 tests.
+`tests/test_app.py` stubs out Mollie, Resend, Flask-WTF CSRF, and Flask-Limiter so tests run with only Flask installed. Tests cover pricing, input validation, database operations, atomic transactions, email sending, webhook processing, admin routes, `max_per_bestelling`/`max_eendjes` settings, price settings (`prijs_per_stuk`/`prijs_vijf_stuks`/`transactiekosten`) via admin, CSV injection escaping, CSV filename timestamp, CSV header columns, email header content (afbeelding/kleur/datum), notification email (instellen/validatie/versturen), email validation in wijzig_bestelling, opruimen, paginering, server-side statusfilter, CSP nonces, Permissions-Policy, session permanence, `saniteer_log`, legal pages (`/privacy`, `/voorwaarden`), footer content on `/betaald/<id>` and error pages (`fout.html`), collapsible `<details>` sections in admin, multi-account admin and password management (`TestBeheerderAccounts`, including `laatste_inlog` tests), security headers (`TestSecurityHeadersAanvullend`), email formatting variants (`TestBevestigingsmailOpmaakvarianten`), input boundary values (`TestValideerInvoerGrenswaardes`), atomic ticket assignment edge cases (`TestWijsLotnummersToeAanvullend`), admin page username display, password change persistence, betaald-page fallback errors, bestellen edge cases, admin settings validation, handmatige bestelling telefoon, webhook audit log, SEO meta-tags/robots.txt/sitemap.xml (`TestSeoEnRobots`), beheer-paginasplitsing en filterbalk-layout (`TestAdminBeheerPagina`), onderhoudsmodus aan/uit/503/admin-bypass/webhook-bypass (`TestOnderhoudsmodus`), sponsorstrip statisch/scroll/volgorde/bestandstype-filter (`TestSponsorStrip`), vallende eendjes animatie/accordion/afzendernaam/projectblokje (`TestRecenteWijzigingen`). The test database uses `/tmp/eendjes_test.db` (reset before each test class). `maak_db()` includes all teller columns and seeds the `beheerders` table (incl. `laatste_inlog`). `conftest.py` cleans up the test database + WAL/SHM files before pytest starts (required for Python 3.14 + SQLite WAL mode). Total: 442 tests.
 
 ### Sponsorstrip
 
 Sponsors worden automatisch geladen vanuit `static/img/sponsors/`. Ondersteunde bestandstypen: `.png`, `.jpg`, `.jpeg`, `.svg`, `.webp`. Bestanden worden alfabetisch gesorteerd. De `index`-route scant de map en geeft `sponsor_bestanden` door aan de template.
 
-- **≤ 4 sponsors**: statische gecentreerde rij (`sponsor-rij-statisch`), geen animatie.
+- **≤ 4 sponsors**: statische gecentreerde rij (`sponsor-rij-statisch`), geen animatie. Minimumbreedte 160px per logo-blok zodat het er verzorgd uitziet met weinig sponsors.
 - **≥ 5 sponsors**: oneindige CSS-scrollbanner (`sponsor-baan` + `sponsor-rij`), gedupliceerde lijst voor naadloze loop, pauzeert bij hover.
+- **Geen sponsors**: sectie wordt volledig verborgen.
 
 Logo's toevoegen: afbeelding in `static/img/sponsors/` plaatsen — geen code aanpassen nodig.
+
+### Vallende eendjes animatie
+
+Op de betaald-pagina (`/betaald/<id>`) vallen bij `status_klasse == 'succes'` 28 badeendjes van boven het scherm naar beneden. Geïmplementeerd via:
+- CSS `@keyframes valEend` (altijd aanwezig in `<style>`)
+- JavaScript (met CSP-nonce) dat `<img class="vallend-eendje">` elementen aanmaakt met willekeurige x-positie (%), grootte (28–48px), duur (2.4–4.6s) en vertraging (0–3s). Elementen verwijderen zichzelf na `animationend`.
+- Animatie speelt eenmalig af (geen `infinite`), werkt op desktop en mobiel via `position: fixed` en `%`-breedte.
+
+### Organisatiestructuur (naamgeving)
+
+Consistent te gebruiken in alle communicatie:
+- **Organisator race**: HGJB-commissie Hervormde Gemeente Wapenveld
+- **Doel opbrengst**: diaconiaal project 'Ik geloof, ik deel'
+- **Juridische entiteit** (footer, voorwaarden, privacy): Diaconie Hervormde gemeente te Wapenveld (KvK 76404862)
+- **E-mail afzender** (`AFZENDER_NAAM`): `"Badeendjesrace Wapenveld"` (herkenbaarst in inbox)
 
 ## Key Patterns
 

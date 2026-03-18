@@ -3824,6 +3824,115 @@ class TestOnderhoudsmodus(unittest.TestCase):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# Recente wijzigingen: vallende eendjes, accordion, afzendernaam, projectblokje
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestRecenteWijzigingen(unittest.TestCase):
+
+    def setUp(self):
+        self.client, self.ctx = maak_flask_client()
+
+    def tearDown(self):
+        self.ctx.pop()
+
+    def _zet_betaald(self):
+        doe_bestelling(self.client)
+        App.get_db().execute(
+            "UPDATE bestellingen SET status='betaald', mollie_id='tr_x', lot_van=1, lot_tot=2 WHERE id=1"
+        )
+
+    def _vang_mail(self, **kwargs):
+        verzonden = {}
+        def nep_send(params):
+            verzonden.update(params)
+            return {"id": "test"}
+        with patch("resend.Emails.send", side_effect=nep_send):
+            stuur_bevestigingsmail("Jan", "Jansen", "jan@test.nl", 2, 1, 2, 5.00, **kwargs)
+        return verzonden
+
+    # --- Vallende eendjes animatie ---
+
+    def test_vallende_eendjes_script_aanwezig_bij_succes(self):
+        """Animatiescript (maakEendje) wordt alleen ingeladen bij status 'betaald'."""
+        self._zet_betaald()
+        r = self.client.get("/betaald/1")
+        self.assertIn(b"maakEendje", r.data)
+
+    def test_vallende_eendjes_script_afwezig_bij_mislukt(self):
+        """Geen animatiescript bij mislukte betaling."""
+        doe_bestelling(self.client)
+        App.get_db().execute(
+            "UPDATE bestellingen SET status='mislukt', mollie_id='tr_x' WHERE id=1"
+        )
+        r = self.client.get("/betaald/1")
+        self.assertNotIn(b"maakEendje", r.data)
+
+    def test_vallende_eendjes_script_afwezig_bij_geannuleerd(self):
+        """Geen animatiescript bij geannuleerde betaling."""
+        doe_bestelling(self.client)
+        App.get_db().execute(
+            "UPDATE bestellingen SET status='geannuleerd', mollie_id='tr_x' WHERE id=1"
+        )
+        r = self.client.get("/betaald/1")
+        self.assertNotIn(b"maakEendje", r.data)
+
+    def test_projectzin_zichtbaar_op_betaald_pagina_bij_succes(self):
+        """Projectvermelding 'Ik geloof, ik deel' zichtbaar op betaald-pagina."""
+        self._zet_betaald()
+        r = self.client.get("/betaald/1")
+        self.assertIn("Ik geloof, ik deel".encode(), r.data)
+
+    # --- Accordion "Hoe werkt de race?" ---
+
+    def test_homepage_bevat_accordion_details(self):
+        """Homepage bevat een <details> accordion element."""
+        r = self.client.get("/")
+        self.assertIn(b"<details", r.data)
+
+    def test_accordion_toont_hoe_werkt_het_tekst(self):
+        """Accordion-summary bevat 'Hoe werkt de race?'."""
+        r = self.client.get("/")
+        self.assertIn("Hoe werkt de race?".encode(), r.data)
+
+    def test_accordion_standaard_ingeklapt(self):
+        """<details> heeft geen 'open' attribuut — standaard ingeklapt."""
+        import re as _re
+        r = self.client.get("/")
+        match = _re.search(r'<details[^>]*>', r.data.decode())
+        self.assertIsNotNone(match)
+        self.assertNotIn(" open", match.group())
+
+    # --- AFZENDER_NAAM ---
+
+    def test_afzender_naam_in_from_veld(self):
+        """E-mail from-veld bevat 'Badeendjesrace Wapenveld'."""
+        mail = self._vang_mail()
+        self.assertIn("Badeendjesrace Wapenveld", mail.get("from", ""))
+
+    def test_afzender_naam_in_mailbody(self):
+        """E-mailbody bevat de afzendernaam 'Badeendjesrace Wapenveld'."""
+        mail = self._vang_mail()
+        self.assertIn("Badeendjesrace Wapenveld", mail.get("html", ""))
+
+    # --- Projectblokje in e-mail ---
+
+    def test_projectblokje_noemt_ik_geloof_ik_deel(self):
+        """Bevestigingsmail vermeldt het diaconale project 'Ik geloof, ik deel'."""
+        mail = self._vang_mail()
+        self.assertIn("Ik geloof, ik deel", mail.get("html", ""))
+
+    def test_projectblokje_bevat_projectlink(self):
+        """Bevestigingsmail bevat link naar het project op hervormdwapenveld.nl."""
+        mail = self._vang_mail()
+        self.assertIn("hgjb-diaconaal-project", mail.get("html", ""))
+
+    def test_projectblokje_noemt_hgjb_commissie(self):
+        """Bevestigingsmail vermeldt de HGJB-commissie."""
+        mail = self._vang_mail()
+        self.assertIn("HGJB-commissie", mail.get("html", ""))
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # Sponsorstrip
 # ══════════════════════════════════════════════════════════════════════════════
 
