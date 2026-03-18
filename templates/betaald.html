@@ -50,6 +50,19 @@
     }
     @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.5; } }
     .wacht-anim { animation: pulse 1.5s ease-in-out infinite; }
+
+    @keyframes valEend {
+      0%   { transform: translateY(-80px) rotate(0deg);   opacity: 1; }
+      80%  { opacity: 1; }
+      100% { transform: translateY(110vh) rotate(360deg); opacity: 0; }
+    }
+    .vallend-eendje {
+      position: fixed;
+      top: 0;
+      pointer-events: none;
+      z-index: 999;
+      animation: valEend linear forwards;
+    }
     .site-footer {
       text-align: center;
       color: rgba(255,255,255,0.90);
@@ -150,6 +163,37 @@
     <a href="/" class="terug">← Terug naar de Badeendjesrace</a>
   </div>
   </main>
+  {% if status_klasse == 'succes' %}
+  <script nonce="{{ g.csp_nonce }}">
+    (function() {
+      var SRC    = "{{ url_for('static', filename='img/eend.png') }}";
+      var AANTAL = 28;
+      var MATEN  = [28, 34, 40, 48];
+
+      function maakEendje() {
+        var img = document.createElement('img');
+        img.src       = SRC;
+        img.alt       = '';
+        img.className = 'vallend-eendje';
+        var maat      = MATEN[Math.floor(Math.random() * MATEN.length)];
+        var links     = Math.random() * 96;   // 0–96% zodat het niet afsnijdt
+        var duur      = 2.4 + Math.random() * 2.2;   // 2.4–4.6s
+        var vertraging= Math.random() * 3.0;          // 0–3s spread
+        img.style.cssText = [
+          'width:'  + maat + 'px',
+          'left:'   + links + '%',
+          'animation-duration:' + duur.toFixed(2) + 's',
+          'animation-delay:'    + vertraging.toFixed(2) + 's',
+        ].join(';');
+        document.body.appendChild(img);
+        img.addEventListener('animationend', function() { img.remove(); });
+      }
+
+      for (var i = 0; i < AANTAL; i++) { maakEendje(); }
+    })();
+  </script>
+  {% endif %}
+
   <footer class="site-footer">
     <p><strong style="color:rgba(255,255,255,0.85);">Diaconie Hervormde gemeente te Wapenveld</strong></p>
     <p>Kerkstraat 2a · 8191 LV Wapenveld · KvK 76404862</p>
