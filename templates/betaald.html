@@ -84,10 +84,11 @@
           {% endif %}
         </div>
       </div>
+      <p class="info" style="margin-top:14px;">🌍 Jouw bijdrage gaat naar het diaconale project <strong>'Ik geloof, ik deel'</strong> — georganiseerd door de HGJB-commissie van de Hervormde Gemeente Wapenveld.</p>
       {% if not bestelling['mail_verstuurd'] %}
       <div class="mail-waarsch">
         ⚠️ Het is helaas niet gelukt om een bevestigingsmail te sturen.
-        Noteer je lotnummer(s) hierboven goed! Neem contact op met de kerk als je hulp nodig hebt.
+        Noteer je lotnummer(s) hierboven goed! Neem contact op via <a href="mailto:diaconie@hervormdwapenveld.nl">diaconie@hervormdwapenveld.nl</a> als je hulp nodig hebt.
       </div>
       {% else %}
       <p class="info">📧 Een bevestiging is verstuurd naar <strong>{{ bestelling['email'] }}</strong>.</p>

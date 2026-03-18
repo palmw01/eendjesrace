@@ -82,7 +82,7 @@ TRANSACTIEKOSTEN = float(os.environ.get("TRANSACTIEKOSTEN", "0.32"))  # iDEAL-tr
 
 RESEND_API_KEY   = os.environ.get("RESEND_API_KEY", "")
 RESEND_FROM      = os.environ.get("RESEND_FROM", "")
-AFZENDER_NAAM    = "Hervormde Gemeente Wapenveld"
+AFZENDER_NAAM    = "Badeendjesrace Wapenveld"
 
 ADMIN_GEBRUIKER  = os.environ.get("ADMIN_USER", "admin")
 ADMIN_WACHTWOORD = os.environ.get("ADMIN_PASS", "")
@@ -495,11 +495,24 @@ def stuur_bevestigingsmail(voornaam, achternaam, email, aantal, lot_van, lot_tot
           <p style="font-size:20px;margin:0;color:#0077B6;">{lotnr_tekst}</p>
         </div>
         <p>Op de dag van de race worden jouw eendjes te water gelaten. Bewaar je nummers goed!</p>
+        <div style="background:#E8F5E9;border:1px solid #A5D6A7;border-radius:10px;padding:16px 20px;margin:24px 0;">
+          <p style="margin:0 0 6px;font-weight:bold;color:#2E7D32;">&#127758; Waarvoor gaat dit geld?</p>
+          <p style="margin:0;font-size:.9rem;color:#1B5E20;line-height:1.6;">
+            De opbrengst van de Badeendjesrace gaat naar het diaconale project
+            <strong>'Ik geloof, ik deel'</strong> van de HGJB-commissie van de
+            Hervormde Gemeente Wapenveld. Met dit project ondersteunen we
+            christenen in Albani&euml; en maken we mensen bewust van wat het
+            betekent om te delen vanuit geloof.<br>
+            <a href="https://hervormdwapenveld.nl/werkgroepen/hgjb-diaconaal-project"
+               style="color:#2E7D32;font-weight:bold;">Lees meer over het project &rarr;</a>
+          </p>
+        </div>
         <hr style="border:none;border-top:1px solid #eee;margin:24px 0;">
         <p style="font-size:.85rem;color:#999;">
           Dit is een automatisch bericht &mdash; niet beantwoorden.
         </p>
-        <p>Met vriendelijke groet,<br><strong>{AFZENDER_NAAM}</strong></p>
+        <p>Met vriendelijke groet,<br><strong>HGJB-commissie Hervormde Gemeente Wapenveld</strong><br>
+        <span style="font-size:.85rem;color:#999;">namens Diaconie Hervormde gemeente te Wapenveld</span></p>
       </div>
     </body></html>
     """
