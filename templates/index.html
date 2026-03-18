@@ -377,20 +377,36 @@
       font-size: 0.95rem;
       line-height: 2;
     }
-    .hoe-werkt-het {
-      margin-top: 0;
+    .info-details {
+      margin-top: 14px;
+      border-top: 1px solid rgba(255,255,255,0.2);
+      padding-top: 12px;
     }
-    .hoe-werkt-het h3 {
+    .info-details summary {
       font-family: 'Fredoka One', cursive;
-      font-size: 1.1rem;
+      font-size: 1.05rem;
       color: var(--geel);
-      margin-bottom: 8px;
+      cursor: pointer;
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      user-select: none;
     }
-    .hoe-werkt-het ol {
+    .info-details summary::-webkit-details-marker { display: none; }
+    .info-details summary::before {
+      content: '▶';
+      font-size: 0.65rem;
+      transition: transform .2s;
+      display: inline-block;
+    }
+    .info-details[open] summary::before { transform: rotate(90deg); }
+    .info-details ol {
       padding-left: 20px;
       font-size: 0.9rem;
       line-height: 1.8;
       color: rgba(255,255,255,0.9);
+      margin-top: 10px;
     }
 
     /* Foutmelding */
@@ -631,17 +647,12 @@
   <div class="info-kaart">
     <h2>Badeendjesrace Wapenveld</h2>
     <p>
-      Op zaterdag 30 mei 2026 organiseert de HGJB-commissie van de Hervormde Gemeente Wapenveld
-      een bijzonder en gezellig evenement: Badeendjesrace Wapenveld.
-    </p>
-    <p>
       Tijdens dit vrolijke spektakel nemen honderden gele badeendjes het tegen elkaar op in een
-      spannende race over het water. Tegelijkertijd zamelen we geld in voor het diaconale project
-      <strong>'Ik geloof, ik deel'</strong>. Met de opbrengst ondersteunen we christenen in Albanië
-      en willen we mensen bewust maken van wat het betekent om te delen vanuit ons geloof.
+      spannende race over het water. De opbrengst gaat naar het diaconale project
+      <strong>'Ik geloof, ik deel'</strong> — waarmee we christenen in Albanië steunen en
+      mensen bewust maken van wat het betekent om te delen vanuit geloof.
+      <a href="https://hervormdwapenveld.nl/werkgroepen/hgjb-diaconaal-project" target="_blank" rel="noopener">Meer over het project →</a>
     </p>
-    <p>Meer weten over het diaconale project? <a href="https://hervormdwapenveld.nl/werkgroepen/hgjb-diaconaal-project" target="_blank" rel="noopener">Lees dan hier verder.</a></p>
-    <p>Iedereen is van harte welkom om te komen kijken, mee te doen en dit mooie doel te steunen!</p>
 
     <div class="evenement-details">
       📅 <strong>Datum:</strong> Zaterdag 30 mei 2026<br>
@@ -649,12 +660,8 @@
       📍 <strong>Locatie:</strong> Het Apeldoorns Kanaal, bij de Manenbergerbrug / de Loswal in Wapenveld
     </div>
 
-  </div>
-
-  <!-- Hoe werkt de race -->
-  <div class="info-kaart">
-    <div class="hoe-werkt-het">
-      <h3>Hoe werkt de race?</h3>
+    <details class="info-details">
+      <summary>Hoe werkt de race?</summary>
       <ol>
         <li>Er gaan maximaal {{ max_eendjes }} badeendjes tegelijk het water in.</li>
         <li>Elk badeendje heeft een uniek nummer van 1 t/m {{ max_eendjes }}.</li>
@@ -663,7 +670,7 @@
         <li>Het eendje dat als eerste de finishgeul binnenkomt, wint de hoofdprijs.</li>
         <li>Daarna worden de overige prijzen verdeeld op basis van de volgorde van binnenkomst.</li>
       </ol>
-    </div>
+    </details>
   </div>
   <!-- Sponsorstrip -->
   {% if sponsor_bestanden %}
