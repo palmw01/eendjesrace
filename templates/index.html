@@ -446,14 +446,13 @@
       -webkit-mask-image: linear-gradient(to right, transparent 0%, black 12%, black 88%, transparent 100%);
       transform: translateZ(0);
       -webkit-transform: translateZ(0);
+      will-change: transform;
     }
     .sponsor-rij {
       display: flex;
       width: max-content;
       animation: sponsorscroll 20s linear infinite;
       will-change: transform;
-      backface-visibility: hidden;
-      -webkit-backface-visibility: hidden;
     }
     .sponsor-rij .sponsor-logo {
       margin-right: 32px;
