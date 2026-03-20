@@ -447,11 +447,13 @@
     }
     .sponsor-rij {
       display: flex;
-      gap: 32px;
       width: max-content;
       animation: sponsorscroll 20s linear infinite;
       will-change: transform;
       backface-visibility: hidden;
+    }
+    .sponsor-rij .sponsor-logo {
+      margin-right: 32px;
     }
     @media (hover: hover) {
       .sponsor-rij:hover { animation-play-state: paused; }
