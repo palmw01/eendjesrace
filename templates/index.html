@@ -457,18 +457,10 @@
     .sponsor-rij {
       display: flex;
       width: max-content;
-      animation: sponsorscroll 20s linear infinite;
       will-change: transform;
     }
     .sponsor-rij .sponsor-logo {
       margin-right: 32px;
-    }
-    @media (hover: hover) {
-      .sponsor-rij:hover { animation-play-state: paused; }
-    }
-    @keyframes sponsorscroll {
-      from { transform: translate3d(0, 0, 0); }
-      to   { transform: translate3d(-50%, 0, 0); }
     }
     .sponsor-rij-statisch {
       display: flex;
@@ -774,6 +766,38 @@
     knop.disabled = true;
     knop.textContent = '⏳ Doorsturen naar betaalpagina…';
   });
+
+  // Sponsorstrip: vloeiende scroll via requestAnimationFrame (geen CSS loop-reset)
+  (function() {
+    const rij = document.querySelector('.sponsor-rij');
+    if (!rij) return;
+    let pos = 0;
+    let gepauzeerd = false;
+    let halfBreedte = 0;
+
+    function start() {
+      halfBreedte = rij.scrollWidth / 2;
+      if (halfBreedte <= 0) return;
+      const snelheid = halfBreedte / (20 * 60); // 20s bij 60fps
+      function frame() {
+        if (!gepauzeerd) {
+          pos += snelheid;
+          if (pos >= halfBreedte) pos -= halfBreedte;
+          rij.style.transform = 'translateX(-' + pos.toFixed(2) + 'px)';
+        }
+        requestAnimationFrame(frame);
+      }
+      requestAnimationFrame(frame);
+    }
+
+    if (window.matchMedia('(hover: hover)').matches) {
+      rij.addEventListener('mouseenter', function() { gepauzeerd = true; });
+      rij.addEventListener('mouseleave', function() { gepauzeerd = false; });
+    }
+
+    if (document.readyState === 'complete') { start(); }
+    else { window.addEventListener('load', start); }
+  })();
 
   // Auto-refresh beschikbaarheid elke 30 seconden
   (function() {
