@@ -618,6 +618,15 @@ def saniteer_log(tekst):
     return "".join(c if ord(c) >= 32 else " " for c in str(tekst))
 
 
+def get_client_ip():
+    """Geef het echte client-IP terug.
+    Als de app achter Cloudflare draait stuurt CF het originele IP mee via
+    CF-Connecting-IP. Anders valt terug op request.remote_addr (dat ProxyFix
+    al heeft gecorrigeerd voor de Railway load balancer).
+    """
+    return request.headers.get("CF-Connecting-IP") or request.remote_addr
+
+
 def schrijf_audit_log(actie, details=None, gebruiker=None, ip=None):
     """Schrijf een regel naar de audit_log tabel. Fouten worden gelogd maar niet gegooid."""
     try:
@@ -966,7 +975,7 @@ def bestellen():
 @limiter.limit("60 per minute")
 @csrf.exempt
 def webhook():
-    client_ip = request.remote_addr
+    client_ip = get_client_ip()
     mollie_id = request.form.get("id", "").strip()
     if not mollie_id or not mollie_id.startswith("tr_"):
         app.logger.warning(f"Webhook: ongeldig mollie_id '{saniteer_log(mollie_id)}'")
@@ -1169,7 +1178,7 @@ def admin_login():
                 if _dt.now() < geblokkeerd_tot_dt:
                     resterende = int((geblokkeerd_tot_dt - _dt.now()).total_seconds())
                     fout = f"Account tijdelijk geblokkeerd. Probeer over {resterende // 60 + 1} minuten opnieuw."
-                    app.logger.warning(f"Login geblokkeerd voor '{saniteer_log(gebruiker)}' vanaf {request.remote_addr}")
+                    app.logger.warning(f"Login geblokkeerd voor '{saniteer_log(gebruiker)}' vanaf {get_client_ip()}")
                     return render_template("admin_login.html", fout=fout)
                 else:
                     db.execute(
@@ -1195,8 +1204,8 @@ def admin_login():
             session["admin_gebruikersnaam"] = gebruiker
             session["admin_sessie_versie"]  = rij["sessie_versie"] if rij["sessie_versie"] is not None else 0
             session.permanent = True
-            app.logger.info(f"Admin ingelogd: {saniteer_log(gebruiker)} vanaf {request.remote_addr}")
-            schrijf_audit_log("login_succes", gebruiker=gebruiker, ip=request.remote_addr)
+            app.logger.info(f"Admin ingelogd: {saniteer_log(gebruiker)} vanaf {get_client_ip()}")
+            schrijf_audit_log("login_succes", gebruiker=gebruiker, ip=get_client_ip())
             return redirect(url_for("admin"))
 
         # Mislukte login: verhoog teller, blokkeer na 10 opeenvolgende pogingen
@@ -1209,8 +1218,8 @@ def admin_login():
                     "UPDATE beheerders SET mislukte_pogingen = ?, geblokkeerd_tot = ? WHERE gebruikersnaam = ?",
                     (nieuwe_pogingen, geblokkeerd_tot, gebruiker)
                 )
-                app.logger.warning(f"Account geblokkeerd na {nieuwe_pogingen} pogingen: {saniteer_log(gebruiker)} vanaf {request.remote_addr}")
-                schrijf_audit_log("account_geblokkeerd", details=f"{nieuwe_pogingen} mislukte pogingen", gebruiker=gebruiker, ip=request.remote_addr)
+                app.logger.warning(f"Account geblokkeerd na {nieuwe_pogingen} pogingen: {saniteer_log(gebruiker)} vanaf {get_client_ip()}")
+                schrijf_audit_log("account_geblokkeerd", details=f"{nieuwe_pogingen} mislukte pogingen", gebruiker=gebruiker, ip=get_client_ip())
             else:
                 db.execute(
                     "UPDATE beheerders SET mislukte_pogingen = ? WHERE gebruikersnaam = ?",
@@ -1219,8 +1228,8 @@ def admin_login():
             db.commit()
 
         fout = "Onjuiste gebruikersnaam of wachtwoord."
-        app.logger.warning(f"Mislukte admin-login voor '{saniteer_log(gebruiker)}' vanaf {request.remote_addr}")
-        schrijf_audit_log("login_mislukt", gebruiker=gebruiker if gebruiker else None, ip=request.remote_addr)
+        app.logger.warning(f"Mislukte admin-login voor '{saniteer_log(gebruiker)}' vanaf {get_client_ip()}")
+        schrijf_audit_log("login_mislukt", gebruiker=gebruiker if gebruiker else None, ip=get_client_ip())
     return render_template("admin_login.html", fout=fout)
 
 
@@ -1228,7 +1237,7 @@ def admin_login():
 @login_vereist
 def admin_logout():
     gebruiker = session.get("admin_gebruikersnaam", "onbekend")
-    schrijf_audit_log("logout", gebruiker=gebruiker, ip=request.remote_addr)
+    schrijf_audit_log("logout", gebruiker=gebruiker, ip=get_client_ip())
     session.clear()
     app.logger.info(f"Admin uitgelogd: {saniteer_log(gebruiker)}")
     return redirect(url_for("admin_login"))
@@ -1440,7 +1449,7 @@ def admin_instellingen():
                 db.execute("COMMIT")
                 if meldingen:
                     flash(" ".join(meldingen), "info")
-                    schrijf_audit_log("instellingen_gewijzigd", details="; ".join(meldingen), gebruiker=session.get("admin_gebruikersnaam"), ip=request.remote_addr)
+                    schrijf_audit_log("instellingen_gewijzigd", details="; ".join(meldingen), gebruiker=session.get("admin_gebruikersnaam"), ip=get_client_ip())
             except sqlite3.Error as db_err:
                 try:
                     db.execute("ROLLBACK")
@@ -1479,8 +1488,8 @@ def beheerder_toevoegen():
             (gebruikersnaam, generate_password_hash(wachtwoord))
         )
         db.commit()
-        app.logger.info(f"Nieuw beheerdersaccount aangemaakt: {saniteer_log(gebruikersnaam)} door {saniteer_log(session.get('admin_gebruikersnaam'))} (IP: {saniteer_log(request.remote_addr)})")
-        schrijf_audit_log("beheerder_aangemaakt", details=f"Nieuw account: {gebruikersnaam}", gebruiker=session.get("admin_gebruikersnaam"), ip=request.remote_addr)
+        app.logger.info(f"Nieuw beheerdersaccount aangemaakt: {saniteer_log(gebruikersnaam)} door {saniteer_log(session.get('admin_gebruikersnaam'))} (IP: {saniteer_log(get_client_ip())})")
+        schrijf_audit_log("beheerder_aangemaakt", details=f"Nieuw account: {gebruikersnaam}", gebruiker=session.get("admin_gebruikersnaam"), ip=get_client_ip())
         flash(f"Account '{gebruikersnaam}' aangemaakt.", "info")
     except sqlite3.IntegrityError:
         flash(f"Gebruikersnaam '{gebruikersnaam}' bestaat al.", "fout")
@@ -1510,8 +1519,8 @@ def beheerder_verwijderen(beheerder_id):
             return redirect(url_for("admin_beheer"))
         db.execute("DELETE FROM beheerders WHERE id = ?", (beheerder_id,))
         db.commit()
-        app.logger.info(f"Beheerdersaccount verwijderd: {saniteer_log(rij['gebruikersnaam'])} door {saniteer_log(session.get('admin_gebruikersnaam'))} (IP: {saniteer_log(request.remote_addr)})")
-        schrijf_audit_log("beheerder_verwijderd", details=f"Account: {rij['gebruikersnaam']}", gebruiker=session.get("admin_gebruikersnaam"), ip=request.remote_addr)
+        app.logger.info(f"Beheerdersaccount verwijderd: {saniteer_log(rij['gebruikersnaam'])} door {saniteer_log(session.get('admin_gebruikersnaam'))} (IP: {saniteer_log(get_client_ip())})")
+        schrijf_audit_log("beheerder_verwijderd", details=f"Account: {rij['gebruikersnaam']}", gebruiker=session.get("admin_gebruikersnaam"), ip=get_client_ip())
         flash(f"Account '{rij['gebruikersnaam']}' verwijderd.", "info")
     except sqlite3.Error as e:
         app.logger.error(f"DB-fout beheerder_verwijderen: {e}")
@@ -1553,8 +1562,8 @@ def wachtwoord_wijzigen():
             "SELECT sessie_versie FROM beheerders WHERE id = ?", (rij["id"],)
         ).fetchone()["sessie_versie"]
         session["admin_sessie_versie"] = nieuwe_versie
-        app.logger.info(f"Wachtwoord gewijzigd voor: {saniteer_log(gebruiker)} (IP: {saniteer_log(request.remote_addr)})")
-        schrijf_audit_log("wachtwoord_gewijzigd", gebruiker=gebruiker, ip=request.remote_addr)
+        app.logger.info(f"Wachtwoord gewijzigd voor: {saniteer_log(gebruiker)} (IP: {saniteer_log(get_client_ip())})")
+        schrijf_audit_log("wachtwoord_gewijzigd", gebruiker=gebruiker, ip=get_client_ip())
         flash("Wachtwoord succesvol gewijzigd.", "info")
     except sqlite3.Error as e:
         app.logger.error(f"DB-fout wachtwoord_wijzigen: {e}")
@@ -1585,7 +1594,7 @@ def mail_opnieuw(bestelling_id):
         )
         db.commit()
         app.logger.info(f"Mail opnieuw verstuurd voor bestelling {bestelling_id}: {'ok' if ok else 'mislukt'}")
-        schrijf_audit_log("mail_opnieuw", details=f"Bestelling #{bestelling_id} – {'verstuurd' if ok else 'mislukt'}", gebruiker=session.get("admin_gebruikersnaam"), ip=request.remote_addr)
+        schrijf_audit_log("mail_opnieuw", details=f"Bestelling #{bestelling_id} – {'verstuurd' if ok else 'mislukt'}", gebruiker=session.get("admin_gebruikersnaam"), ip=get_client_ip())
     except sqlite3.Error as e:
         app.logger.error(f"DB-fout mail-opnieuw: {e}")
         abort(500)
@@ -1674,7 +1683,7 @@ def wijzig_bestelling(bestelling_id):
                     (voornaam, achternaam, telefoon, email, status, mail_verstuurd, bestelling_id),
                 )
                 db.commit()
-                schrijf_audit_log("bestelling_gewijzigd", details=f"Bestelling #{bestelling_id}", gebruiker=session.get("admin_gebruikersnaam"), ip=request.remote_addr)
+                schrijf_audit_log("bestelling_gewijzigd", details=f"Bestelling #{bestelling_id}", gebruiker=session.get("admin_gebruikersnaam"), ip=get_client_ip())
             except sqlite3.Error as e:
                 app.logger.error(f"DB-fout wijzig_bestelling: {e}")
                 abort(500)
@@ -1700,7 +1709,7 @@ def admin_opruimen():
         db.commit()
         flash(f"{aantal} ongeldige bestelling(en) verwijderd.", "info")
         app.logger.info(f"Admin opruimen: {aantal} bestellingen verwijderd.")
-        schrijf_audit_log("opruimen", details=f"{aantal} bestelling(en) verwijderd", gebruiker=session.get("admin_gebruikersnaam"), ip=request.remote_addr)
+        schrijf_audit_log("opruimen", details=f"{aantal} bestelling(en) verwijderd", gebruiker=session.get("admin_gebruikersnaam"), ip=get_client_ip())
     except sqlite3.Error as e:
         app.logger.error(f"DB-fout admin_opruimen: {e}")
         abort(500)
@@ -1716,8 +1725,8 @@ def audit_wissen():
         db.execute("DELETE FROM audit_log")
         db.execute("DELETE FROM sqlite_sequence WHERE name='audit_log'")
         db.commit()
-        schrijf_audit_log("audit_log_gewist", gebruiker=session.get("admin_gebruikersnaam"), ip=request.remote_addr)
-        app.logger.warning(f"Audit-log gewist door {saniteer_log(session.get('admin_gebruikersnaam'))} vanaf {request.remote_addr}")
+        schrijf_audit_log("audit_log_gewist", gebruiker=session.get("admin_gebruikersnaam"), ip=get_client_ip())
+        app.logger.warning(f"Audit-log gewist door {saniteer_log(session.get('admin_gebruikersnaam'))} vanaf {get_client_ip()}")
         flash("Audit-log gewist.", "info")
     except sqlite3.Error as e:
         app.logger.error(f"DB-fout audit_wissen: {e}")
@@ -1741,7 +1750,7 @@ def reset_database():
         db.execute("DELETE FROM sqlite_sequence WHERE name='webhook_log'")
         db.execute("UPDATE teller SET volgend_lot=1")
         # Schrijf reset naar audit_log vóór het wissen (audit_log zelf wordt niet gewist)
-        schrijf_audit_log("reset", details="Volledige database-reset: bestellingen en webhook_log gewist", gebruiker=session.get("admin_gebruikersnaam"), ip=request.remote_addr)
+        schrijf_audit_log("reset", details="Volledige database-reset: bestellingen en webhook_log gewist", gebruiker=session.get("admin_gebruikersnaam"), ip=get_client_ip())
         db.commit()
         app.logger.warning("Database volledig gereset door admin.")
     except sqlite3.Error as e:
@@ -1826,7 +1835,7 @@ def handmatige_bestelling():
         f"Handmatige bestelling aangemaakt: id={bestelling_id}, "
         f"voornaam={saniteer_log(voornaam)}, achternaam={saniteer_log(achternaam)}, lotnummers={lot_van}-{lot_tot}, betaalwijze={betaalwijze}"
     )
-    schrijf_audit_log("handmatige_bestelling", details=f"Bestelling #{bestelling_id} – {voornaam} {achternaam}, loten {lot_van}–{lot_tot}, {betaalwijze}", gebruiker=session.get("admin_gebruikersnaam"), ip=request.remote_addr)
+    schrijf_audit_log("handmatige_bestelling", details=f"Bestelling #{bestelling_id} – {voornaam} {achternaam}, loten {lot_van}–{lot_tot}, {betaalwijze}", gebruiker=session.get("admin_gebruikersnaam"), ip=get_client_ip())
 
     if email:
         mail_ok = stuur_bevestigingsmail(voornaam, achternaam, email, aantal, lot_van, lot_tot, bedrag)

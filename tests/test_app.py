@@ -4273,6 +4273,14 @@ class TestAuditLog(unittest.TestCase):
         acties = [r["actie"] for r in regels]
         self.assertIn("reset", acties)
 
+    def test_cf_connecting_ip_wordt_gebruikt_als_aanwezig(self):
+        """CF-Connecting-IP header wordt opgeslagen als client-IP boven remote_addr."""
+        self.client.post("/admin/opruimen", headers={"CF-Connecting-IP": "9.8.7.6"})
+        regels = self._audit_regels()
+        rij = next((r for r in regels if r["actie"] == "opruimen"), None)
+        self.assertIsNotNone(rij)
+        self.assertEqual(rij["ip"], "9.8.7.6")
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Uitvoeren als script
