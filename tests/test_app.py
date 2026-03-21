@@ -4166,6 +4166,115 @@ class TestAdminInstellingenTransactie(unittest.TestCase):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# AUDIT-LOG
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestAuditLog(unittest.TestCase):
+
+    def setUp(self):
+        self.client, self.ctx = maak_flask_client()
+        self.client.post("/admin/login",
+                         data={"gebruiker": "admin", "wachtwoord": "testpass12345"})
+
+    def tearDown(self):
+        self.ctx.pop()
+
+    def _audit_regels(self):
+        return App.get_db().execute(
+            "SELECT actie, details, gebruiker, ip FROM audit_log ORDER BY id"
+        ).fetchall()
+
+    def test_login_succes_wordt_gelogd(self):
+        """Succesvolle login schrijft login_succes naar audit_log."""
+        regels = self._audit_regels()
+        acties = [r["actie"] for r in regels]
+        self.assertIn("login_succes", acties)
+        rij = next(r for r in regels if r["actie"] == "login_succes")
+        self.assertEqual(rij["gebruiker"], "admin")
+
+    def test_login_mislukt_wordt_gelogd(self):
+        """Mislukte login schrijft login_mislukt naar audit_log."""
+        self.client.post("/admin/login",
+                         data={"gebruiker": "admin", "wachtwoord": "foutWachtwoord"})
+        regels = self._audit_regels()
+        acties = [r["actie"] for r in regels]
+        self.assertIn("login_mislukt", acties)
+
+    def test_logout_wordt_gelogd(self):
+        """Uitloggen schrijft logout naar audit_log."""
+        self.client.post("/admin/logout")
+        regels = self._audit_regels()
+        acties = [r["actie"] for r in regels]
+        self.assertIn("logout", acties)
+
+    def test_wachtwoord_wijzigen_wordt_gelogd(self):
+        """Wachtwoordwijziging schrijft wachtwoord_gewijzigd naar audit_log."""
+        self.client.post("/admin/wachtwoord-wijzigen", data={
+            "huidig_wachtwoord": "testpass12345",
+            "nieuw_wachtwoord": "NieuwWachtwoord99",
+            "nieuw_wachtwoord_bevestiging": "NieuwWachtwoord99",
+        })
+        regels = self._audit_regels()
+        acties = [r["actie"] for r in regels]
+        self.assertIn("wachtwoord_gewijzigd", acties)
+
+    def test_beheerder_aangemaakt_wordt_gelogd(self):
+        """Nieuw beheerdersaccount schrijft beheerder_aangemaakt naar audit_log."""
+        self.client.post("/admin/beheerder-toevoegen", data={
+            "gebruikersnaam": "nieuwebeheerder",
+            "wachtwoord": "sterkwachtwoord1",
+            "wachtwoord_bevestiging": "sterkwachtwoord1",
+        })
+        regels = self._audit_regels()
+        acties = [r["actie"] for r in regels]
+        self.assertIn("beheerder_aangemaakt", acties)
+        rij = next(r for r in regels if r["actie"] == "beheerder_aangemaakt")
+        self.assertIn("nieuwebeheerder", rij["details"])
+
+    def test_instellingen_gewijzigd_wordt_gelogd(self):
+        """Instellingen opslaan schrijft instellingen_gewijzigd naar audit_log."""
+        self.client.post("/admin/instellingen", data={"max_per_bestelling": "20"})
+        regels = self._audit_regels()
+        acties = [r["actie"] for r in regels]
+        self.assertIn("instellingen_gewijzigd", acties)
+
+    def test_opruimen_wordt_gelogd(self):
+        """Opruimen schrijft opruimen naar audit_log."""
+        self.client.post("/admin/opruimen")
+        regels = self._audit_regels()
+        acties = [r["actie"] for r in regels]
+        self.assertIn("opruimen", acties)
+
+    def test_audit_log_zichtbaar_op_beheer_pagina(self):
+        """Audit-log regels zijn zichtbaar op /admin/beheer."""
+        r = self.client.get("/admin/beheer")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(b"Audit-log", r.data)
+        self.assertIn(b"Ingelogd", r.data)  # login_succes label
+
+    def test_audit_log_wissen(self):
+        """Audit-log wissen verwijdert alle regels (op de wisregel zelf na)."""
+        self.client.post("/admin/audit-wissen")
+        regels = self._audit_regels()
+        # Na wissen staat alleen de 'audit_log_gewist' regel er nog in
+        self.assertEqual(len(regels), 1)
+        self.assertEqual(regels[0]["actie"], "audit_log_gewist")
+
+    def test_audit_log_bevat_ip_adres(self):
+        """Audit-log regels bevatten een IP-adres."""
+        regels = self._audit_regels()
+        rij = next(r for r in regels if r["actie"] == "login_succes")
+        self.assertIsNotNone(rij["ip"])
+
+    def test_reset_wordt_gelogd(self):
+        """Database-reset schrijft reset naar audit_log."""
+        self.client.post("/admin/reset", data={"bevestiging": "RESET"})
+        regels = self._audit_regels()
+        acties = [r["actie"] for r in regels]
+        self.assertIn("reset", acties)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # Uitvoeren als script
 # ══════════════════════════════════════════════════════════════════════════════
 

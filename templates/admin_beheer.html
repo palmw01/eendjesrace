@@ -125,6 +125,26 @@
     }
     .tabel-wrapper table { border-radius: 0; box-shadow: none; }
 
+    /* ── audit-log ── */
+    .audit-tabel { width: 100%; border-collapse: collapse; font-size: .82rem; }
+    .audit-tabel th {
+      background: #F0F4F8; color: #555; font-weight: 700; text-align: left;
+      padding: 8px 10px; border-bottom: 2px solid #E0E0E0; white-space: nowrap;
+    }
+    .audit-tabel td { padding: 7px 10px; border-bottom: 1px solid #F0F4F8; vertical-align: top; }
+    .audit-tabel tr:last-child td { border-bottom: none; }
+    .audit-niveau-info  td:first-child { border-left: 3px solid #43A047; }
+    .audit-niveau-waarschuwing td:first-child { border-left: 3px solid #FB8C00; }
+    .audit-niveau-kritiek td:first-child { border-left: 3px solid #C62828; }
+    .audit-badge {
+      display: inline-block; padding: 2px 8px; border-radius: 99px;
+      font-size: .74rem; font-weight: 700; white-space: nowrap;
+    }
+    .audit-badge-info  { background: #E8F5E9; color: #2E7D32; }
+    .audit-badge-waarschuwing { background: #FFF3E0; color: #E65100; }
+    .audit-badge-kritiek { background: #FFEBEE; color: #C62828; }
+    .audit-leeg { color: #aaa; font-style: italic; padding: 18px 10px; text-align: center; }
+
     .gevaarzone {
       margin-top: 40px; border: 2px solid #EF9A9A; border-radius: 14px;
       padding: 22px 28px; background: #FFEBEE;
@@ -301,9 +321,85 @@
     </form>
   </details>
 
+  <!-- Audit-log -->
+  <details style="margin-top:28px;">
+    <summary style="cursor:pointer;font-family:'Fredoka One',cursive;font-size:1.2rem;color:#0077B6;padding:4px 0;user-select:none;">
+      🔍 Audit-log
+      <span style="font-family:'Nunito',sans-serif;font-size:.82rem;font-weight:600;color:#888;margin-left:8px;">(laatste 200 acties)</span>
+    </summary>
+    <div class="tabel-wrapper" style="margin-top:14px;">
+      <table class="audit-tabel">
+        <thead>
+          <tr>
+            <th>Tijdstip</th>
+            <th>Gebruiker</th>
+            <th>Actie</th>
+            <th>Details</th>
+            <th>IP-adres</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% set niveau_map = {
+            'login_succes':         'info',
+            'login_mislukt':        'waarschuwing',
+            'account_geblokkeerd':  'waarschuwing',
+            'logout':               'info',
+            'wachtwoord_gewijzigd': 'info',
+            'beheerder_aangemaakt': 'info',
+            'beheerder_verwijderd': 'waarschuwing',
+            'instellingen_gewijzigd': 'info',
+            'bestelling_gewijzigd': 'info',
+            'mail_opnieuw':         'info',
+            'handmatige_bestelling':'info',
+            'opruimen':             'info',
+            'reset':                'kritiek',
+            'audit_log_gewist':     'waarschuwing'
+          } %}
+          {% set label_map = {
+            'login_succes':         'Ingelogd',
+            'login_mislukt':        'Login mislukt',
+            'account_geblokkeerd':  'Account geblokkeerd',
+            'logout':               'Uitgelogd',
+            'wachtwoord_gewijzigd': 'Wachtwoord gewijzigd',
+            'beheerder_aangemaakt': 'Beheerder aangemaakt',
+            'beheerder_verwijderd': 'Beheerder verwijderd',
+            'instellingen_gewijzigd': 'Instellingen gewijzigd',
+            'bestelling_gewijzigd': 'Bestelling gewijzigd',
+            'mail_opnieuw':         'Mail opnieuw verstuurd',
+            'handmatige_bestelling':'Handmatige bestelling',
+            'opruimen':             'Opruimen',
+            'reset':                'Database reset',
+            'audit_log_gewist':     'Audit-log gewist'
+          } %}
+          {% if audit_regels %}
+            {% for rij in audit_regels %}
+              {% set niv = niveau_map.get(rij.actie, 'info') %}
+              <tr class="audit-niveau-{{ niv }}">
+                <td style="white-space:nowrap;color:#555;">{{ rij.tijdstip }}</td>
+                <td>{{ rij.gebruiker or '–' }}</td>
+                <td><span class="audit-badge audit-badge-{{ niv }}">{{ label_map.get(rij.actie, rij.actie) }}</span></td>
+                <td style="color:#444;">{{ rij.details or '' }}</td>
+                <td style="white-space:nowrap;font-family:monospace;color:#777;font-size:.78rem;">{{ rij.ip or '–' }}</td>
+              </tr>
+            {% endfor %}
+          {% else %}
+            <tr><td colspan="5" class="audit-leeg">Nog geen acties geregistreerd.</td></tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </details>
+
   <!-- Gevaarzone: database resetten -->
   <div class="gevaarzone">
     <h2>⚠ Gevaarzone</h2>
+    <p style="margin-bottom:10px;">
+      <strong>Audit-log wissen</strong> verwijdert alle audit-logregels permanent.
+    </p>
+    <form method="POST" action="{{ url_for('audit_wissen') }}" id="auditWissenForm" style="margin-bottom:18px;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="knop-reset" style="background:#E65100;">Audit-log wissen</button>
+    </form>
     <p style="margin-bottom:10px;">
       <strong>Opruimen</strong> verwijdert verlopen, mislukte en geannuleerde bestellingen
       <em>zonder lotnummers</em>. Betaalde bestellingen blijven onaangetast.
@@ -385,6 +481,11 @@
     modal.addEventListener('click', function(e) { if (e.target === modal) { modal.close(); } });
     document.addEventListener('click', function(e) { if (avatarMenu && avatarMenu.open && !avatarMenu.contains(e.target)) { avatarMenu.removeAttribute('open'); } });
 
+    document.getElementById('auditWissenForm').addEventListener('submit', function(e) {
+      if (!confirm('Audit-log volledig wissen? Dit kan niet ongedaan worden gemaakt.')) {
+        e.preventDefault();
+      }
+    });
     document.getElementById('resetForm').addEventListener('submit', function(e) {
       if (!confirm('Weet je zeker dat je de database wilt resetten? Dit kan niet ongedaan worden gemaakt.')) {
         e.preventDefault();
