@@ -128,6 +128,7 @@
     /* ── audit-log ── */
     .audit-tabel { width: 100%; border-collapse: collapse; font-size: .82rem; }
     .audit-tabel th {
+      position: sticky; top: 0; z-index: 1;
       background: #F0F4F8; color: #555; font-weight: 700; text-align: left;
       padding: 8px 10px; border-bottom: 2px solid #E0E0E0; white-space: nowrap;
     }
@@ -327,7 +328,7 @@
       🔍 Audit-log
       <span style="font-family:'Nunito',sans-serif;font-size:.82rem;font-weight:600;color:#888;margin-left:8px;">(laatste 200 acties)</span>
     </summary>
-    <div class="tabel-wrapper" style="margin-top:14px;">
+    <div class="tabel-wrapper" style="margin-top:14px;max-height:420px;overflow-y:auto;">
       <table class="audit-tabel">
         <thead>
           <tr>
