@@ -75,10 +75,30 @@ app.logger.addHandler(console_handler)
 # ─── Configuratie ────────────────────────────────────────────────────────────
 MOLLIE_API_KEY   = os.environ.get("MOLLIE_API_KEY", "")
 BASE_URL         = os.environ.get("BASE_URL", "http://localhost:5000")
-MAX_EENDJES      = int(os.environ.get("MAX_EENDJES", 3000))
-PRIJS_PER_STUK   = float(os.environ.get("PRIJS_PER_STUK",   "2.50"))
-PRIJS_VIJF_STUKS = float(os.environ.get("PRIJS_VIJF_STUKS", "10.00"))
-TRANSACTIEKOSTEN = float(os.environ.get("TRANSACTIEKOSTEN", "0.32"))  # iDEAL-transactiekosten Mollie
+try:
+    MAX_EENDJES = int(os.environ.get("MAX_EENDJES", 3000))
+    if MAX_EENDJES < 1:
+        raise ValueError("MAX_EENDJES moet minimaal 1 zijn")
+except (ValueError, TypeError) as _e:
+    raise ValueError(f"Ongeldige waarde voor MAX_EENDJES: {_e}") from _e
+try:
+    PRIJS_PER_STUK = float(os.environ.get("PRIJS_PER_STUK", "2.50"))
+    if PRIJS_PER_STUK <= 0:
+        raise ValueError("PRIJS_PER_STUK moet groter dan 0 zijn")
+except (ValueError, TypeError) as _e:
+    raise ValueError(f"Ongeldige waarde voor PRIJS_PER_STUK: {_e}") from _e
+try:
+    PRIJS_VIJF_STUKS = float(os.environ.get("PRIJS_VIJF_STUKS", "10.00"))
+    if PRIJS_VIJF_STUKS <= 0:
+        raise ValueError("PRIJS_VIJF_STUKS moet groter dan 0 zijn")
+except (ValueError, TypeError) as _e:
+    raise ValueError(f"Ongeldige waarde voor PRIJS_VIJF_STUKS: {_e}") from _e
+try:
+    TRANSACTIEKOSTEN = float(os.environ.get("TRANSACTIEKOSTEN", "0.32"))  # iDEAL-transactiekosten Mollie
+    if TRANSACTIEKOSTEN < 0:
+        raise ValueError("TRANSACTIEKOSTEN mag niet negatief zijn")
+except (ValueError, TypeError) as _e:
+    raise ValueError(f"Ongeldige waarde voor TRANSACTIEKOSTEN: {_e}") from _e
 
 RESEND_API_KEY   = os.environ.get("RESEND_API_KEY", "")
 RESEND_FROM      = os.environ.get("RESEND_FROM", "")
@@ -281,6 +301,18 @@ def init_db():
         pass  # kolom bestaat al
     try:
         conn.execute("ALTER TABLE beheerders ADD COLUMN laatste_inlog TEXT")
+    except sqlite3.OperationalError:
+        pass  # kolom bestaat al
+    try:
+        conn.execute("ALTER TABLE beheerders ADD COLUMN sessie_versie INTEGER NOT NULL DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass  # kolom bestaat al
+    try:
+        conn.execute("ALTER TABLE beheerders ADD COLUMN mislukte_pogingen INTEGER NOT NULL DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass  # kolom bestaat al
+    try:
+        conn.execute("ALTER TABLE beheerders ADD COLUMN geblokkeerd_tot TEXT")
     except sqlite3.OperationalError:
         pass  # kolom bestaat al
     try:
@@ -576,13 +608,24 @@ def login_vereist(f):
     def wrapper(*args, **kwargs):
         if not session.get("admin_ingelogd"):
             return redirect(url_for("admin_login"))
+        # Valideer sessie-versie: ongeldig na wachtwoordwijziging
+        gebruiker = session.get("admin_gebruikersnaam")
+        if gebruiker:
+            db = get_db()
+            rij = db.execute(
+                "SELECT sessie_versie FROM beheerders WHERE gebruikersnaam = ?",
+                (gebruiker,)
+            ).fetchone()
+            if not rij or rij["sessie_versie"] != session.get("admin_sessie_versie", -1):
+                session.clear()
+                return redirect(url_for("admin_login"))
         return f(*args, **kwargs)
     return wrapper
 
 
 def saniteer_log(tekst):
-    """Verwijder newlines uit gebruikersinvoer om log-injectie te voorkomen."""
-    return str(tekst).replace("\n", " ").replace("\r", " ")
+    """Verwijder control characters uit gebruikersinvoer om log-injectie te voorkomen."""
+    return "".join(c if ord(c) >= 32 else " " for c in str(tekst))
 
 
 @app.before_request
@@ -917,6 +960,7 @@ def bestellen():
 
 
 @app.route("/webhook", methods=["POST"])
+@limiter.limit("60 per minute")
 @csrf.exempt
 def webhook():
     client_ip = request.remote_addr
@@ -1039,11 +1083,14 @@ def betaald_redirect(bestelling_id):
 
 
 @app.route("/betaald/<mollie_id>")
+@limiter.limit("30 per minute")
 def betaald(mollie_id):
     """
     Landingspagina na terugkeer van Mollie.
     Webhook kan iets later komen dan deze redirect — dus fallback-check.
     """
+    if not mollie_id.startswith("tr_") or len(mollie_id) > 64:
+        abort(404)
     try:
         db  = get_db()
         rij = db.execute("SELECT * FROM bestellingen WHERE mollie_id=?", (mollie_id,)).fetchone()
@@ -1107,25 +1154,71 @@ def admin_login():
         wachtwoord = request.form.get("wachtwoord", "")
         db  = get_db()
         rij = db.execute(
-            "SELECT wachtwoord_hash FROM beheerders WHERE gebruikersnaam = ?",
+            "SELECT wachtwoord_hash, sessie_versie, mislukte_pogingen, geblokkeerd_tot FROM beheerders WHERE gebruikersnaam = ?",
             (gebruiker,)
         ).fetchone()
-        if rij and check_password_hash(rij["wachtwoord_hash"], wachtwoord):
-            session["admin_ingelogd"]       = True
-            session["admin_gebruikersnaam"] = gebruiker
-            session.permanent = True
+
+        # Controleer account-blokkering
+        if rij and rij["geblokkeerd_tot"]:
+            from datetime import datetime as _dt
+            try:
+                geblokkeerd_tot_dt = _dt.fromisoformat(rij["geblokkeerd_tot"])
+                if _dt.now() < geblokkeerd_tot_dt:
+                    resterende = int((geblokkeerd_tot_dt - _dt.now()).total_seconds())
+                    fout = f"Account tijdelijk geblokkeerd. Probeer over {resterende // 60 + 1} minuten opnieuw."
+                    app.logger.warning(f"Login geblokkeerd voor '{saniteer_log(gebruiker)}' vanaf {request.remote_addr}")
+                    return render_template("admin_login.html", fout=fout)
+                else:
+                    db.execute(
+                        "UPDATE beheerders SET mislukte_pogingen = 0, geblokkeerd_tot = NULL WHERE gebruikersnaam = ?",
+                        (gebruiker,)
+                    )
+                    db.commit()
+            except (ValueError, TypeError):
+                pass
+
+        # Timing-safe hash check — altijd uitvoeren om username-enumeratie via responstijd te voorkomen
+        _te_controleren_hash = rij["wachtwoord_hash"] if rij else generate_password_hash("dummy-constant-waarde-tegen-timing")
+        _hash_klopt = check_password_hash(_te_controleren_hash, wachtwoord)
+
+        if rij and _hash_klopt:
             db.execute(
-                "UPDATE beheerders SET laatste_inlog = datetime('now','localtime') WHERE gebruikersnaam = ?",
+                "UPDATE beheerders SET mislukte_pogingen = 0, geblokkeerd_tot = NULL, laatste_inlog = datetime('now','localtime') WHERE gebruikersnaam = ?",
                 (gebruiker,)
             )
+            db.commit()
+            session.clear()  # Session fixation voorkomen: gooi oude session-ID weg
+            session["admin_ingelogd"]       = True
+            session["admin_gebruikersnaam"] = gebruiker
+            session["admin_sessie_versie"]  = rij["sessie_versie"] if rij["sessie_versie"] is not None else 0
+            session.permanent = True
             app.logger.info(f"Admin ingelogd: {saniteer_log(gebruiker)} vanaf {request.remote_addr}")
             return redirect(url_for("admin"))
+
+        # Mislukte login: verhoog teller, blokkeer na 10 opeenvolgende pogingen
+        if rij:
+            nieuwe_pogingen = (rij["mislukte_pogingen"] or 0) + 1
+            if nieuwe_pogingen >= 10:
+                from datetime import datetime as _dt, timedelta as _td
+                geblokkeerd_tot = (_dt.now() + _td(minutes=15)).isoformat(timespec="seconds")
+                db.execute(
+                    "UPDATE beheerders SET mislukte_pogingen = ?, geblokkeerd_tot = ? WHERE gebruikersnaam = ?",
+                    (nieuwe_pogingen, geblokkeerd_tot, gebruiker)
+                )
+                app.logger.warning(f"Account geblokkeerd na {nieuwe_pogingen} pogingen: {saniteer_log(gebruiker)} vanaf {request.remote_addr}")
+            else:
+                db.execute(
+                    "UPDATE beheerders SET mislukte_pogingen = ? WHERE gebruikersnaam = ?",
+                    (nieuwe_pogingen, gebruiker)
+                )
+            db.commit()
+
         fout = "Onjuiste gebruikersnaam of wachtwoord."
         app.logger.warning(f"Mislukte admin-login voor '{saniteer_log(gebruiker)}' vanaf {request.remote_addr}")
     return render_template("admin_login.html", fout=fout)
 
 
-@app.route("/admin/logout")
+@app.route("/admin/logout", methods=["POST"])
 @login_vereist
 def admin_logout():
     gebruiker = session.get("admin_gebruikersnaam", "onbekend")
@@ -1332,6 +1425,13 @@ def admin_instellingen():
                 flash(f, "fout")
         else:
             # Alleen opslaan als alle velden geldig zijn — atomisch
+            _TOEGESTANE_KOLOMMEN = {
+                "max_eendjes", "max_per_bestelling", "prijs_per_stuk",
+                "prijs_vijf_stuks", "transactiekosten", "notificatie_email", "onderhoudsmodus",
+            }
+            for _kolom in updates:
+                if _kolom not in _TOEGESTANE_KOLOMMEN:
+                    raise ValueError(f"Ongeldige kolomnaam: {_kolom}")
             try:
                 db.execute("BEGIN")
                 for kolom, waarde in updates.items():
@@ -1377,7 +1477,7 @@ def beheerder_toevoegen():
             (gebruikersnaam, generate_password_hash(wachtwoord))
         )
         db.commit()
-        app.logger.info(f"Nieuw beheerdersaccount aangemaakt: {saniteer_log(gebruikersnaam)}")
+        app.logger.info(f"Nieuw beheerdersaccount aangemaakt: {saniteer_log(gebruikersnaam)} door {saniteer_log(session.get('admin_gebruikersnaam'))} (IP: {saniteer_log(request.remote_addr)})")
         flash(f"Account '{gebruikersnaam}' aangemaakt.", "info")
     except sqlite3.IntegrityError:
         flash(f"Gebruikersnaam '{gebruikersnaam}' bestaat al.", "fout")
@@ -1407,7 +1507,7 @@ def beheerder_verwijderen(beheerder_id):
             return redirect(url_for("admin_beheer"))
         db.execute("DELETE FROM beheerders WHERE id = ?", (beheerder_id,))
         db.commit()
-        app.logger.info(f"Beheerdersaccount verwijderd: {saniteer_log(rij['gebruikersnaam'])}")
+        app.logger.info(f"Beheerdersaccount verwijderd: {saniteer_log(rij['gebruikersnaam'])} door {saniteer_log(session.get('admin_gebruikersnaam'))} (IP: {saniteer_log(request.remote_addr)})")
         flash(f"Account '{rij['gebruikersnaam']}' verwijderd.", "info")
     except sqlite3.Error as e:
         app.logger.error(f"DB-fout beheerder_verwijderen: {e}")
@@ -1439,11 +1539,17 @@ def wachtwoord_wijzigen():
             flash("Nieuwe wachtwoorden komen niet overeen.", "fout")
             return redirect(url_for("admin"))
         db.execute(
-            "UPDATE beheerders SET wachtwoord_hash = ? WHERE id = ?",
+            "UPDATE beheerders SET wachtwoord_hash = ?, sessie_versie = sessie_versie + 1 WHERE id = ?",
             (generate_password_hash(nieuw), rij["id"])
         )
         db.commit()
-        app.logger.info(f"Wachtwoord gewijzigd voor: {saniteer_log(gebruiker)}")
+        # Bijwerken van de huidige sessie naar de nieuwe versie zodat de eigen sessie geldig blijft;
+        # alle andere sessies van deze gebruiker worden daarmee ongeldig.
+        nieuwe_versie = db.execute(
+            "SELECT sessie_versie FROM beheerders WHERE id = ?", (rij["id"],)
+        ).fetchone()["sessie_versie"]
+        session["admin_sessie_versie"] = nieuwe_versie
+        app.logger.info(f"Wachtwoord gewijzigd voor: {saniteer_log(gebruiker)} (IP: {saniteer_log(request.remote_addr)})")
         flash("Wachtwoord succesvol gewijzigd.", "info")
     except sqlite3.Error as e:
         app.logger.error(f"DB-fout wachtwoord_wijzigen: {e}")

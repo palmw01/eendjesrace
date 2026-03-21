@@ -828,7 +828,7 @@ class TestAdmin(unittest.TestCase):
 
     def test_logout_verwijdert_sessie(self):
         self._login()
-        self.client.get("/admin/logout")
+        self.client.post("/admin/logout")
         self.assertEqual(self.client.get("/admin").status_code, 302)
 
     def test_admin_bevat_details_handmatige_bestelling(self):
@@ -1137,7 +1137,7 @@ class TestWijzigenVerwijderen(unittest.TestCase):
         self.assertEqual(self.client.get("/admin/bestelling/99999/wijzigen").status_code, 404)
 
     def test_wijzigen_get_zonder_login_geeft_302(self):
-        self.client.get("/admin/logout")
+        self.client.post("/admin/logout")
         self.assertEqual(self.client.get("/admin/bestelling/1/wijzigen").status_code, 302)
 
     # ── wijzigen POST ─────────────────────────────────────────────────────────
@@ -2246,7 +2246,7 @@ class TestBeheerderAccounts(unittest.TestCase):
         r = self._wijzig_wachtwoord("testpass12345", "nieuwwachtwoord99")
         self.assertIn(b"succesvol", r.data)
         # Inloggen met nieuw wachtwoord werkt
-        self.client.get("/admin/logout")
+        self.client.post("/admin/logout")
         r2 = self.client.post("/admin/login",
                               data={"gebruiker": "admin", "wachtwoord": "nieuwwachtwoord99"})
         self.assertEqual(r2.status_code, 302)
@@ -2495,7 +2495,7 @@ class TestAdminLoginSessie(unittest.TestCase):
         """Uitloggen stuurt door naar de inlogpagina."""
         self.client.post("/admin/login",
                          data={"gebruiker": "admin", "wachtwoord": "testpass12345"})
-        r = self.client.get("/admin/logout")
+        r = self.client.post("/admin/logout")
         self.assertEqual(r.status_code, 302)
         self.assertIn("login", r.headers["Location"])
 
@@ -2503,14 +2503,14 @@ class TestAdminLoginSessie(unittest.TestCase):
         """Na uitloggen mogen geen admin-sessiegegevens meer aanwezig zijn."""
         self.client.post("/admin/login",
                          data={"gebruiker": "admin", "wachtwoord": "testpass12345"})
-        self.client.get("/admin/logout")
+        self.client.post("/admin/logout")
         with self.client.session_transaction() as sess:
             self.assertFalse(sess.get("admin_ingelogd", False))
             self.assertIsNone(sess.get("admin_gebruikersnaam"))
 
     def test_logout_zonder_login_geeft_302(self):
         """Uitloggen zonder actieve sessie redirect naar inlogpagina."""
-        r = self.client.get("/admin/logout")
+        r = self.client.post("/admin/logout")
         self.assertEqual(r.status_code, 302)
 
     def test_login_onbekende_gebruiker_geeft_fout(self):
@@ -2551,7 +2551,7 @@ class TestBeheerderToevoegenExtra(unittest.TestCase):
 
     def test_beheerder_toevoegen_zonder_login_geeft_302(self):
         """Unauthenticated toegang wordt doorgestuurd naar login."""
-        self.client.get("/admin/logout")
+        self.client.post("/admin/logout")
         r = self.client.post("/admin/beheerder-toevoegen", data={
             "gebruikersnaam": "nieuw",
             "wachtwoord": "sterkwachtwoord1",
@@ -2604,7 +2604,7 @@ class TestBeheerderVerwijderenExtra(unittest.TestCase):
 
     def test_beheerder_verwijderen_zonder_login_geeft_302(self):
         """Unauthenticated toegang wordt doorgestuurd naar login."""
-        self.client.get("/admin/logout")
+        self.client.post("/admin/logout")
         r = self.client.post("/admin/beheerder-verwijderen/1")
         self.assertEqual(r.status_code, 302)
         self.assertIn("login", r.headers["Location"])
@@ -2626,7 +2626,7 @@ class TestWachtwoordWijzigenExtra(unittest.TestCase):
 
     def test_wachtwoord_wijzigen_zonder_login_geeft_302(self):
         """Unauthenticated toegang wordt doorgestuurd naar login."""
-        self.client.get("/admin/logout")
+        self.client.post("/admin/logout")
         r = self.client.post("/admin/wachtwoord-wijzigen", data={
             "huidig_wachtwoord": "testpass12345",
             "nieuw_wachtwoord": "nieuwwachtwoord99",

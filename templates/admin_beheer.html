@@ -171,7 +171,10 @@
       {% if huidige_gebruiker %}
         <button type="button" id="btnWachtwoordWijzigen" style="padding:8px 14px;background:#E3F2FD;color:#1565C0;border:none;border-radius:99px;font-weight:700;font-size:.9rem;cursor:pointer;">🔑 Wachtwoord</button>
       {% endif %}
-      <a href="/admin/logout" class="uitloggen">Uitloggen</a>
+      <form method="post" action="{{ url_for('admin_logout') }}" style="display:inline">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="uitloggen">Uitloggen</button>
+      </form>
     </div>
     {% if huidige_gebruiker %}
     <details class="avatar-menu" id="avatarMenu">
@@ -180,7 +183,10 @@
         <div class="avatar-naam">👤 {{ huidige_gebruiker }}</div>
         <a href="/admin" class="avatar-dd-knop" style="background:#F0F4F8;color:#0077B6;">← Bestellingen</a>
         <button type="button" id="btnWachtwoordWijzigenAvatar" class="avatar-dd-knop" style="background:#E3F2FD;color:#1565C0;">🔑 Wachtwoord wijzigen</button>
-        <a href="/admin/logout" class="avatar-dd-knop" style="background:#FFEBEE;color:#C62828;">Uitloggen</a>
+        <form method="post" action="{{ url_for('admin_logout') }}" style="display:contents">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="avatar-dd-knop" style="background:#FFEBEE;color:#C62828;border:none;cursor:pointer;text-align:left;width:100%;">Uitloggen</button>
+        </form>
       </div>
     </details>
     {% endif %}

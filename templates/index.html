@@ -628,11 +628,10 @@
         </div>
       </div>
 
-      <div class="tk-rij" onclick="document.getElementById('transactiekosten').click()">
+      <div class="tk-rij">
         <input type="checkbox" id="transactiekosten" name="transactiekosten" value="1"
-               {% if vorig and vorig.transactiekosten %}checked{% endif %}
-               onclick="event.stopPropagation(); updatePrijs()">
-        <label for="transactiekosten" onclick="event.preventDefault()">
+               {% if vorig and vorig.transactiekosten %}checked{% endif %}>
+        <label for="transactiekosten">
           Ik betaal de iDEAL-transactiekosten (€&nbsp;{{ "%.2f"|format(transactiekosten)|replace(".", ",") }})
           <span>— zo gaat het volledige lotbedrag naar het goede doel.</span>
         </label>
@@ -761,6 +760,19 @@
   aantalInput?.addEventListener('input', updatePrijs);
   tkCheckbox?.addEventListener('change', updatePrijs);
   updatePrijs();
+
+  // tk-rij klik-afhandeling (vervangt inline onclick handlers)
+  var tkRij = document.querySelector('.tk-rij');
+  if (tkRij && tkCheckbox) {
+    tkRij.addEventListener('click', function(e) {
+      if (e.target === tkCheckbox || e.target.tagName === 'LABEL') return;
+      tkCheckbox.click();
+    });
+    tkCheckbox.addEventListener('click', function(e) {
+      e.stopPropagation();
+      updatePrijs();
+    });
+  }
 
   document.getElementById('bestelForm')?.addEventListener('submit', function() {
     knop.disabled = true;

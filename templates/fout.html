@@ -112,7 +112,7 @@
     <div class="acties">
       <a href="/" class="knop knop-primair">← Terug naar start</a>
       {% if code >= 500 %}
-      <a href="javascript:location.reload()" class="knop knop-secundair">↻ Probeer opnieuw</a>
+      <button type="button" id="herlaad-knop" class="knop knop-secundair">↻ Probeer opnieuw</button>
       {% endif %}
     </div>
   </div>
@@ -130,5 +130,9 @@
       <a href="/voorwaarden">Algemene voorwaarden</a>
     </p>
   </footer>
+<script nonce="{{ g.csp_nonce }}">
+  var herlaadKnop = document.getElementById('herlaad-knop');
+  if (herlaadKnop) herlaadKnop.addEventListener('click', function() { location.reload(); });
+</script>
 </body>
 </html>
