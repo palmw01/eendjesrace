@@ -15,12 +15,13 @@ Gebouwd met **Python/Flask**, **Mollie** (iDEAL-betalingen), **SQLite** en **Res
 | iDEAL-betaling via Mollie | ✅ |
 | Automatische lotnummer-toewijzing na betaling | ✅ |
 | Bevestigingsmail met lotnummers via Resend | ✅ |
-| Stille kopie-mail naar beheerder bij elke bestelling (optioneel) | ✅ |
 | Beheerpagina met statistieken, zoeken, filter en CSV-export | ✅ |
-| Instellingen beheren via admin (max. eendjes, max. per bestelling, prijzen, notificatieadres) | ✅ |
+| Instellingen beheren via admin (max. eendjes, max. per bestelling, prijzen) | ✅ |
 | Meerdere beheerdersaccounts aanmaken en verwijderen via admin | ✅ |
-| Laatste inlogdatum per beheerder bijhouden | ✅ |
+| Tweefactorauthenticatie (TOTP) per beheerdersaccount | ✅ |
+| Audit-log van alle beheersacties (incl. IP-adres, kleurgecodeerd op ernst) | ✅ |
 | Wachtwoord wijzigen via admin-topbar | ✅ |
+| Handmatige bestellingen aanmaken (contant/overboeking) | ✅ |
 | Automatische database-backup naar Cloudflare R2 via Litestream | ✅ |
 | SEO-geoptimaliseerd (meta description, Open Graph, Twitter Card, JSON-LD, sitemap.xml, robots.txt) | ✅ |
 | Sponsorstrip op homepage (automatisch geladen uit `static/img/sponsors/`, ≤4 statisch / ≥5 scrollend) | ✅ |
@@ -150,6 +151,8 @@ De app ondersteunt meerdere beheerdersaccounts. Wachtwoorden worden gehasht opge
 
 - **Accounts beheren**: inloggen → admin-paneel → sectie "Beheerders"
 - **Wachtwoord wijzigen**: knop "🔑 Wachtwoord" rechtsboven in de topbar
+- **2FA instellen**: inloggen → Beheer → sectie "Beheerders" → "2FA inschakelen". Scan de QR-code met Google Authenticator, Aegis, Authy of een andere TOTP-app. Na activering wordt bij elke login een 6-cijferige code gevraagd naast het wachtwoord.
+- **Account lockout**: na 10 opeenvolgende mislukte loginpogingen wordt een account 15 minuten geblokkeerd
 - **Database reset** verwijdert **geen** beheerdersaccounts — alleen bestellingen en webhook-log worden gewist
 
 ---
@@ -168,16 +171,21 @@ De app ondersteunt meerdere beheerdersaccounts. Wachtwoorden worden gehasht opge
 | `/robots.txt` | Crawler-instructies (blokkeert admin/bestellen/betaald, verwijst naar sitemap) |
 | `/sitemap.xml` | XML-sitemap met openbare pagina's (`/`, `/privacy`, `/voorwaarden`) |
 | `/admin` | Bestellingenpagina — statistieken, bestellingen, zoeken, filter, CSV-download |
-| `/admin/beheer` | Beheerpagina — instellingen, beheerders, gevaarzone |
+| `/admin/beheer` | Beheerpagina — instellingen, beheerders (incl. 2FA), audit-log, gevaarzone |
 | `/admin/export-csv` | Download alle bestellingen als CSV |
 | `/admin/bestelling/<id>/wijzigen` | Bewerk naam, e-mail, telefoon, status of mailstatus |
-| `/admin/instellingen` | Wijzig totaal beschikbare eendjes, maximum per bestelling, prijzen en notificatie-e-mailadres |
+| `/admin/instellingen` | Wijzig totaal beschikbare eendjes, maximum per bestelling en prijzen |
 | `/admin/opruimen` | Verwijder verlopen/mislukte/geannuleerde bestellingen zonder lotnummers |
 | `/admin/handmatig` | Maak handmatige bestelling aan (contant/overboeking) |
 | `/admin/reset` | Reset volledige database — bestellingen en webhook-log (beheerdersaccounts blijven intact) |
 | `/admin/beheerder-toevoegen` | Nieuw beheerdersaccount aanmaken |
 | `/admin/beheerder-verwijderen/<id>` | Beheerdersaccount verwijderen |
 | `/admin/wachtwoord-wijzigen` | Eigen wachtwoord wijzigen |
+| `/admin/2fa/instellen` | 2FA-instelpagina met QR-code |
+| `/admin/2fa/bevestigen` | Activeer 2FA na verificatie van de eerste code |
+| `/admin/2fa/uitschakelen` | Schakel 2FA uit met huidige TOTP-code |
+| `/admin/login/totp` | Tweede loginstap (TOTP-code) wanneer 2FA actief is |
+| `/admin/audit-wissen` | Wis de volledige audit-log |
 | `/.well-known/security.txt` | Beveiligingscontactinformatie (RFC 9116) |
 
 ---
@@ -204,9 +212,11 @@ eendjesrace/
     ├── privacy.html        # Privacyverklaring (AVG)
     ├── voorwaarden.html    # Algemene voorwaarden
     ├── admin.html          # Bestellingenpagina
-    ├── admin_beheer.html   # Beheerpagina (instellingen, beheerders, gevaarzone)
+    ├── admin_beheer.html   # Beheerpagina (instellingen, beheerders, audit-log, gevaarzone)
+    ├── admin_login.html    # Admin-login (stap 1: gebruikersnaam + wachtwoord)
+    ├── admin_login_totp.html  # Admin-login (stap 2: TOTP-code bij actieve 2FA)
+    ├── admin_2fa_instellen.html  # 2FA-instelpagina met QR-code
     ├── wijzigen.html       # Bestelling bewerken
-    ├── admin_login.html    # Admin-login
     ├── onderhoud.html      # Onderhoudspagina (503)
     └── fout.html           # Foutpagina's (404, 500, …)
 ```
@@ -219,15 +229,21 @@ eendjesrace/
 |---|---|
 | **Order injection** (bestelling zonder betaling) | Lotnummers worden uitsluitend toegewezen na verificatie bij de Mollie API — nooit op basis van POST-data |
 | **Webhook spoofing** | Webhook vertrouwt alleen op `mollie.payments.get()` via authenticated API-call; de POST-body bevat enkel het `id` |
-| **Admin-toegang** | Sessie-login met PBKDF2-wachtwoordhash, rate limiting (5/min), 4-uurs sessieverval, HTTPS-only cookie in productie |
-| **CSRF** | Flask-WTF CSRFProtect op alle formulieren; webhook is bewust uitgezonderd (Mollie kan geen token meesturen) |
+| **Admin-toegang** | Wachtwoord + optionele TOTP-2FA; PBKDF2-hash; rate limiting (5/min op login én TOTP-stap); 4-uurs sessieverval; HTTPS-only cookie in productie |
+| **Session fixation** | `session.clear()` bij elke succesvolle login voorkomt dat een aanvaller een bekende session-ID kan injecteren |
+| **Sessie-invalidatie** | `sessie_versie` in DB wordt opgehoogd bij wachtwoordwijziging — alle andere actieve sessies van die gebruiker worden direct ongeldig |
+| **Account lockout** | Na 10 opeenvolgende mislukte loginpogingen wordt het account 15 minuten geblokkeerd |
+| **Timing-aanval op gebruikersnamen** | Login voert altijd een PBKDF2-hash-check uit, ook als de gebruikersnaam niet bestaat |
+| **CSRF** | Flask-WTF CSRFProtect op alle formulieren; webhook is bewust uitgezonderd (Mollie kan geen token meesturen); logout is POST-only |
 | **SQL injection** | Alle queries gebruiken parameterized statements (`?`); sorteervelden gewhitelisted |
 | **XSS** | CSP met per-request nonce voor scripts; `html.escape()` op gebruikersinvoer in e-mails |
 | **Clickjacking** | `X-Frame-Options: DENY` + `frame-ancestors 'none'` in CSP |
-| **Log injection** | `saniteer_log()` verwijdert newlines uit alle gelogde gebruikersinvoer |
+| **Log injection** | `saniteer_log()` verwijdert alle ASCII-stuurcodes (0x00–0x1F) uit gelogde gebruikersinvoer |
 | **Fingerprinting** | `Server`-header onderdrukt |
 | **iDEAL 2.0 redirect** | `pay.ideal.nl` in CSP `form-action` (Firefox blokkeert redirect anders) |
 | **Bestellingenopsomming** | `/betaald/<mollie_id>` gebruikt het niet-raadbare Mollie-betaal-ID — oplopende order-IDs worden nooit blootgesteld in de browser-URL |
+| **IP-adres achter Cloudflare** | `get_client_ip()` leest `CF-Connecting-IP` (Cloudflare) en valt terug op `remote_addr` (Railway load balancer via ProxyFix) |
+| **Audit-trail** | Alle beheersacties worden gelogd in `audit_log` (tijdstip, gebruiker, actie, details, IP) — zichtbaar op `/admin/beheer` |
 
 ---
 
@@ -256,4 +272,4 @@ PYTHONPATH=. .venv/bin/pytest tests/test_app.py -v
 PYTHONPATH=. .venv/bin/python tests/test_app.py
 ```
 
-De testsuite stubt Mollie, Resend, Flask-WTF en Flask-Limiter. `conftest.py` zorgt voor automatische testdatabase-cleanup (vereist voor Python 3.14 + SQLite WAL mode). **455 tests.**
+De testsuite stubt Mollie, Resend, Flask-WTF en Flask-Limiter. `conftest.py` zorgt voor automatische testdatabase-cleanup (vereist voor Python 3.14 + SQLite WAL mode). **479 tests.**
