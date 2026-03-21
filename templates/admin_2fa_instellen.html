@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>2FA instellen – Badeendjesrace</title>
+  <link rel="icon" href="{{ url_for('static', filename='img/eend-favicon.png') }}">
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Nunito', sans-serif; background: #F0F4F8; color: #1A1A2E; padding: 24px; }
+    .topbar {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 28px; flex-wrap: wrap; gap: 12px;
+    }
+    h1 { font-family: 'Fredoka One', cursive; font-size: clamp(1rem, 4.5vw, 2rem); color: #0077B6; }
+    .kaart {
+      background: white; border-radius: 14px; padding: 28px 32px;
+      max-width: 560px; box-shadow: 0 2px 12px rgba(0,0,0,.07);
+    }
+    .kaart h2 { font-family: 'Fredoka One', cursive; font-size: 1.3rem; color: #0077B6; margin-bottom: 16px; }
+    .stap { display: flex; gap: 14px; margin-bottom: 20px; align-items: flex-start; }
+    .stap-nr {
+      min-width: 28px; height: 28px; border-radius: 50%;
+      background: #0077B6; color: white; font-weight: 700; font-size: .9rem;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+      margin-top: 2px;
+    }
+    .stap-tekst { font-size: .95rem; line-height: 1.5; color: #333; }
+    .qr-wrapper { text-align: center; margin: 20px 0; }
+    .qr-wrapper img { border: 3px solid #E0E0E0; border-radius: 10px; max-width: 200px; }
+    .geheim-blok {
+      background: #F0F4F8; border-radius: 8px; padding: 10px 14px;
+      font-family: monospace; font-size: .9rem; letter-spacing: .05em;
+      word-break: break-all; color: #333; margin: 12px 0;
+    }
+    label { display: block; font-weight: 700; font-size: .9rem; margin-bottom: 6px; color: #333; margin-top: 16px; }
+    input[type="text"] {
+      width: 180px; padding: 10px 14px; border: 2px solid #E0E0E0;
+      border-radius: 10px; font-family: 'Nunito', sans-serif; font-size: 1.3rem;
+      letter-spacing: .2em; text-align: center; background: #FAFAFA; transition: border-color .2s;
+    }
+    input:focus { outline: none; border-color: #0077B6; background: white; }
+    .knop {
+      margin-top: 14px; padding: 10px 28px; background: #0077B6; color: white;
+      border: none; border-radius: 10px; cursor: pointer;
+      font-family: 'Nunito', sans-serif; font-size: .95rem; font-weight: 700;
+      display: inline-block; text-decoration: none;
+    }
+    .knop:hover { background: #005f8e; }
+    .knop-grijs {
+      background: #F0F4F8; color: #555; border: 2px solid #E0E0E0;
+      padding: 8px 18px; border-radius: 99px; text-decoration: none;
+      font-weight: 700; font-size: .9rem;
+    }
+    .knop-grijs:hover { background: #E0E0E0; }
+    .waarschuwing {
+      background: #FFF8E1; border: 2px solid #FFD700; border-radius: 12px;
+      padding: 14px 18px; margin-bottom: 20px; color: #E65100; font-weight: 600;
+    }
+    .bevestiging {
+      background: #E8F5E9; border: 2px solid #A5D6A7; border-radius: 12px;
+      padding: 14px 18px; margin-bottom: 20px; color: #2E7D32; font-weight: 600;
+    }
+    @media (max-width: 600px) {
+      .kaart { padding: 18px; }
+      input[type="text"] { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <h1>🔐 2FA instellen</h1>
+    <a href="{{ url_for('admin_beheer') }}" class="knop-grijs">← Beheer</a>
+  </div>
+
+  {% with berichten = get_flashed_messages(with_categories=true) %}
+    {% for categorie, bericht in berichten %}
+    {% if categorie == 'info' %}
+    <div class="bevestiging">✓ {{ bericht }}</div>
+    {% else %}
+    <div class="waarschuwing">⚠️ {{ bericht }}</div>
+    {% endif %}
+    {% endfor %}
+  {% endwith %}
+
+  <div class="kaart">
+    {% if actief %}
+      <h2>✅ 2FA is ingeschakeld</h2>
+      <p style="margin-bottom:18px;color:#555;">Tweefactorauthenticatie is actief voor je account. Bij elke inlog wordt een code uit je authenticator-app gevraagd.</p>
+      <p style="font-size:.9rem;color:#888;margin-bottom:20px;">Wil je 2FA uitschakelen? Dat doe je via de Beheer-pagina.</p>
+      <a href="{{ url_for('admin_beheer') }}" class="knop">← Terug naar Beheer</a>
+    {% else %}
+      <h2>Tweefactorauthenticatie instellen</h2>
+
+      {% if not geheim %}
+      <p style="margin-bottom:18px;color:#555;">Genereer eerst een geheim om 2FA in te stellen.</p>
+      <form method="POST" action="{{ url_for('admin_2fa_nieuw_geheim') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="knop">Genereer QR-code</button>
+      </form>
+      {% else %}
+      <div class="stap">
+        <div class="stap-nr">1</div>
+        <div class="stap-tekst">
+          Open je authenticator-app (bijv. Google Authenticator, Aegis of Authy) en scan de QR-code hieronder.
+          Of voer het geheim handmatig in.
+        </div>
+      </div>
+
+      <div class="qr-wrapper">
+        <img src="data:image/png;base64,{{ qr_data }}" alt="QR-code voor 2FA">
+      </div>
+
+      <p style="font-size:.85rem;color:#888;margin-bottom:4px;">Handmatig invoeren (base32-geheim):</p>
+      <div class="geheim-blok">{{ geheim }}</div>
+
+      <div class="stap" style="margin-top:20px;">
+        <div class="stap-nr">2</div>
+        <div class="stap-tekst">
+          Voer de 6-cijferige code uit je app in om te bevestigen dat alles werkt.
+        </div>
+      </div>
+
+      <form method="POST" action="{{ url_for('admin_2fa_bevestigen') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label for="code">Verificatiecode</label>
+        <input type="text" id="code" name="code" inputmode="numeric" pattern="[0-9]{6}"
+               maxlength="6" autocomplete="one-time-code" autofocus placeholder="000000" required>
+        <br>
+        <button type="submit" class="knop" style="margin-top:14px;">2FA activeren</button>
+      </form>
+
+      <p style="margin-top:20px;font-size:.85rem;color:#888;">
+        Verkeerde QR-code gescand?
+        <form method="POST" action="{{ url_for('admin_2fa_nieuw_geheim') }}" style="display:inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" style="background:none;border:none;color:#0077B6;cursor:pointer;font-size:.85rem;font-family:'Nunito',sans-serif;padding:0;text-decoration:underline;">Nieuw geheim genereren</button>
+        </form>
+      </p>
+      {% endif %}
+    {% endif %}
+  </div>
+</body>
+</html>

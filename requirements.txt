@@ -4,3 +4,5 @@ flask-limiter==4.1.1
 mollie-api-python==3.9.1
 resend==2.23.0
 gunicorn==25.1.0
+pyotp==2.9.0
+qrcode[pil]==8.2

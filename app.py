@@ -18,8 +18,11 @@ if os.path.exists(_config_pad):
     with open(_config_pad) as _f:
         for _k, _v in json.load(_f).items():
             os.environ.setdefault(_k, str(_v))
+import base64
 import logging
 import secrets
+import pyotp
+import qrcode
 import resend
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
@@ -319,6 +322,14 @@ def init_db():
         pass  # kolom bestaat al
     try:
         conn.execute("ALTER TABLE beheerders ADD COLUMN geblokkeerd_tot TEXT")
+    except sqlite3.OperationalError:
+        pass  # kolom bestaat al
+    try:
+        conn.execute("ALTER TABLE beheerders ADD COLUMN totp_geheim TEXT")
+    except sqlite3.OperationalError:
+        pass  # kolom bestaat al
+    try:
+        conn.execute("ALTER TABLE beheerders ADD COLUMN totp_actief INTEGER NOT NULL DEFAULT 0")
     except sqlite3.OperationalError:
         pass  # kolom bestaat al
     try:
@@ -625,6 +636,14 @@ def get_client_ip():
     al heeft gecorrigeerd voor de Railway load balancer).
     """
     return request.headers.get("CF-Connecting-IP") or request.remote_addr
+
+
+def genereer_qr_base64(uri: str) -> str:
+    """Genereer een QR-code voor de gegeven URI en geef een base64 PNG-string terug."""
+    img = qrcode.make(uri)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return base64.b64encode(buf.getvalue()).decode("ascii")
 
 
 def schrijf_audit_log(actie, details=None, gebruiker=None, ip=None):
@@ -1157,6 +1176,49 @@ def betaald(mollie_id):
                            status_label=status_label)
 
 # ─── Admin routes ─────────────────────────────────────────────────────────────
+def _voltooi_login(gebruiker: str, sessie_versie):
+    """Schrijf sessievariabelen en audit-log na succesvol inloggen (na wachtwoord én eventuele 2FA)."""
+    db = get_db()
+    db.execute(
+        "UPDATE beheerders SET laatste_inlog = datetime('now','localtime') WHERE gebruikersnaam = ?",
+        (gebruiker,)
+    )
+    db.commit()
+    session.clear()
+    session["admin_ingelogd"]       = True
+    session["admin_gebruikersnaam"] = gebruiker
+    session["admin_sessie_versie"]  = sessie_versie if sessie_versie is not None else 0
+    session.permanent = True
+    app.logger.info(f"Admin ingelogd: {saniteer_log(gebruiker)} vanaf {get_client_ip()}")
+    schrijf_audit_log("login_succes", gebruiker=gebruiker, ip=get_client_ip())
+
+
+@app.route("/admin/login/totp", methods=["GET", "POST"])
+@limiter.limit("5 per minute")
+def admin_login_totp():
+    """Tweede stap van het inlogproces: TOTP-code invoeren."""
+    gebruiker = session.get("totp_pending_gebruiker")
+    if not gebruiker:
+        return redirect(url_for("admin_login"))
+    fout = None
+    if request.method == "POST":
+        code = request.form.get("code", "").strip()
+        db = get_db()
+        rij = db.execute(
+            "SELECT totp_geheim, totp_actief, sessie_versie FROM beheerders WHERE gebruikersnaam = ?",
+            (gebruiker,)
+        ).fetchone()
+        if rij and rij["totp_actief"] and rij["totp_geheim"]:
+            totp = pyotp.TOTP(rij["totp_geheim"])
+            if totp.verify(code, valid_window=1):
+                versie = session.get("totp_pending_versie", rij["sessie_versie"])
+                _voltooi_login(gebruiker, versie)
+                return redirect(url_for("admin"))
+        schrijf_audit_log("login_mislukt_totp", gebruiker=gebruiker, ip=get_client_ip())
+        fout = "Ongeldige code. Controleer de tijd op je telefoon en probeer opnieuw."
+    return render_template("admin_login_totp.html", fout=fout)
+
+
 @app.route("/admin/login", methods=["GET", "POST"])
 @limiter.limit("5 per minute")
 def admin_login():
@@ -1166,7 +1228,7 @@ def admin_login():
         wachtwoord = request.form.get("wachtwoord", "")
         db  = get_db()
         rij = db.execute(
-            "SELECT wachtwoord_hash, sessie_versie, mislukte_pogingen, geblokkeerd_tot FROM beheerders WHERE gebruikersnaam = ?",
+            "SELECT wachtwoord_hash, sessie_versie, mislukte_pogingen, geblokkeerd_tot, totp_actief, totp_geheim FROM beheerders WHERE gebruikersnaam = ?",
             (gebruiker,)
         ).fetchone()
 
@@ -1195,17 +1257,18 @@ def admin_login():
 
         if rij and _hash_klopt:
             db.execute(
-                "UPDATE beheerders SET mislukte_pogingen = 0, geblokkeerd_tot = NULL, laatste_inlog = datetime('now','localtime') WHERE gebruikersnaam = ?",
+                "UPDATE beheerders SET mislukte_pogingen = 0, geblokkeerd_tot = NULL WHERE gebruikersnaam = ?",
                 (gebruiker,)
             )
             db.commit()
-            session.clear()  # Session fixation voorkomen: gooi oude session-ID weg
-            session["admin_ingelogd"]       = True
-            session["admin_gebruikersnaam"] = gebruiker
-            session["admin_sessie_versie"]  = rij["sessie_versie"] if rij["sessie_versie"] is not None else 0
-            session.permanent = True
-            app.logger.info(f"Admin ingelogd: {saniteer_log(gebruiker)} vanaf {get_client_ip()}")
-            schrijf_audit_log("login_succes", gebruiker=gebruiker, ip=get_client_ip())
+            # Als 2FA actief is: ga naar de TOTP-stap (login nog niet compleet)
+            if rij["totp_actief"]:
+                session.clear()
+                session["totp_pending_gebruiker"] = gebruiker
+                session["totp_pending_versie"]    = rij["sessie_versie"] if rij["sessie_versie"] is not None else 0
+                return redirect(url_for("admin_login_totp"))
+            # Geen 2FA: login direct afronden
+            _voltooi_login(gebruiker, rij["sessie_versie"])
             return redirect(url_for("admin"))
 
         # Mislukte login: verhoog teller, blokkeer na 10 opeenvolgende pogingen
@@ -1338,11 +1401,17 @@ def admin_beheer():
     try:
         db = get_db()
         beheerders_lijst = db.execute(
-            "SELECT id, gebruikersnaam, aangemaakt_op, laatste_inlog FROM beheerders ORDER BY id"
+            "SELECT id, gebruikersnaam, aangemaakt_op, laatste_inlog, totp_actief FROM beheerders ORDER BY id"
         ).fetchall()
         audit_regels = db.execute(
             "SELECT tijdstip, gebruiker, actie, details, ip FROM audit_log ORDER BY id DESC LIMIT 200"
         ).fetchall()
+        huidige_gebruiker = session.get("admin_gebruikersnaam")
+        eigen_rij = db.execute(
+            "SELECT totp_actief FROM beheerders WHERE gebruikersnaam = ?",
+            (huidige_gebruiker,)
+        ).fetchone()
+        eigen_totp_actief = bool(eigen_rij["totp_actief"]) if eigen_rij else False
         return render_template("admin_beheer.html",
                                max_eendjes=get_max_eendjes(),
                                max_per_bestelling=get_max_per_bestelling(),
@@ -1352,7 +1421,8 @@ def admin_beheer():
                                onderhoudsmodus=get_onderhoudsmodus(),
                                beheerders=beheerders_lijst,
                                audit_regels=audit_regels,
-                               huidige_gebruiker=session.get("admin_gebruikersnaam"))
+                               eigen_totp_actief=eigen_totp_actief,
+                               huidige_gebruiker=huidige_gebruiker)
     except sqlite3.Error as e:
         app.logger.error(f"DB-fout admin_beheer: {e}")
         abort(500)
@@ -1569,6 +1639,116 @@ def wachtwoord_wijzigen():
         app.logger.error(f"DB-fout wachtwoord_wijzigen: {e}")
         abort(500)
     return redirect(url_for("admin"))
+
+
+@app.route("/admin/2fa/instellen", methods=["GET"])
+@login_vereist
+def admin_2fa_instellen():
+    """Toon de 2FA-instellingenpagina met QR-code."""
+    gebruiker = session.get("admin_gebruikersnaam")
+    db = get_db()
+    rij = db.execute(
+        "SELECT totp_geheim, totp_actief FROM beheerders WHERE gebruikersnaam = ?",
+        (gebruiker,)
+    ).fetchone()
+    geheim   = rij["totp_geheim"]
+    actief   = bool(rij["totp_actief"])
+    qr_data  = None
+    totp_uri = None
+    if geheim and not actief:
+        totp_uri = pyotp.TOTP(geheim).provisioning_uri(name=gebruiker, issuer_name="Badeendjesrace")
+        qr_data  = genereer_qr_base64(totp_uri)
+    return render_template("admin_2fa_instellen.html",
+                           actief=actief,
+                           geheim=geheim,
+                           qr_data=qr_data,
+                           totp_uri=totp_uri,
+                           huidige_gebruiker=gebruiker)
+
+
+@app.route("/admin/2fa/nieuw-geheim", methods=["POST"])
+@login_vereist
+def admin_2fa_nieuw_geheim():
+    """Genereer een nieuw TOTP-geheim (nog niet actief — vereist bevestiging)."""
+    gebruiker = session.get("admin_gebruikersnaam")
+    geheim = pyotp.random_base32()
+    try:
+        db = get_db()
+        db.execute(
+            "UPDATE beheerders SET totp_geheim = ?, totp_actief = 0 WHERE gebruikersnaam = ?",
+            (geheim, gebruiker)
+        )
+        db.commit()
+    except sqlite3.Error as e:
+        app.logger.error(f"DB-fout 2fa nieuw geheim: {e}")
+        abort(500)
+    return redirect(url_for("admin_2fa_instellen"))
+
+
+@app.route("/admin/2fa/bevestigen", methods=["POST"])
+@login_vereist
+def admin_2fa_bevestigen():
+    """Activeer 2FA na verificatie van de eerste TOTP-code."""
+    gebruiker = session.get("admin_gebruikersnaam")
+    code = request.form.get("code", "").strip()
+    db = get_db()
+    rij = db.execute(
+        "SELECT totp_geheim FROM beheerders WHERE gebruikersnaam = ?",
+        (gebruiker,)
+    ).fetchone()
+    if not rij or not rij["totp_geheim"]:
+        flash("Geen 2FA-geheim gevonden. Genereer eerst een nieuw geheim.", "fout")
+        return redirect(url_for("admin_2fa_instellen"))
+    totp = pyotp.TOTP(rij["totp_geheim"])
+    if totp.verify(code, valid_window=1):
+        try:
+            db.execute(
+                "UPDATE beheerders SET totp_actief = 1 WHERE gebruikersnaam = ?",
+                (gebruiker,)
+            )
+            db.commit()
+        except sqlite3.Error as e:
+            app.logger.error(f"DB-fout 2fa bevestigen: {e}")
+            abort(500)
+        schrijf_audit_log("2fa_ingeschakeld", gebruiker=gebruiker, ip=get_client_ip())
+        app.logger.info(f"2FA ingeschakeld voor {saniteer_log(gebruiker)}")
+        flash("Tweefactorauthenticatie ingeschakeld.", "info")
+        return redirect(url_for("admin_beheer"))
+    flash("Ongeldige code. Scan de QR-code opnieuw en probeer het nog eens.", "fout")
+    return redirect(url_for("admin_2fa_instellen"))
+
+
+@app.route("/admin/2fa/uitschakelen", methods=["POST"])
+@login_vereist
+def admin_2fa_uitschakelen():
+    """Schakel 2FA uit na verificatie van de huidige TOTP-code."""
+    gebruiker = session.get("admin_gebruikersnaam")
+    code = request.form.get("code", "").strip()
+    db = get_db()
+    rij = db.execute(
+        "SELECT totp_geheim, totp_actief FROM beheerders WHERE gebruikersnaam = ?",
+        (gebruiker,)
+    ).fetchone()
+    if not rij or not rij["totp_actief"]:
+        flash("2FA is al uitgeschakeld.", "info")
+        return redirect(url_for("admin_beheer"))
+    totp = pyotp.TOTP(rij["totp_geheim"])
+    if totp.verify(code, valid_window=1):
+        try:
+            db.execute(
+                "UPDATE beheerders SET totp_actief = 0, totp_geheim = NULL WHERE gebruikersnaam = ?",
+                (gebruiker,)
+            )
+            db.commit()
+        except sqlite3.Error as e:
+            app.logger.error(f"DB-fout 2fa uitschakelen: {e}")
+            abort(500)
+        schrijf_audit_log("2fa_uitgeschakeld", gebruiker=gebruiker, ip=get_client_ip())
+        app.logger.info(f"2FA uitgeschakeld voor {saniteer_log(gebruiker)}")
+        flash("Tweefactorauthenticatie uitgeschakeld.", "info")
+        return redirect(url_for("admin_beheer"))
+    flash("Ongeldige code. 2FA blijft ingeschakeld.", "fout")
+    return redirect(url_for("admin_beheer"))
 
 
 @app.route("/admin/mail-opnieuw/<int:bestelling_id>", methods=["POST"])

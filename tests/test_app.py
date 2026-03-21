@@ -144,7 +144,12 @@ def maak_db():
             gebruikersnaam TEXT NOT NULL UNIQUE,
             wachtwoord_hash TEXT NOT NULL,
             aangemaakt_op TEXT NOT NULL DEFAULT (datetime('now','localtime')),
-            laatste_inlog TEXT
+            laatste_inlog TEXT,
+            sessie_versie INTEGER NOT NULL DEFAULT 0,
+            mislukte_pogingen INTEGER NOT NULL DEFAULT 0,
+            geblokkeerd_tot TEXT,
+            totp_geheim TEXT,
+            totp_actief INTEGER NOT NULL DEFAULT 0
         )""",
         f"INSERT INTO teller (id, volgend_lot, max_eendjes, max_per_bestelling, prijs_per_stuk, prijs_vijf_stuks, transactiekosten) VALUES (1, 1, {MAX_EENDJES}, 100, 2.50, 10.00, 0.32)",
         f"INSERT INTO beheerders (gebruikersnaam, wachtwoord_hash) VALUES ('admin', '{generate_password_hash('testpass12345')}')",
@@ -4280,6 +4285,174 @@ class TestAuditLog(unittest.TestCase):
         rij = next((r for r in regels if r["actie"] == "opruimen"), None)
         self.assertIsNotNone(rij)
         self.assertEqual(rij["ip"], "9.8.7.6")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Tweefactorauthenticatie
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestTweeFactorAuth(unittest.TestCase):
+    """Tests voor TOTP-gebaseerde tweefactorauthenticatie."""
+
+    def setUp(self):
+        self.client, self.ctx = maak_flask_client()
+        # Inloggen als admin
+        self.client.post("/admin/login",
+                         data={"gebruiker": "admin", "wachtwoord": "testpass12345"})
+
+    def tearDown(self):
+        self.ctx.pop()
+
+    def _zet_totp_actief(self):
+        """Stel een TOTP-geheim in en activeer 2FA voor admin in de DB."""
+        import pyotp
+        geheim = pyotp.random_base32()
+        db = App.get_db()
+        db.execute(
+            "UPDATE beheerders SET totp_geheim = ?, totp_actief = 1 WHERE gebruikersnaam = 'admin'",
+            (geheim,)
+        )
+        db.commit()
+        return geheim
+
+    def _genereer_geldige_code(self, geheim):
+        import pyotp
+        return pyotp.TOTP(geheim).now()
+
+    def test_2fa_setup_pagina_laadt(self):
+        """GET /admin/2fa/instellen geeft 200."""
+        r = self.client.get("/admin/2fa/instellen")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(b"Tweefactorauthenticatie", r.data)
+
+    def test_nieuw_geheim_genereren(self):
+        """POST /admin/2fa/nieuw-geheim genereert een geheim en redirect."""
+        r = self.client.post("/admin/2fa/nieuw-geheim")
+        self.assertEqual(r.status_code, 302)
+        # Controleer dat het geheim in de DB staat
+        db = App.get_db()
+        rij = db.execute("SELECT totp_geheim, totp_actief FROM beheerders WHERE gebruikersnaam='admin'").fetchone()
+        self.assertIsNotNone(rij["totp_geheim"])
+        self.assertEqual(rij["totp_actief"], 0)  # nog niet actief
+
+    def test_2fa_bevestigen_activeert_met_geldige_code(self):
+        """POST /admin/2fa/bevestigen met geldige code zet totp_actief=1."""
+        import pyotp
+        # Genereer geheim
+        self.client.post("/admin/2fa/nieuw-geheim")
+        db = App.get_db()
+        geheim = db.execute("SELECT totp_geheim FROM beheerders WHERE gebruikersnaam='admin'").fetchone()["totp_geheim"]
+        code = pyotp.TOTP(geheim).now()
+        r = self.client.post("/admin/2fa/bevestigen", data={"code": code})
+        self.assertEqual(r.status_code, 302)
+        rij = db.execute("SELECT totp_actief FROM beheerders WHERE gebruikersnaam='admin'").fetchone()
+        self.assertEqual(rij["totp_actief"], 1)
+
+    def test_2fa_bevestigen_mislukt_met_ongeldige_code(self):
+        """POST /admin/2fa/bevestigen met verkeerde code activeert 2FA niet."""
+        self.client.post("/admin/2fa/nieuw-geheim")
+        r = self.client.post("/admin/2fa/bevestigen", data={"code": "000000"},
+                             follow_redirects=True)
+        self.assertIn(b"Ongeldige code", r.data)
+        db = App.get_db()
+        rij = db.execute("SELECT totp_actief FROM beheerders WHERE gebruikersnaam='admin'").fetchone()
+        self.assertEqual(rij["totp_actief"], 0)
+
+    def test_login_met_2fa_vraagt_totp_stap(self):
+        """Als 2FA actief is, leidt succesvolle wachtwoordcheck door naar /admin/login/totp."""
+        self._zet_totp_actief()
+        self.client.post("/admin/logout")
+        r = self.client.post("/admin/login",
+                             data={"gebruiker": "admin", "wachtwoord": "testpass12345"})
+        self.assertEqual(r.status_code, 302)
+        self.assertIn("/admin/login/totp", r.headers["Location"])
+
+    def test_login_totp_stap_laadt(self):
+        """GET /admin/login/totp geeft 200 als er een pending sessie is."""
+        geheim = self._zet_totp_actief()
+        self.client.post("/admin/logout")
+        self.client.post("/admin/login",
+                         data={"gebruiker": "admin", "wachtwoord": "testpass12345"})
+        r = self.client.get("/admin/login/totp")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(b"2FA", r.data)
+
+    def test_login_totp_stap_zonder_pending_sessie_redirect(self):
+        """GET /admin/login/totp zonder pending sessie redirect naar login."""
+        self.client.post("/admin/logout")
+        r = self.client.get("/admin/login/totp")
+        self.assertEqual(r.status_code, 302)
+        self.assertIn("/admin/login", r.headers["Location"])
+
+    def test_login_met_2fa_geldige_code_logt_in(self):
+        """Geldige TOTP-code na wachtwoord voltooit de login."""
+        import pyotp
+        geheim = self._zet_totp_actief()
+        self.client.post("/admin/logout")
+        self.client.post("/admin/login",
+                         data={"gebruiker": "admin", "wachtwoord": "testpass12345"})
+        code = pyotp.TOTP(geheim).now()
+        r = self.client.post("/admin/login/totp", data={"code": code},
+                             follow_redirects=True)
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(b"Bestellingen", r.data)
+
+    def test_login_met_2fa_ongeldige_code_logt_niet_in(self):
+        """Ongeldige TOTP-code voltooit de login niet."""
+        self._zet_totp_actief()
+        self.client.post("/admin/logout")
+        self.client.post("/admin/login",
+                         data={"gebruiker": "admin", "wachtwoord": "testpass12345"})
+        r = self.client.post("/admin/login/totp", data={"code": "000000"},
+                             follow_redirects=True)
+        self.assertIn(b"Ongeldige code", r.data)
+        # Nog steeds niet ingelogd op /admin
+        r2 = self.client.get("/admin")
+        self.assertEqual(r2.status_code, 302)
+
+    def test_2fa_uitschakelen_met_geldige_code(self):
+        """2FA uitschakelen met geldige code zet totp_actief=0."""
+        import pyotp
+        geheim = self._zet_totp_actief()
+        code = pyotp.TOTP(geheim).now()
+        r = self.client.post("/admin/2fa/uitschakelen", data={"code": code})
+        self.assertEqual(r.status_code, 302)
+        db = App.get_db()
+        rij = db.execute("SELECT totp_actief, totp_geheim FROM beheerders WHERE gebruikersnaam='admin'").fetchone()
+        self.assertEqual(rij["totp_actief"], 0)
+        self.assertIsNone(rij["totp_geheim"])
+
+    def test_2fa_uitschakelen_met_ongeldige_code_blijft_actief(self):
+        """2FA uitschakelen met verkeerde code laat 2FA actief."""
+        self._zet_totp_actief()
+        r = self.client.post("/admin/2fa/uitschakelen", data={"code": "000000"},
+                             follow_redirects=True)
+        self.assertIn(b"Ongeldige code", r.data)
+        db = App.get_db()
+        rij = db.execute("SELECT totp_actief FROM beheerders WHERE gebruikersnaam='admin'").fetchone()
+        self.assertEqual(rij["totp_actief"], 1)
+
+    def test_beheer_toont_2fa_status(self):
+        """admin_beheer toont 2FA-status per beheerder."""
+        r = self.client.get("/admin/beheer")
+        self.assertIn(b"2FA", r.data)
+
+    def test_2fa_events_in_audit_log(self):
+        """2FA in- en uitschakelen verschijnt in de audit-log."""
+        import pyotp
+        # Genereer en activeer
+        self.client.post("/admin/2fa/nieuw-geheim")
+        db = App.get_db()
+        geheim = db.execute("SELECT totp_geheim FROM beheerders WHERE gebruikersnaam='admin'").fetchone()["totp_geheim"]
+        code = pyotp.TOTP(geheim).now()
+        self.client.post("/admin/2fa/bevestigen", data={"code": code})
+        # Uitschakelen
+        code2 = pyotp.TOTP(geheim).now()
+        self.client.post("/admin/2fa/uitschakelen", data={"code": code2})
+        regels = db.execute("SELECT actie FROM audit_log").fetchall()
+        acties = [r["actie"] for r in regels]
+        self.assertIn("2fa_ingeschakeld", acties)
+        self.assertIn("2fa_uitgeschakeld", acties)
 
 
 # ══════════════════════════════════════════════════════════════════════════════

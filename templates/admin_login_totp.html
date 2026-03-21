@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Tweefactorauthenticatie – Badeendjesrace</title>
+  <link rel="icon" href="{{ url_for('static', filename='img/eend-favicon.png') }}">
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Nunito', sans-serif;
+      background: linear-gradient(180deg, #1A1A2E 0%, #0077B6 100%);
+      min-height: 100vh;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px;
+    }
+    .kaart {
+      background: #FFFDF5; border-radius: 20px; padding: 40px 32px;
+      max-width: 380px; width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,.4);
+    }
+    h1 { font-family: 'Fredoka One', cursive; font-size: 1.8rem; color: #0077B6; margin-bottom: 6px; }
+    .sub { color: #888; font-size: .9rem; margin-bottom: 24px; }
+    label { display: block; font-weight: 700; font-size: .9rem; margin-bottom: 6px; color: #333; }
+    input[type="text"] {
+      width: 100%; padding: 12px 14px; border: 2px solid #E0E0E0;
+      border-radius: 10px; font-family: 'Nunito', sans-serif; font-size: 1.4rem;
+      letter-spacing: .2em; text-align: center;
+      margin-bottom: 16px; background: #FAFAFA; transition: border-color .2s;
+    }
+    input:focus { outline: none; border-color: #0077B6; background: white; }
+    .fout-melding {
+      background: #FFEBEE; border: 1px solid #EF9A9A;
+      color: #C62828; border-radius: 8px; padding: 10px 14px;
+      font-size: .9rem; margin-bottom: 16px;
+    }
+    button {
+      width: 100%; padding: 14px; background: #0077B6; color: white;
+      border: none; border-radius: 12px; font-family: 'Fredoka One', cursive;
+      font-size: 1.2rem; cursor: pointer; transition: background .2s;
+    }
+    button:hover { background: #0096C7; }
+    .home-link {
+      display: block; margin-top: 20px;
+      color: rgba(255,255,255,0.65); font-size: .85rem;
+      text-decoration: none; text-align: center;
+      transition: color .2s;
+    }
+    .home-link:hover { color: white; }
+    .info { color: #555; font-size: .88rem; margin-bottom: 18px; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <div class="kaart">
+    <h1>🔐 2FA-verificatie</h1>
+    <p class="sub">Badeendjesrace – tweefactorauthenticatie</p>
+
+    {% if fout %}
+    <div class="fout-melding">⚠️ {{ fout }}</div>
+    {% endif %}
+
+    <p class="info">Open je authenticator-app en voer de 6-cijferige code in voor <strong>Badeendjesrace</strong>.</p>
+
+    <form method="POST" action="{{ url_for('admin_login_totp') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label for="code">Verificatiecode</label>
+      <input type="text" id="code" name="code" inputmode="numeric" pattern="[0-9]{6}"
+             maxlength="6" autocomplete="one-time-code" autofocus placeholder="000000" required>
+      <button type="submit">Verifiëren</button>
+    </form>
+  </div>
+  <a href="{{ url_for('admin_login') }}" class="home-link">← Terug naar inloggen</a>
+</body>
+</html>

@@ -273,6 +273,7 @@
           <th>Gebruikersnaam</th>
           <th>Aangemaakt op</th>
           <th>Laatste ingelogd</th>
+          <th>2FA</th>
           <th>Actie</th>
         </tr>
       </thead>
@@ -283,6 +284,13 @@
           <td>{{ b['gebruikersnaam'] }}{% if b['gebruikersnaam'] == huidige_gebruiker %} <span class="badge badge-betaald">jij</span>{% endif %}</td>
           <td style="color:#888;font-size:.85rem;">{{ b['aangemaakt_op'][:16] }}</td>
           <td style="color:#888;font-size:.85rem;">{{ b['laatste_inlog'][:16] if b['laatste_inlog'] else '—' }}</td>
+          <td>
+            {% if b['totp_actief'] %}
+              <span class="badge" style="background:#E8F5E9;color:#2E7D32;">✓ Aan</span>
+            {% else %}
+              <span class="badge" style="background:#F5F5F5;color:#888;">Uit</span>
+            {% endif %}
+          </td>
           <td>
             {% set is_eigen = (b['gebruikersnaam'] == huidige_gebruiker) %}
             {% set is_enige = (beheerders|length <= 1) %}
@@ -320,6 +328,22 @@
       </div>
       <button type="submit" class="instelling-knop">Account aanmaken</button>
     </form>
+
+    <hr style="border:none;border-top:1px solid #F0F4F8;margin:22px 0;">
+    <p style="font-size:.9rem;font-weight:700;margin-bottom:10px;">Tweefactorauthenticatie (jouw account)</p>
+    {% if eigen_totp_actief %}
+      <p style="font-size:.88rem;color:#2E7D32;margin-bottom:12px;">✅ 2FA is ingeschakeld voor je account.</p>
+      <form method="POST" action="{{ url_for('admin_2fa_uitschakelen') }}" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input class="instelling-input" type="text" name="code" inputmode="numeric" pattern="[0-9]{6}"
+               maxlength="6" placeholder="6-cijferige code" autocomplete="one-time-code"
+               style="width:160px;letter-spacing:.12em;text-align:center;" required>
+        <button type="submit" class="instelling-knop" style="background:#E65100;">2FA uitschakelen</button>
+      </form>
+    {% else %}
+      <p style="font-size:.88rem;color:#888;margin-bottom:12px;">2FA is uitgeschakeld. Schakel het in voor extra beveiliging.</p>
+      <a href="{{ url_for('admin_2fa_instellen') }}" class="instelling-knop" style="display:inline-block;text-decoration:none;">🔐 2FA inschakelen</a>
+    {% endif %}
   </details>
 
   <!-- Audit-log -->
@@ -354,11 +378,15 @@
             'handmatige_bestelling':'info',
             'opruimen':             'info',
             'reset':                'kritiek',
-            'audit_log_gewist':     'waarschuwing'
+            'audit_log_gewist':     'waarschuwing',
+            'login_mislukt_totp':   'waarschuwing',
+            '2fa_ingeschakeld':     'info',
+            '2fa_uitgeschakeld':    'waarschuwing'
           } %}
           {% set label_map = {
             'login_succes':         'Ingelogd',
             'login_mislukt':        'Login mislukt',
+            'login_mislukt_totp':   'Login mislukt (2FA)',
             'account_geblokkeerd':  'Account geblokkeerd',
             'logout':               'Uitgelogd',
             'wachtwoord_gewijzigd': 'Wachtwoord gewijzigd',
@@ -370,7 +398,9 @@
             'handmatige_bestelling':'Handmatige bestelling',
             'opruimen':             'Opruimen',
             'reset':                'Database reset',
-            'audit_log_gewist':     'Audit-log gewist'
+            'audit_log_gewist':     'Audit-log gewist',
+            '2fa_ingeschakeld':     '2FA ingeschakeld',
+            '2fa_uitgeschakeld':    '2FA uitgeschakeld'
           } %}
           {% if audit_regels %}
             {% for rij in audit_regels %}
