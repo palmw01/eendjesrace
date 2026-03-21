@@ -292,10 +292,6 @@ def init_db():
     except sqlite3.OperationalError:
         pass  # kolom bestaat al
     try:
-        conn.execute("ALTER TABLE teller ADD COLUMN notificatie_email TEXT NOT NULL DEFAULT ''")
-    except sqlite3.OperationalError:
-        pass  # kolom bestaat al
-    try:
         conn.execute("ALTER TABLE bestellingen ADD COLUMN betaalwijze TEXT NOT NULL DEFAULT 'ideal'")
     except sqlite3.OperationalError:
         pass  # kolom bestaat al
@@ -447,10 +443,6 @@ def get_transactiekosten():
     return row["transactiekosten"] if row else TRANSACTIEKOSTEN
 
 
-def get_notificatie_email():
-    row = get_db().execute("SELECT notificatie_email FROM teller WHERE id = 1").fetchone()
-    return row["notificatie_email"] if row else ""
-
 
 def get_onderhoudsmodus():
     row = get_db().execute("SELECT onderhoudsmodus FROM teller WHERE id = 1").fetchone()
@@ -585,18 +577,6 @@ def stuur_bevestigingsmail(voornaam, achternaam, email, aantal, lot_van, lot_tot
             "html":    mail_html,
         })
         app.logger.info(f"Mail verstuurd → {saniteer_log(email)}")
-        try:
-            notificatie = get_notificatie_email()
-            if notificatie:
-                resend.Emails.send({
-                    "from":    f"{AFZENDER_NAAM} <{RESEND_FROM}>",
-                    "to":      [notificatie],
-                    "subject": f"[Kopie] Bestelling {naam} – Badeendjesrace!",
-                    "html":    mail_html,
-                })
-                app.logger.info(f"Notificatiemail verstuurd → {saniteer_log(notificatie)}")
-        except Exception as e:
-            app.logger.error(f"Notificatiemail-fout: {e}")
         return True
     except Exception as e:
         app.logger.error(f"Resend-fout: {e}")
@@ -1330,7 +1310,6 @@ def admin_beheer():
                                prijs_per_stuk=get_prijs_per_stuk(),
                                prijs_vijf_stuks=get_prijs_vijf_stuks(),
                                transactiekosten=get_transactiekosten(),
-                               notificatie_email=get_notificatie_email(),
                                onderhoudsmodus=get_onderhoudsmodus(),
                                beheerders=beheerders_lijst,
                                huidige_gebruiker=session.get("admin_gebruikersnaam"))
@@ -1406,15 +1385,6 @@ def admin_instellingen():
                 updates["transactiekosten"] = tk
                 meldingen.append(f"Transactiekosten bijgewerkt naar € {tk:.2f}.")
 
-        # notificatie_email
-        notif_str = request.form.get("notificatie_email", "").strip()
-        if "notificatie_email" in request.form:
-            if notif_str and not EMAIL_RE.match(notif_str):
-                fouten.append("Notificatie-e-mailadres is ongeldig.")
-            else:
-                updates["notificatie_email"] = notif_str
-                meldingen.append("Notificatie-e-mailadres bijgewerkt." if notif_str else "Notificatie-e-mailadres verwijderd.")
-
         # onderhoudsmodus (checkbox: aanwezig = aan, afwezig = uit)
         modus = 1 if request.form.get("onderhoudsmodus") else 0
         updates["onderhoudsmodus"] = modus
@@ -1427,7 +1397,7 @@ def admin_instellingen():
             # Alleen opslaan als alle velden geldig zijn — atomisch
             _TOEGESTANE_KOLOMMEN = {
                 "max_eendjes", "max_per_bestelling", "prijs_per_stuk",
-                "prijs_vijf_stuks", "transactiekosten", "notificatie_email", "onderhoudsmodus",
+                "prijs_vijf_stuks", "transactiekosten", "onderhoudsmodus",
             }
             for _kolom in updates:
                 if _kolom not in _TOEGESTANE_KOLOMMEN:

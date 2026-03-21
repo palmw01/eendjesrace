@@ -1864,77 +1864,6 @@ class TestMailHeader(unittest.TestCase):
         self.assertNotIn("&#x1F4C5;", voor_kop.split('<p style="margin:0 0 6px')[-1])
 
 
-class TestNotificatieEmail(unittest.TestCase):
-
-    def setUp(self):
-        self.client, self.ctx = maak_flask_client()
-        self.client.post("/admin/login",
-                         data={"gebruiker": "admin", "wachtwoord": "testpass12345"})
-
-    def tearDown(self):
-        self.ctx.pop()
-
-    def test_notificatie_email_instellen_en_opslaan(self):
-        r = self.client.post("/admin/instellingen",
-                             data={"notificatie_email": "beheer@test.nl"})
-        self.assertEqual(r.status_code, 302)
-        from app import get_notificatie_email
-        self.assertEqual(get_notificatie_email(), "beheer@test.nl")
-
-    def test_notificatie_email_leegmaken(self):
-        self.client.post("/admin/instellingen",
-                         data={"notificatie_email": "beheer@test.nl"})
-        self.client.post("/admin/instellingen",
-                         data={"notificatie_email": ""})
-        from app import get_notificatie_email
-        self.assertEqual(get_notificatie_email(), "")
-
-    def test_ongeldig_notificatie_email_geeft_fout(self):
-        r = self.client.post("/admin/instellingen",
-                             data={"notificatie_email": "geen-email"},
-                             follow_redirects=True)
-        self.assertIn(b"ongeldig", r.data.lower())
-
-    def test_notificatie_mail_wordt_verstuurd(self):
-        # Stel notificatie-adres in
-        self.client.post("/admin/instellingen",
-                         data={"notificatie_email": "kopie@test.nl"})
-        verzonden = []
-        def nep_send(params):
-            verzonden.append(params)
-            return {"id": "test"}
-        with patch("resend.Emails.send", side_effect=nep_send):
-            from app import stuur_bevestigingsmail
-            stuur_bevestigingsmail("Jan", "Jansen", "jan@test.nl", 1, 1, 1, 2.50)
-        adressen = [p["to"][0] for p in verzonden]
-        self.assertIn("jan@test.nl", adressen)
-        self.assertIn("kopie@test.nl", adressen)
-
-    def test_notificatie_onderwerp_bevat_kopie_label(self):
-        self.client.post("/admin/instellingen",
-                         data={"notificatie_email": "kopie@test.nl"})
-        verzonden = []
-        def nep_send(params):
-            verzonden.append(params)
-            return {"id": "test"}
-        with patch("resend.Emails.send", side_effect=nep_send):
-            from app import stuur_bevestigingsmail
-            stuur_bevestigingsmail("Jan", "Jansen", "jan@test.nl", 1, 1, 1, 2.50)
-        kopie = next(p for p in verzonden if p["to"][0] == "kopie@test.nl")
-        self.assertIn("[Kopie]", kopie["subject"])
-
-    def test_geen_notificatie_als_adres_leeg(self):
-        self.client.post("/admin/instellingen",
-                         data={"notificatie_email": ""})
-        verzonden = []
-        def nep_send(params):
-            verzonden.append(params)
-            return {"id": "test"}
-        with patch("resend.Emails.send", side_effect=nep_send):
-            from app import stuur_bevestigingsmail
-            stuur_bevestigingsmail("Jan", "Jansen", "jan@test.nl", 1, 1, 1, 2.50)
-        self.assertEqual(len(verzonden), 1)  # alleen naar klant
-
 
 # ══════════════════════════════════════════════════════════════════════════════
 # HANDMATIGE BESTELLINGEN
@@ -2973,18 +2902,6 @@ class TestAdminInstellingenExtra(unittest.TestCase):
                              follow_redirects=True)
         self.assertEqual(r.status_code, 200)
         self.assertIn(b"Ongeldig", r.data)
-
-    def test_notificatie_email_niet_aanwezig_in_form_wijzigt_niet(self):
-        """Als notificatie_email niet in het formulier zit, wordt het niet gewijzigd."""
-        # Stel eerst een adres in
-        self.client.post("/admin/instellingen",
-                         data={"notificatie_email": "beheer@test.nl"})
-        # Stuur nu een formulier zonder notificatie_email veld
-        self.client.post("/admin/instellingen",
-                         data={"max_per_bestelling": "50"})
-        from app import get_notificatie_email
-        # Het adres moet ongewijzigd zijn
-        self.assertEqual(get_notificatie_email(), "beheer@test.nl")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
