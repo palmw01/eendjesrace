@@ -3891,6 +3891,12 @@ class TestOnderhoudsmodus(unittest.TestCase):
         r = self.client.post("/webhook", data={"id": "tr_test"})
         self.assertNotEqual(r.status_code, 503)
 
+    def test_api_beschikbaar_bereikbaar_in_onderhoudsmodus(self):
+        """GET /api/beschikbaar retourneert geen 503 als onderhoudsmodus aan is."""
+        self._zet_modus(True)
+        r = self.client.get("/api/beschikbaar")
+        self.assertNotEqual(r.status_code, 503)
+
     def test_admin_beheer_toont_onderhoudsmodus_checkbox(self):
         """Beheerpagina toont de onderhoudsmodus-checkbox."""
         r = self.client.get("/admin/beheer")

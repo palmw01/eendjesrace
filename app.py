@@ -671,7 +671,7 @@ def controleer_onderhoudsmodus():
     if (request.path.startswith("/admin")
             or request.path.startswith("/static")
             or request.path.startswith("/setup")
-            or request.path in ("/webhook", "/health")):
+            or request.path in ("/webhook", "/health", "/api/beschikbaar")):
         return
     try:
         if get_onderhoudsmodus():
