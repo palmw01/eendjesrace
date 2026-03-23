@@ -1622,7 +1622,8 @@ def beheerder_wachtwoord_reset(beheerder_id):
             flash("Wachtwoorden komen niet overeen.", "fout")
             return redirect(url_for("admin_beheer"))
         db.execute(
-            "UPDATE beheerders SET wachtwoord_hash = ?, sessie_versie = sessie_versie + 1 WHERE id = ?",
+            "UPDATE beheerders SET wachtwoord_hash = ?, sessie_versie = sessie_versie + 1,"
+            " mislukte_pogingen = 0, geblokkeerd_tot = NULL WHERE id = ?",
             (generate_password_hash(nieuw), beheerder_id)
         )
         db.commit()
