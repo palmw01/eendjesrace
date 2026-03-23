@@ -294,22 +294,21 @@
           <td>
             {% set is_eigen = (b['gebruikersnaam'] == huidige_gebruiker) %}
             {% set is_enige = (beheerders|length <= 1) %}
-            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
               {% if is_eigen %}
-                <button class="instelling-knop" style="background:#E0E0E0;color:#888;cursor:not-allowed;padding:4px 10px;font-size:.78rem;" disabled
+                <button class="instelling-knop" style="background:#E0E0E0;color:#888;cursor:not-allowed;padding:4px 10px;font-size:.78rem;margin-top:0;" disabled
                   title="Gebruik de 'Wachtwoord wijzigen' knop voor je eigen account.">
                   Reset
                 </button>
               {% else %}
-                <button type="button" class="instelling-knop"
-                  style="padding:4px 10px;font-size:.78rem;"
-                  data-id="{{ b['id'] }}" data-naam="{{ b['gebruikersnaam'] }}"
-                  onclick="openResetModal(this)">
+                <button type="button" class="instelling-knop js-reset-wachtwoord"
+                  style="padding:4px 10px;font-size:.78rem;margin-top:0;"
+                  data-id="{{ b['id'] }}" data-naam="{{ b['gebruikersnaam'] }}">
                   Reset wachtwoord
                 </button>
               {% endif %}
               {% if is_eigen or is_enige %}
-                <button class="instelling-knop" style="background:#E0E0E0;color:#888;cursor:not-allowed;padding:4px 10px;font-size:.78rem;" disabled
+                <button class="instelling-knop" style="background:#E0E0E0;color:#888;cursor:not-allowed;padding:4px 10px;font-size:.78rem;margin-top:0;" disabled
                   title="{% if is_eigen %}Je kunt je eigen account niet verwijderen{% else %}Het laatste account kan niet worden verwijderd{% endif %}">
                   Verwijderen
                 </button>
@@ -544,16 +543,18 @@
     updateTopbar();
     new ResizeObserver(updateTopbar).observe(topbar);
 
-    // Reset-wachtwoord modal
-    function openResetModal(btn) {
-      var id = btn.getAttribute('data-id');
+    // Reset-wachtwoord modal via event delegation (geen inline onclick wegens CSP)
+    document.addEventListener('click', function(e) {
+      var btn = e.target.closest('.js-reset-wachtwoord');
+      if (!btn) return;
+      var id   = btn.getAttribute('data-id');
       var naam = btn.getAttribute('data-naam');
       document.getElementById('resetModalNaam').textContent = 'Account: ' + naam;
       document.getElementById('resetWachtwoordForm').action = '/admin/beheerder-wachtwoord-reset/' + id;
       document.getElementById('r_nieuw').value = '';
       document.getElementById('r_bevestiging').value = '';
       document.getElementById('resetWachtwoordModal').showModal();
-    }
+    });
     document.getElementById('btnResetSluiten').addEventListener('click', function() {
       document.getElementById('resetWachtwoordModal').close();
     });
