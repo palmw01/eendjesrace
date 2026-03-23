@@ -156,13 +156,7 @@
       font-weight: 700;
       margin-bottom: 10px;
     }
-    .voortgang-pct {
-      font-family: 'Fredoka One', cursive;
-      font-size: clamp(1rem, 4vw, 1.25rem);
-      color: var(--geel);
-      line-height: 1;
-    }
-    .voortgang-bar {
+.voortgang-bar {
       height: clamp(10px, 2.2vw, 14px);
       background: rgba(255,255,255,0.2);
       border-radius: 99px;
@@ -574,8 +568,7 @@
   <div class="voortgang-card">
     <div class="voortgang-header">
       <span id="tellerVerkocht"><img class="eend-inline" src="{{ url_for('static', filename='img/eend.png') }}" alt=""> {{ verkocht }} verkocht</span>
-      <span class="voortgang-pct" id="voortgangPct">{{ pct|int }}%</span>
-      <span id="tellerOver">{{ beschikbaar }} over</span>
+<span id="tellerOver">{{ beschikbaar }} over</span>
     </div>
     <div class="voortgang-bar">
       <div class="voortgang-fill{% if pct >= 90 %} bijna-uitverkocht{% elif pct >= 75 %} bijna-vol{% endif %}" id="voortgangFill" style="width: {{ pct }}%"></div>
@@ -834,8 +827,7 @@
     const fillEl     = document.getElementById('voortgangFill');
     const verkochtEl = document.getElementById('tellerVerkocht');
     const overEl     = document.getElementById('tellerOver');
-    const pctEl      = document.getElementById('voortgangPct');
-    const labelEl    = document.getElementById('voortgangLabel');
+const labelEl    = document.getElementById('voortgangLabel');
     const aantalEl   = document.getElementById('aantal');
     if (!fillEl) return;  // pagina toont uitverkocht-banner, niets te verversen
 
@@ -851,7 +843,6 @@
           else if (pct >= 75) fillEl.classList.add('bijna-vol');
           verkochtEl.innerHTML = '<img class="eend-inline" src="{{ url_for('static', filename='img/eend.png') }}" alt=""> ' + d.verkocht + ' verkocht';
           overEl.textContent = d.beschikbaar + ' over';
-          if (pctEl) pctEl.textContent = Math.round(pct) + '%';
           if (labelEl) labelEl.textContent = d.max_eendjes + ' eendjes beschikbaar';
           if (aantalEl) {
             const nieuwMax = Math.min(d.beschikbaar, d.max_per_bestelling);
