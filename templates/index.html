@@ -142,18 +142,28 @@
       backdrop-filter: blur(10px);
       border: 1px solid rgba(255,255,255,0.2);
       border-radius: 16px;
-      padding: 16px 20px;
+      padding: clamp(12px, 3vw, 18px) clamp(14px, 4vw, 22px);
       margin-bottom: 24px;
       color: white;
     }
     .voortgang-header {
       display: flex;
       justify-content: space-between;
-      font-size: 0.9rem;
-      margin-bottom: 8px;
+      align-items: baseline;
+      flex-wrap: wrap;
+      gap: 2px 8px;
+      font-size: clamp(0.78rem, 2.8vw, 0.92rem);
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+    .voortgang-pct {
+      font-family: 'Fredoka One', cursive;
+      font-size: clamp(1rem, 4vw, 1.25rem);
+      color: var(--geel);
+      line-height: 1;
     }
     .voortgang-bar {
-      height: 14px;
+      height: clamp(10px, 2.2vw, 14px);
       background: rgba(255,255,255,0.2);
       border-radius: 99px;
       overflow: hidden;
@@ -162,13 +172,19 @@
       height: 100%;
       background: linear-gradient(90deg, var(--geel), var(--oranje));
       border-radius: 99px;
-      transition: width 1s ease;
+      transition: width 0.8s ease, background 0.8s ease;
+    }
+    .voortgang-fill.bijna-vol {
+      background: linear-gradient(90deg, #FF8C00, #E53935);
+    }
+    .voortgang-fill.bijna-uitverkocht {
+      background: linear-gradient(90deg, #E53935, #B71C1C);
     }
     .voortgang-label {
       text-align: center;
-      font-size: 0.85rem;
+      font-size: clamp(0.72rem, 2.2vw, 0.85rem);
       margin-top: 6px;
-      color: var(--lichtblauw);
+      opacity: 0.75;
     }
 
     /* Formulier kaart */
@@ -554,15 +570,17 @@
   </header>
 
   <!-- Voortgangsbalk -->
+  {% set pct = ((verkocht / max_eendjes * 100)|round(1)) if max_eendjes else 0 %}
   <div class="voortgang-card">
     <div class="voortgang-header">
-      <span id="tellerVerkocht"><img class="eend-inline" src="{{ url_for('static', filename='img/eend.png') }}" alt=""> {{ verkocht }} eendjes verkocht</span>
+      <span id="tellerVerkocht"><img class="eend-inline" src="{{ url_for('static', filename='img/eend.png') }}" alt=""> {{ verkocht }} verkocht</span>
+      <span class="voortgang-pct" id="voortgangPct">{{ pct|int }}%</span>
       <span id="tellerOver">{{ beschikbaar }} over</span>
     </div>
     <div class="voortgang-bar">
-      <div class="voortgang-fill" id="voortgangFill" style="width: {{ ((verkocht / max_eendjes * 100)|round(1)) if max_eendjes else 0 }}%"></div>
+      <div class="voortgang-fill{% if pct >= 90 %} bijna-uitverkocht{% elif pct >= 75 %} bijna-vol{% endif %}" id="voortgangFill" style="width: {{ pct }}%"></div>
     </div>
-    <div class="voortgang-label" id="voortgangLabel">Maximaal {{ max_eendjes }} eendjes beschikbaar</div>
+    <div class="voortgang-label" id="voortgangLabel">{{ max_eendjes }} eendjes beschikbaar</div>
   </div>
 
   <!-- Bestelformulier -->
@@ -816,6 +834,7 @@
     const fillEl     = document.getElementById('voortgangFill');
     const verkochtEl = document.getElementById('tellerVerkocht');
     const overEl     = document.getElementById('tellerOver');
+    const pctEl      = document.getElementById('voortgangPct');
     const labelEl    = document.getElementById('voortgangLabel');
     const aantalEl   = document.getElementById('aantal');
     if (!fillEl) return;  // pagina toont uitverkocht-banner, niets te verversen
@@ -827,9 +846,13 @@
           if (!d || d.fout) return;
           const pct = d.max_eendjes > 0 ? Math.min(100, d.verkocht / d.max_eendjes * 100) : 0;
           fillEl.style.width = pct.toFixed(1) + '%';
-          verkochtEl.innerHTML = '<img class="eend-inline" src="{{ url_for('static', filename='img/eend.png') }}" alt=""> ' + d.verkocht + ' eendjes verkocht';
-          overEl.textContent     = d.beschikbaar + ' over';
-          if (labelEl) labelEl.textContent = 'Maximaal ' + d.max_eendjes + ' eendjes beschikbaar';
+          fillEl.classList.remove('bijna-vol', 'bijna-uitverkocht');
+          if (pct >= 90) fillEl.classList.add('bijna-uitverkocht');
+          else if (pct >= 75) fillEl.classList.add('bijna-vol');
+          verkochtEl.innerHTML = '<img class="eend-inline" src="{{ url_for('static', filename='img/eend.png') }}" alt=""> ' + d.verkocht + ' verkocht';
+          overEl.textContent = d.beschikbaar + ' over';
+          if (pctEl) pctEl.textContent = Math.round(pct) + '%';
+          if (labelEl) labelEl.textContent = d.max_eendjes + ' eendjes beschikbaar';
           if (aantalEl) {
             const nieuwMax = Math.min(d.beschikbaar, d.max_per_bestelling);
             aantalEl.max = nieuwMax;
