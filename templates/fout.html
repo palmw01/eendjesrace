@@ -115,6 +115,14 @@
       <button type="button" id="herlaad-knop" class="knop knop-secundair">↻ Probeer opnieuw</button>
       {% endif %}
     </div>
+    {% if code >= 500 %}
+    <p style="margin-top:20px; font-size:0.85rem; color:#888;">
+      Aanhoudende problemen?
+      <a href="https://uptime.ipalm.nl/status/badeendjesracewapenveld"
+         target="_blank" rel="noopener"
+         style="color:#0077B6;">Bekijk de systeemstatus →</a>
+    </p>
+    {% endif %}
   </div>
   </main>
   <footer class="site-footer">

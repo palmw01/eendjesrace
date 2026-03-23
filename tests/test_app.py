@@ -4568,6 +4568,90 @@ class TestTweeFactorAuth(unittest.TestCase):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# GEZONDHEIDSCHECK (/health)
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestGezondheidsCheck(unittest.TestCase):
+
+    def setUp(self):
+        self.client, self.ctx = maak_flask_client()
+
+    def tearDown(self):
+        self.ctx.pop()
+
+    def test_health_geeft_200(self):
+        """/health geeft HTTP 200 terug bij normale werking."""
+        r = self.client.get("/health")
+        self.assertEqual(r.status_code, 200)
+
+    def test_health_geeft_json(self):
+        """/health geeft een JSON-response terug."""
+        r = self.client.get("/health")
+        self.assertEqual(r.content_type, "application/json")
+
+    def test_health_status_ok(self):
+        """/health bevat "status": "ok" bij normale werking."""
+        r = self.client.get("/health")
+        data = r.get_json()
+        self.assertEqual(data["status"], "ok")
+
+    def test_health_db_ok(self):
+        """/health rapporteert db: ok bij werkende database."""
+        r = self.client.get("/health")
+        data = r.get_json()
+        self.assertEqual(data["db"], "ok")
+
+    def test_health_mollie_ok(self):
+        """/health rapporteert mollie: ok als Mollie-client geen fout gooit."""
+        r = self.client.get("/health")
+        data = r.get_json()
+        self.assertIn(data["mollie"], ("ok", "niet_geconfigureerd"))
+
+    def test_health_mollie_fout_geeft_503(self):
+        """/health geeft 503 als de Mollie-client een uitzondering gooit."""
+        with patch("app.maak_mollie_client", side_effect=Exception("Mollie neer")):
+            r = self.client.get("/health")
+        self.assertEqual(r.status_code, 503)
+        data = r.get_json()
+        self.assertEqual(data["status"], "fout")
+        self.assertEqual(data["mollie"], "fout")
+
+    def test_health_bereikbaar_in_onderhoudsmodus(self):
+        """/health is bereikbaar (niet 503) als onderhoudsmodus aan is."""
+        self.client.post("/admin/login",
+                         data={"gebruiker": "admin", "wachtwoord": "testpass12345"})
+        self.client.post("/admin/instellingen", data={"onderhoudsmodus": "1"})
+        r = self.client.get("/health")
+        self.assertNotEqual(r.status_code, 503)
+        self.client.post("/admin/instellingen", data={})
+
+    def test_foutpagina_500_bevat_statuslink(self):
+        """fout.html toont de statuslink bij HTTP 500."""
+        with App.app.test_request_context():
+            resp = App.app.make_response(
+                App.app.handle_http_exception(
+                    __import__("werkzeug.exceptions", fromlist=["InternalServerError"])
+                    .InternalServerError()
+                )
+            )
+        self.assertIn(b"uptime.ipalm.nl", resp.data)
+
+    def test_foutpagina_404_bevat_geen_statuslink(self):
+        """fout.html toont de statuslink NIET bij HTTP 404."""
+        r = self.client.get("/bestaat-niet-xyz")
+        self.assertNotIn(b"uptime.ipalm.nl", r.data)
+
+    def test_onderhoudspagina_bevat_statuslink(self):
+        """onderhoud.html toont altijd de statuslink."""
+        self.client.post("/admin/login",
+                         data={"gebruiker": "admin", "wachtwoord": "testpass12345"})
+        self.client.post("/admin/instellingen", data={"onderhoudsmodus": "1"})
+        r = self.client.get("/")
+        self.assertIn(b"uptime.ipalm.nl", r.data)
+        self.client.post("/admin/instellingen", data={})
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # Uitvoeren als script
 # ══════════════════════════════════════════════════════════════════════════════
 

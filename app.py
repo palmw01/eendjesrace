@@ -671,7 +671,7 @@ def controleer_onderhoudsmodus():
     if (request.path.startswith("/admin")
             or request.path.startswith("/static")
             or request.path.startswith("/setup")
-            or request.path == "/webhook"):
+            or request.path in ("/webhook", "/health")):
         return
     try:
         if get_onderhoudsmodus():
@@ -864,6 +864,33 @@ def api_beschikbaar():
     except sqlite3.Error as e:
         app.logger.error(f"DB-fout api_beschikbaar: {e}")
         return jsonify({"fout": "Databasefout"}), 500
+
+
+@app.route("/health")
+def gezondheid():
+    """Gezondheidscheck voor uptime monitoring. Controleert DB en Mollie-verbinding."""
+    db_status     = "ok"
+    mollie_status = "ok"
+
+    try:
+        get_db().execute("SELECT 1")
+    except Exception:
+        db_status = "fout"
+
+    if MOLLIE_API_KEY:
+        try:
+            maak_mollie_client().payments.list(limit=1)
+        except Exception:
+            mollie_status = "fout"
+    else:
+        mollie_status = "niet_geconfigureerd"
+
+    alles_ok = db_status == "ok" and mollie_status in ("ok", "niet_geconfigureerd")
+    return jsonify({
+        "status": "ok" if alles_ok else "fout",
+        "db":     db_status,
+        "mollie": mollie_status,
+    }), 200 if alles_ok else 503
 
 
 @app.route("/bestellen", methods=["POST"])
