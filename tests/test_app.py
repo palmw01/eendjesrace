@@ -2218,6 +2218,118 @@ class TestBeheerderAccounts(unittest.TestCase):
         # Na login moet er een datum staan (minstens jaar 20xx)
         self.assertIn(b"20", r.data)
 
+    def _reset_wachtwoord(self, beheerder_id, nieuw, bevestiging=None):
+        if bevestiging is None:
+            bevestiging = nieuw
+        return self.client.post(f"/admin/beheerder-wachtwoord-reset/{beheerder_id}", data={
+            "nieuw_wachtwoord": nieuw,
+            "nieuw_wachtwoord_bevestiging": bevestiging,
+        }, follow_redirects=True)
+
+    def test_wachtwoord_reset_werkt(self):
+        """Beheerder kan wachtwoord van ander account resetten."""
+        self._voeg_toe(gebruikersnaam="reset_target", wachtwoord="oudwachtwoord1")
+        rij = App.get_db().execute(
+            "SELECT id FROM beheerders WHERE gebruikersnaam='reset_target'"
+        ).fetchone()
+        r = self._reset_wachtwoord(rij["id"], "nieuwwachtwoord99")
+        self.assertIn(b"succesvol", r.data)
+        # Inloggen met nieuw wachtwoord werkt
+        self.client.post("/admin/logout")
+        r2 = self.client.post("/admin/login",
+                              data={"gebruiker": "reset_target",
+                                    "wachtwoord": "nieuwwachtwoord99"})
+        self.assertEqual(r2.status_code, 302)
+
+    def test_wachtwoord_reset_te_kort(self):
+        """Nieuw wachtwoord korter dan 12 tekens geeft foutmelding."""
+        self._voeg_toe(gebruikersnaam="reset_kort")
+        rij = App.get_db().execute(
+            "SELECT id FROM beheerders WHERE gebruikersnaam='reset_kort'"
+        ).fetchone()
+        r = self._reset_wachtwoord(rij["id"], "kort", "kort")
+        self.assertIn(b"12", r.data)
+
+    def test_wachtwoord_reset_mismatch(self):
+        """Niet-overeenkomende wachtwoorden geven foutmelding."""
+        self._voeg_toe(gebruikersnaam="reset_mismatch")
+        rij = App.get_db().execute(
+            "SELECT id FROM beheerders WHERE gebruikersnaam='reset_mismatch'"
+        ).fetchone()
+        r = self._reset_wachtwoord(rij["id"], "wachtwoordA123", "wachtwoordB456")
+        self.assertIn(b"overeen", r.data)
+
+    def test_wachtwoord_reset_eigen_account_geblokkeerd(self):
+        """Eigen wachtwoord kan niet via reset-route worden gewijzigd."""
+        rij = App.get_db().execute(
+            "SELECT id FROM beheerders WHERE gebruikersnaam='admin'"
+        ).fetchone()
+        r = self._reset_wachtwoord(rij["id"], "nieuwwachtwoord99")
+        self.assertIn(b"eigen", r.data)
+
+    def test_wachtwoord_reset_invalideert_sessie(self):
+        """Na wachtwoord-reset wordt de bestaande sessie van dat account ongeldig."""
+        self._voeg_toe(gebruikersnaam="sessie_target", wachtwoord="oudwachtwoord1")
+        rij = App.get_db().execute(
+            "SELECT id, sessie_versie FROM beheerders WHERE gebruikersnaam='sessie_target'"
+        ).fetchone()
+        oude_versie = rij["sessie_versie"]
+        self._reset_wachtwoord(rij["id"], "nieuwwachtwoord99")
+        nieuwe_versie = App.get_db().execute(
+            "SELECT sessie_versie FROM beheerders WHERE gebruikersnaam='sessie_target'"
+        ).fetchone()["sessie_versie"]
+        self.assertGreater(nieuwe_versie, oude_versie)
+
+    def test_wachtwoord_reset_heft_blokkering_op(self):
+        """Na wachtwoord-reset zijn mislukte_pogingen en geblokkeerd_tot gewist."""
+        self._voeg_toe(gebruikersnaam="geblokkeerd_target", wachtwoord="oudwachtwoord1")
+        rij = App.get_db().execute(
+            "SELECT id FROM beheerders WHERE gebruikersnaam='geblokkeerd_target'"
+        ).fetchone()
+        # Simuleer geblokkeerd account
+        App.get_db().execute(
+            "UPDATE beheerders SET mislukte_pogingen=10, geblokkeerd_tot='2099-01-01T00:00:00'"
+            " WHERE id=?", (rij["id"],)
+        )
+        App.get_db().commit()
+        self._reset_wachtwoord(rij["id"], "nieuwwachtwoord99")
+        na = App.get_db().execute(
+            "SELECT mislukte_pogingen, geblokkeerd_tot FROM beheerders WHERE id=?",
+            (rij["id"],)
+        ).fetchone()
+        self.assertEqual(na["mislukte_pogingen"], 0)
+        self.assertIsNone(na["geblokkeerd_tot"])
+
+    def test_wachtwoord_reset_onbekend_id_geeft_404(self):
+        """Reset voor niet-bestaand ID geeft 404."""
+        r = self.client.post("/admin/beheerder-wachtwoord-reset/99999", data={
+            "nieuw_wachtwoord": "nieuwwachtwoord99",
+            "nieuw_wachtwoord_bevestiging": "nieuwwachtwoord99",
+        })
+        self.assertEqual(r.status_code, 404)
+
+    def test_wachtwoord_reset_zonder_login_geeft_302(self):
+        """Reset-route vereist ingelogde sessie."""
+        self.client.post("/admin/logout")
+        r = self.client.post("/admin/beheerder-wachtwoord-reset/1", data={
+            "nieuw_wachtwoord": "nieuwwachtwoord99",
+            "nieuw_wachtwoord_bevestiging": "nieuwwachtwoord99",
+        })
+        self.assertEqual(r.status_code, 302)
+
+    def test_wachtwoord_reset_wordt_gelogd(self):
+        """Wachtwoord-reset schrijft wachtwoord_reset naar de audit-log."""
+        self._voeg_toe(gebruikersnaam="log_target", wachtwoord="oudwachtwoord1")
+        rij = App.get_db().execute(
+            "SELECT id FROM beheerders WHERE gebruikersnaam='log_target'"
+        ).fetchone()
+        self._reset_wachtwoord(rij["id"], "nieuwwachtwoord99")
+        log = App.get_db().execute(
+            "SELECT * FROM audit_log WHERE actie='wachtwoord_reset' ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+        self.assertIsNotNone(log)
+        self.assertIn("log_target", log["details"])
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # SECURITY.TXT
