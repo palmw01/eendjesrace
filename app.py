@@ -1598,6 +1598,43 @@ def beheerder_verwijderen(beheerder_id):
     return redirect(url_for("admin_beheer"))
 
 
+@app.route("/admin/beheerder-wachtwoord-reset/<int:beheerder_id>", methods=["POST"])
+@login_vereist
+def beheerder_wachtwoord_reset(beheerder_id):
+    """Reset het wachtwoord van een ander beheerdersaccount."""
+    huidig_gebruiker = session.get("admin_gebruikersnaam")
+    nieuw = request.form.get("nieuw_wachtwoord", "")
+    bevestiging = request.form.get("nieuw_wachtwoord_bevestiging", "")
+    try:
+        db = get_db()
+        rij = db.execute(
+            "SELECT id, gebruikersnaam FROM beheerders WHERE id = ?", (beheerder_id,)
+        ).fetchone()
+        if not rij:
+            abort(404)
+        if rij["gebruikersnaam"] == huidig_gebruiker:
+            flash("Gebruik de 'Wachtwoord wijzigen' knop voor je eigen account.", "fout")
+            return redirect(url_for("admin_beheer"))
+        if len(nieuw) < 12:
+            flash("Nieuw wachtwoord moet minimaal 12 tekens zijn.", "fout")
+            return redirect(url_for("admin_beheer"))
+        if nieuw != bevestiging:
+            flash("Wachtwoorden komen niet overeen.", "fout")
+            return redirect(url_for("admin_beheer"))
+        db.execute(
+            "UPDATE beheerders SET wachtwoord_hash = ?, sessie_versie = sessie_versie + 1 WHERE id = ?",
+            (generate_password_hash(nieuw), beheerder_id)
+        )
+        db.commit()
+        app.logger.info(f"Wachtwoord gereset voor: {saniteer_log(rij['gebruikersnaam'])} door {saniteer_log(huidig_gebruiker)} (IP: {saniteer_log(get_client_ip())})")
+        schrijf_audit_log("wachtwoord_reset", details=f"Account: {rij['gebruikersnaam']}", gebruiker=huidig_gebruiker, ip=get_client_ip())
+        flash(f"Wachtwoord van '{rij['gebruikersnaam']}' succesvol opnieuw ingesteld.", "info")
+    except sqlite3.Error as e:
+        app.logger.error(f"DB-fout beheerder_wachtwoord_reset: {e}")
+        abort(500)
+    return redirect(url_for("admin_beheer"))
+
+
 @app.route("/admin/wachtwoord-wijzigen", methods=["POST"])
 @login_vereist
 def wachtwoord_wijzigen():

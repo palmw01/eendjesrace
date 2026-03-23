@@ -294,17 +294,32 @@
           <td>
             {% set is_eigen = (b['gebruikersnaam'] == huidige_gebruiker) %}
             {% set is_enige = (beheerders|length <= 1) %}
-            {% if is_eigen or is_enige %}
-              <button class="instelling-knop" style="background:#E0E0E0;color:#888;cursor:not-allowed;padding:4px 10px;font-size:.78rem;" disabled
-                title="{% if is_eigen %}Je kunt je eigen account niet verwijderen{% else %}Het laatste account kan niet worden verwijderd{% endif %}">
-                Verwijderen
-              </button>
-            {% else %}
-              <form method="POST" action="/admin/beheerder-verwijderen/{{ b['id'] }}" style="display:inline">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <button type="submit" class="knop-reset" style="padding:4px 10px;font-size:.78rem;">Verwijderen</button>
-              </form>
-            {% endif %}
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              {% if is_eigen %}
+                <button class="instelling-knop" style="background:#E0E0E0;color:#888;cursor:not-allowed;padding:4px 10px;font-size:.78rem;" disabled
+                  title="Gebruik de 'Wachtwoord wijzigen' knop voor je eigen account.">
+                  Reset
+                </button>
+              {% else %}
+                <button type="button" class="instelling-knop"
+                  style="padding:4px 10px;font-size:.78rem;"
+                  data-id="{{ b['id'] }}" data-naam="{{ b['gebruikersnaam'] }}"
+                  onclick="openResetModal(this)">
+                  Reset wachtwoord
+                </button>
+              {% endif %}
+              {% if is_eigen or is_enige %}
+                <button class="instelling-knop" style="background:#E0E0E0;color:#888;cursor:not-allowed;padding:4px 10px;font-size:.78rem;" disabled
+                  title="{% if is_eigen %}Je kunt je eigen account niet verwijderen{% else %}Het laatste account kan niet worden verwijderd{% endif %}">
+                  Verwijderen
+                </button>
+              {% else %}
+                <form method="POST" action="/admin/beheerder-verwijderen/{{ b['id'] }}" style="display:inline">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button type="submit" class="knop-reset" style="padding:4px 10px;font-size:.78rem;">Verwijderen</button>
+                </form>
+              {% endif %}
+            </div>
           </td>
         </tr>
         {% endfor %}
@@ -370,6 +385,7 @@
             'account_geblokkeerd':  'waarschuwing',
             'logout':               'info',
             'wachtwoord_gewijzigd': 'info',
+            'wachtwoord_reset':     'waarschuwing',
             'beheerder_aangemaakt': 'info',
             'beheerder_verwijderd': 'waarschuwing',
             'instellingen_gewijzigd': 'info',
@@ -390,6 +406,7 @@
             'account_geblokkeerd':  'Account geblokkeerd',
             'logout':               'Uitgelogd',
             'wachtwoord_gewijzigd': 'Wachtwoord gewijzigd',
+            'wachtwoord_reset':     'Wachtwoord gereset',
             'beheerder_aangemaakt': 'Beheerder aangemaakt',
             'beheerder_verwijderd': 'Beheerder verwijderd',
             'instellingen_gewijzigd': 'Instellingen gewijzigd',
@@ -450,6 +467,27 @@
     </form>
   </div>
 
+  <!-- Modal: wachtwoord resetten voor ander account -->
+  <dialog id="resetWachtwoordModal" style="border:none;border-radius:14px;padding:28px 32px;box-shadow:0 4px 32px rgba(0,0,0,.18);max-width:420px;width:90%;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);margin:0;">
+    <h2 style="margin-top:0;font-size:1.1rem;">🔑 Wachtwoord resetten</h2>
+    <p id="resetModalNaam" style="font-size:.9rem;color:#555;margin-bottom:14px;"></p>
+    <form id="resetWachtwoordForm" method="POST" action="">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="instelling-rij">
+        <label class="instelling-label" for="r_nieuw">Nieuw wachtwoord <span style="color:#C62828">*</span></label>
+        <input class="instelling-input" type="password" id="r_nieuw" name="nieuw_wachtwoord" placeholder="minimaal 12 tekens" required autocomplete="new-password">
+      </div>
+      <div class="instelling-rij">
+        <label class="instelling-label" for="r_bevestiging">Bevestigen <span style="color:#C62828">*</span></label>
+        <input class="instelling-input" type="password" id="r_bevestiging" name="nieuw_wachtwoord_bevestiging" placeholder="herhaal nieuw wachtwoord" required autocomplete="new-password">
+      </div>
+      <div style="display:flex;gap:10px;margin-top:18px;">
+        <button type="submit" class="instelling-knop" style="flex:1;">Wachtwoord instellen</button>
+        <button type="button" id="btnResetSluiten" style="flex:1;padding:10px;background:#F5F5F5;border:none;border-radius:8px;font-weight:700;cursor:pointer;">Annuleren</button>
+      </div>
+    </form>
+  </dialog>
+
   <!-- Modal: wachtwoord wijzigen -->
   <dialog id="wachtwoordModal" style="border:none;border-radius:14px;padding:28px 32px;box-shadow:0 4px 32px rgba(0,0,0,.18);max-width:420px;width:90%;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);margin:0;">
     <h2 style="margin-top:0;font-size:1.1rem;">🔑 Wachtwoord wijzigen</h2>
@@ -505,6 +543,23 @@
     }
     updateTopbar();
     new ResizeObserver(updateTopbar).observe(topbar);
+
+    // Reset-wachtwoord modal
+    function openResetModal(btn) {
+      var id = btn.getAttribute('data-id');
+      var naam = btn.getAttribute('data-naam');
+      document.getElementById('resetModalNaam').textContent = 'Account: ' + naam;
+      document.getElementById('resetWachtwoordForm').action = '/admin/beheerder-wachtwoord-reset/' + id;
+      document.getElementById('r_nieuw').value = '';
+      document.getElementById('r_bevestiging').value = '';
+      document.getElementById('resetWachtwoordModal').showModal();
+    }
+    document.getElementById('btnResetSluiten').addEventListener('click', function() {
+      document.getElementById('resetWachtwoordModal').close();
+    });
+    document.getElementById('resetWachtwoordModal').addEventListener('click', function(e) {
+      if (e.target === this) { this.close(); }
+    });
 
     if (btnOpen) { btnOpen.addEventListener('click', function() { modal.showModal(); }); }
     if (btnOpenAvatar) { btnOpenAvatar.addEventListener('click', function() { if (avatarMenu) avatarMenu.removeAttribute('open'); modal.showModal(); }); }
