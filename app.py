@@ -1401,9 +1401,21 @@ def admin():
                 COALESCE(SUM(CASE WHEN status='betaald' THEN bedrag END), 0)     AS totaal_omzet,
                 COALESCE(SUM(CASE WHEN status='betaald'
                                    AND mail_verstuurd=0 THEN 1 END), 0)          AS mails_mislukt,
-                COALESCE(SUM(CASE WHEN status='aangemaakt' THEN 1 END), 0)       AS openstaand
+                COALESCE(SUM(CASE WHEN status='aangemaakt' THEN 1 END), 0)       AS openstaand,
+                COALESCE(SUM(CASE WHEN pogingen > 2 THEN 1 END), 0)              AS webhook_alarm
             FROM bestellingen
         """).fetchone()
+        verkopen_per_dag = db.execute("""
+            SELECT DATE(bijgewerkt_op) AS dag,
+                   COUNT(*)            AS bestellingen,
+                   COALESCE(SUM(aantal), 0) AS eendjes
+            FROM bestellingen
+            WHERE status='betaald'
+              AND bijgewerkt_op >= datetime('now', 'localtime', '-30 days')
+            GROUP BY dag
+            ORDER BY dag
+        """).fetchall()
+        max_dag_eendjes = max((r["eendjes"] for r in verkopen_per_dag), default=1)
         return render_template("admin.html",
                                bestellingen=bestellingen,
                                stats=stats,
@@ -1415,7 +1427,9 @@ def admin():
                                zoekterm=zoekterm,
                                sorter=sorter,
                                richting=richting,
-                               huidige_gebruiker=session.get("admin_gebruikersnaam"))
+                               huidige_gebruiker=session.get("admin_gebruikersnaam"),
+                               verkopen_per_dag=verkopen_per_dag,
+                               max_dag_eendjes=max_dag_eendjes)
     except sqlite3.Error as e:
         app.logger.error(f"DB-fout admin: {e}")
         abort(500)

@@ -108,6 +108,16 @@
     .stat .label { font-size: .82rem; color: #888; margin-top: 2px; }
     .stat.alarm .getal { color: #C62828; }
 
+    /* Verkopen per dag */
+    .grafiek { background: white; border-radius: 14px; padding: 18px 22px;
+               margin-bottom: 24px; box-shadow: 0 2px 12px rgba(0,0,0,.07); }
+    .grafiek-titel { font-family: 'Fredoka One', cursive; font-size: 1.1rem; color: #0077B6; margin-bottom: 14px; }
+    .grafiek-rij { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; font-size: .8rem; }
+    .grafiek-dag { width: 54px; color: #888; flex-shrink: 0; }
+    .grafiek-balk-wrap { flex: 1; background: #F0F4F8; border-radius: 99px; height: 14px; overflow: hidden; }
+    .grafiek-balk { height: 100%; background: linear-gradient(90deg,#FFD700,#FF8C00); border-radius: 99px; min-width: 4px; }
+    .grafiek-waarde { width: 36px; text-align: right; color: #555; font-weight: 700; }
+
     /* Voortgangsbalk */
     .voortgang { background: white; border-radius: 14px; padding: 18px 22px;
                  margin-bottom: 24px; box-shadow: 0 2px 12px rgba(0,0,0,.07); }
@@ -329,6 +339,10 @@
       <div class="getal">{{ stats['openstaand'] }}</div>
       <div class="label">Openstaand (nog niet betaald)</div>
     </div>
+    <div class="stat {% if stats['webhook_alarm'] > 0 %}waarschuwing-stat{% endif %}">
+      <div class="getal">{{ stats['webhook_alarm'] }}</div>
+      <div class="label">Webhook herhaald (&gt;2×)</div>
+    </div>
   </div>
 
   <!-- Voortgangsbalk -->
@@ -342,6 +356,22 @@
       <div class="voortgang-fill" style="width:{{ pct }}%"></div>
     </div>
   </div>
+
+  <!-- Verkopen per dag -->
+  {% if verkopen_per_dag %}
+  <div class="grafiek">
+    <div class="grafiek-titel">🦆 Verkopen per dag (laatste 30 dagen)</div>
+    {% for rij in verkopen_per_dag %}
+    <div class="grafiek-rij">
+      <div class="grafiek-dag">{{ rij['dag'][5:] }}</div>
+      <div class="grafiek-balk-wrap">
+        <div class="grafiek-balk" style="width:{{ (rij['eendjes'] / max_dag_eendjes * 100)|round }}%"></div>
+      </div>
+      <div class="grafiek-waarde">{{ rij['eendjes'] }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
 
   <!-- Zoekbalk + statusfilter -->
   <form method="GET" action="/admin" class="zoek">
