@@ -3080,6 +3080,29 @@ class TestHomepageEnApi(unittest.TestCase):
         bedrag = r.get_json()["bedrag"]
         self.assertAlmostEqual(bedrag, 2.50 + 0.32, places=2)
 
+    def test_homepage_toont_bestel_cta_knop(self):
+        """Homepage toont de 'Bestel hier'-CTA-knop bij een schoon bezoek."""
+        r = self.client.get("/")
+        self.assertIn(b'id="bestelCta"', r.data)
+
+    def test_homepage_formulier_verborgen_bij_eerste_bezoek(self):
+        """Het bestelformulier is server-side verborgen bij een schoon bezoek."""
+        r = self.client.get("/")
+        self.assertIn(b'id="formulierInhoud" style="display:none"', r.data)
+
+    def test_homepage_toont_verberg_knop_in_formulier(self):
+        """De 'Verbergen'-knop zit in de formulierwrapper."""
+        r = self.client.get("/")
+        self.assertIn(b'id="verbergFormulier"', r.data)
+
+    def test_homepage_formulier_direct_zichtbaar_na_validatiefout(self):
+        """Na een validatiefout is het formulier direct zichtbaar (geen CTA-knop)."""
+        r = self.client.post("/bestellen", data={
+            "voornaam": "", "achternaam": "", "email": "", "telefoon": "", "aantal": "1"
+        })
+        self.assertNotIn(b'style="display:none"', r.data)
+        self.assertNotIn(b'id="bestelCta"', r.data)
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # SECURITY HEADERS — AANVULLEND

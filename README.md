@@ -31,6 +31,7 @@ Gebouwd met **Python/Flask**, **Mollie** (iDEAL-betalingen), **SQLite** en **Res
 | Bestellingen-per-dag barchart in admin (laatste 30 dagen, puur CSS) | ✅ |
 | Webhook-alarm stat in admin bij herhaalde webhook-verwerking (pogingen > 2) | ✅ |
 | Dynamische browsertab-titel op betaald-pagina per betaalstatus | ✅ |
+| Bestelformulier verborgen achter CTA-knop, inklapbaar via "Verbergen" | ✅ |
 
 ---
 
@@ -278,4 +279,4 @@ PYTHONPATH=. .venv/bin/pytest tests/test_app.py -v
 PYTHONPATH=. .venv/bin/python tests/test_app.py
 ```
 
-De testsuite stubt Mollie, Resend, Flask-WTF en Flask-Limiter. `conftest.py` zorgt voor automatische testdatabase-cleanup (vereist voor Python 3.14 + SQLite WAL mode). **507 tests.**
+De testsuite stubt Mollie, Resend, Flask-WTF en Flask-Limiter. `conftest.py` zorgt voor automatische testdatabase-cleanup (vereist voor Python 3.14 + SQLite WAL mode). **511 tests.**
