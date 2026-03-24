@@ -28,6 +28,9 @@ Gebouwd met **Python/Flask**, **Mollie** (iDEAL-betalingen), **SQLite** en **Res
 | Vallende badeendjes animatie op betaald-pagina na succesvolle betaling | ✅ |
 | Onderhoudsmodus (admin toggle, toont 503 voor publieke routes) | ✅ |
 | Bevestigingspagina met niet-raadbare URL (Mollie-ID) — bestellingen niet optelbaar | ✅ |
+| Bestellingen-per-dag barchart in admin (laatste 30 dagen, puur CSS) | ✅ |
+| Webhook-alarm stat in admin bij herhaalde webhook-verwerking (pogingen > 2) | ✅ |
+| Dynamische browsertab-titel op betaald-pagina per betaalstatus | ✅ |
 
 ---
 
@@ -275,4 +278,4 @@ PYTHONPATH=. .venv/bin/pytest tests/test_app.py -v
 PYTHONPATH=. .venv/bin/python tests/test_app.py
 ```
 
-De testsuite stubt Mollie, Resend, Flask-WTF en Flask-Limiter. `conftest.py` zorgt voor automatische testdatabase-cleanup (vereist voor Python 3.14 + SQLite WAL mode). **499 tests.**
+De testsuite stubt Mollie, Resend, Flask-WTF en Flask-Limiter. `conftest.py` zorgt voor automatische testdatabase-cleanup (vereist voor Python 3.14 + SQLite WAL mode). **507 tests.**

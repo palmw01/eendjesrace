@@ -761,6 +761,27 @@ class TestBetaaldPagina(unittest.TestCase):
         self.assertIn(b"diaconie@hervormdwapenveld.nl", r.data)
         self.assertIn(b"Kerkstraat", r.data)
 
+    def test_betaald_title_succes(self):
+        """<title> bevat het vinkje-emoji bij een geslaagde betaling."""
+        self._zet_status("betaald", lot_van=1, lot_tot=2)
+        r = self.client.get("/betaald/tr_x")
+        self.assertIn("<title>\u2705".encode(), r.data)
+
+    def test_betaald_title_mislukt(self):
+        """<title> bevat het kruis-emoji bij een mislukte betaling."""
+        self._zet_status("mislukt")
+        r = self.client.get("/betaald/tr_x")
+        self.assertIn("<title>\u274c".encode(), r.data)
+
+    def test_betaald_title_wacht(self):
+        """<title> bevat het zandloper-emoji bij een openstaande betaling."""
+        self._zet_status("aangemaakt")
+        mock_b = simuleer_mollie_betaling("open")
+        with patch("app.maak_mollie_client") as mc:
+            mc.return_value.payments.get.return_value = mock_b
+            r = self.client.get("/betaald/tr_x")
+        self.assertIn("<title>\u23f3".encode(), r.data)
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 8b. /betaald/r/<id> tussenroute (Mollie redirectUrl → mollie_id-URL)
@@ -4655,6 +4676,63 @@ class TestGezondheidsCheck(unittest.TestCase):
         r = self.client.get("/")
         self.assertIn(b"uptime.ipalm.nl", r.data)
         self.client.post("/admin/instellingen", data={})
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Admin statistieken: barchart verkopen per dag + webhook-alarm
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestAdminStatistieken(unittest.TestCase):
+
+    def setUp(self):
+        self.client, self.ctx = maak_flask_client()
+
+    def tearDown(self):
+        self.ctx.pop()
+
+    def _login(self):
+        self.client.post("/admin/login",
+                         data={"gebruiker": "admin", "wachtwoord": "testpass12345"})
+
+    def _zet_betaald(self, pogingen=1):
+        doe_bestelling(self.client)
+        App.get_db().execute(
+            "UPDATE bestellingen SET status='betaald', mollie_id='tr_s', "
+            "lot_van=1, lot_tot=2, pogingen=? WHERE id=1",
+            (pogingen,)
+        )
+
+    def test_admin_bevat_webhook_alarm_label(self):
+        """Admin-pagina toont altijd het 'Webhook herhaald' stat-label."""
+        self._login()
+        r = self.client.get("/admin")
+        self.assertIn("Webhook herhaald".encode(), r.data)
+
+    def test_admin_webhook_alarm_geen_waarschuwing_bij_lege_db(self):
+        """Lege DB: geen enkel stat-div heeft de waarschuwing-stat klasse."""
+        self._login()
+        r = self.client.get("/admin")
+        self.assertNotIn(b'class="stat waarschuwing-stat"', r.data)
+
+    def test_admin_webhook_alarm_waarschuwing_bij_hoge_pogingen(self):
+        """Bestellingen met pogingen > 2 activeren de waarschuwing-stat klasse op een stat-div."""
+        self._zet_betaald(pogingen=3)
+        self._login()
+        r = self.client.get("/admin")
+        self.assertIn(b'class="stat waarschuwing-stat"', r.data)
+
+    def test_admin_grafiek_afwezig_zonder_betaalde_bestellingen(self):
+        """Verkopen-per-dag grafiek verschijnt niet als er geen betaalde bestellingen zijn."""
+        self._login()
+        r = self.client.get("/admin")
+        self.assertNotIn("laatste 30 dagen".encode(), r.data)
+
+    def test_admin_grafiek_aanwezig_bij_betaalde_bestelling(self):
+        """Verkopen-per-dag grafiek verschijnt als er betaalde bestellingen zijn."""
+        self._zet_betaald()
+        self._login()
+        r = self.client.get("/admin")
+        self.assertIn("laatste 30 dagen".encode(), r.data)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
