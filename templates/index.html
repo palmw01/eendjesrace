@@ -690,6 +690,11 @@
       Veilig betalen via <strong>Mollie</strong> · iDEAL<br>
       Na betaling ontvang je direct je lotnummers per e-mail.
     </p>
+    {% if not fouten and not vorig %}
+    <p style="text-align:center;margin-top:10px;">
+      <button type="button" id="verbergFormulier" style="background:none;border:none;color:#bbb;font-size:.78rem;cursor:pointer;font-family:'Nunito',sans-serif;padding:0;">▲ Verbergen</button>
+    </p>
+    {% endif %}
     </div>{# /formulierInhoud #}
     {% endif %}
   </div>
@@ -825,20 +830,35 @@
     knop.textContent = '⏳ Doorsturen naar betaalpagina…';
   });
 
-  // CTA-knop → formulier onthullen
+  // CTA-knop → formulier onthullen / verbergen
   (function() {
     var cta    = document.getElementById('bestelCta');
     var ctaSub = document.getElementById('bestelCtaSub');
-    if (!cta) return;
-    cta.addEventListener('click', function() {
-      var fi = document.getElementById('formulierInhoud');
+    var fi     = document.getElementById('formulierInhoud');
+    var sluit  = document.getElementById('verbergFormulier');
+    if (!cta || !fi) return;
+
+    function toonFormulier() {
       cta.style.display    = 'none';
       if (ctaSub) ctaSub.style.display = 'none';
       fi.style.display     = '';
+      fi.classList.remove('formulier-animeer');
+      void fi.offsetWidth; // reflow zodat animatie herstart
       fi.classList.add('formulier-animeer');
       var eersteInput = fi.querySelector('input[type="text"]');
       if (eersteInput) eersteInput.focus();
-    });
+    }
+
+    function verbergFormulier() {
+      fi.style.display     = 'none';
+      fi.classList.remove('formulier-animeer');
+      cta.style.display    = '';
+      if (ctaSub) ctaSub.style.display = '';
+      cta.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    cta.addEventListener('click', toonFormulier);
+    if (sluit) sluit.addEventListener('click', verbergFormulier);
   })();
 
   // Sponsorstrip: vloeiende scroll via requestAnimationFrame (geen CSS loop-reset)
