@@ -501,6 +501,30 @@
       display: block;
     }
 
+    /* CTA-knop (onthult het formulier) */
+    .bestel-cta {
+      width: 100%; padding: 16px; margin-top: 8px;
+      background: linear-gradient(135deg, var(--geel), var(--oranje));
+      border: none; border-radius: 14px;
+      font-family: 'Fredoka One', cursive; font-size: 1.4rem;
+      color: var(--donker); cursor: pointer;
+      box-shadow: 0 6px 20px rgba(255,140,0,0.4);
+      transition: transform .15s, box-shadow .15s;
+      letter-spacing: .5px;
+    }
+    .bestel-cta:hover { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(255,140,0,0.5); }
+    .bestel-cta:active { transform: translateY(0); }
+    .bestel-cta-sub {
+      text-align: center; font-size: 0.78rem; color: #999; margin-top: 8px;
+    }
+
+    /* Formulier inschuif-animatie */
+    @keyframes inschuiven {
+      from { opacity: 0; transform: translateY(-10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .formulier-animeer { animation: inschuiven 0.35s ease; }
+
     /* Uitverkocht banner */
     .uitverkocht {
       text-align: center;
@@ -603,6 +627,16 @@
       {% for fout in fouten %}<p>{{ fout }}</p>{% endfor %}
     </div>
     {% endif %}
+
+    {% if not fouten and not vorig %}
+    <button type="button" class="bestel-cta" id="bestelCta">
+      <img class="eend-inline" src="{{ url_for('static', filename='img/eend.png') }}" alt=""> Bestel hier
+    </button>
+    <p class="bestel-cta-sub" id="bestelCtaSub">Betaal veilig via iDEAL · lotnummers direct per e-mail</p>
+    <noscript><p style="color:#C62828;font-weight:700;margin-top:10px;font-size:.9rem;">Schakel JavaScript in om te kunnen bestellen.</p></noscript>
+    {% endif %}
+
+    <div id="formulierInhoud"{% if not fouten and not vorig %} style="display:none"{% endif %}>
     <form method="POST" action="/bestellen" id="bestelForm">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="form-groep">
@@ -656,6 +690,7 @@
       Veilig betalen via <strong>Mollie</strong> · iDEAL<br>
       Na betaling ontvang je direct je lotnummers per e-mail.
     </p>
+    </div>{# /formulierInhoud #}
     {% endif %}
   </div>
 
@@ -789,6 +824,22 @@
     knop.disabled = true;
     knop.textContent = '⏳ Doorsturen naar betaalpagina…';
   });
+
+  // CTA-knop → formulier onthullen
+  (function() {
+    var cta    = document.getElementById('bestelCta');
+    var ctaSub = document.getElementById('bestelCtaSub');
+    if (!cta) return;
+    cta.addEventListener('click', function() {
+      var fi = document.getElementById('formulierInhoud');
+      cta.style.display    = 'none';
+      if (ctaSub) ctaSub.style.display = 'none';
+      fi.style.display     = '';
+      fi.classList.add('formulier-animeer');
+      var eersteInput = fi.querySelector('input[type="text"]');
+      if (eersteInput) eersteInput.focus();
+    });
+  })();
 
   // Sponsorstrip: vloeiende scroll via requestAnimationFrame (geen CSS loop-reset)
   (function() {
