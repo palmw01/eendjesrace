@@ -418,6 +418,32 @@
       color: rgba(255,255,255,0.9);
       margin-top: 10px;
     }
+    .prijzen-tabel {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+      color: rgba(255,255,255,0.9);
+      margin-top: 10px;
+    }
+    .prijzen-tabel td {
+      padding: 5px 8px 5px 0;
+      vertical-align: middle;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    .prijzen-tabel tr:last-child td { border-bottom: none; }
+    .prijzen-plek {
+      width: 2.2rem;
+      text-align: center;
+      font-size: 1rem;
+      white-space: nowrap;
+    }
+    .prijzen-bedrag {
+      text-align: right;
+      white-space: nowrap;
+      color: var(--geel);
+      font-weight: 600;
+      padding-left: 12px;
+    }
 
     /* Foutmelding */
     .foutmelding {
@@ -727,6 +753,26 @@
         <li>Het eendje dat als eerste de finishgeul binnenkomt, wint de hoofdprijs.</li>
         <li>Daarna worden de overige prijzen verdeeld op basis van de volgorde van binnenkomst.</li>
       </ol>
+    </details>
+
+    <details class="info-details">
+      <summary>Welke prijzen zijn er te winnen?</summary>
+      <table class="prijzen-tabel">
+        <tbody>
+          <tr><td class="prijzen-plek">🥇</td><td>BEKO Wasmachine</td><td class="prijzen-bedrag">€ 500</td></tr>
+          <tr><td class="prijzen-plek">🥈</td><td>Vliegervaring Teuge — 60 min voor 2–3 personen</td><td class="prijzen-bedrag">€ 370</td></tr>
+          <tr><td class="prijzen-plek">🥉</td><td>Kamado Mini-Maxi 15 inch</td><td class="prijzen-bedrag">€ 340</td></tr>
+          <tr><td class="prijzen-plek">4</td><td>Bosch steelstofzuiger</td><td class="prijzen-bedrag">€ 126</td></tr>
+          <tr><td class="prijzen-plek">5</td><td>Skelter / Traptrekker</td><td class="prijzen-bedrag"></td></tr>
+          <tr><td class="prijzen-plek">6</td><td>Crockpot</td><td class="prijzen-bedrag">€ 75</td></tr>
+          <tr><td class="prijzen-plek">7</td><td>Kinderstep</td><td class="prijzen-bedrag"></td></tr>
+          <tr><td class="prijzen-plek">8</td><td>Boodschappenpakket</td><td class="prijzen-bedrag">€ 40</td></tr>
+          <tr><td class="prijzen-plek">9</td><td>Waardebon Taart</td><td class="prijzen-bedrag">€ 26</td></tr>
+          <tr><td class="prijzen-plek">10</td><td>Waardebon Taart</td><td class="prijzen-bedrag">€ 26</td></tr>
+          <tr><td class="prijzen-plek">11</td><td>Waardebon Taart</td><td class="prijzen-bedrag">€ 26</td></tr>
+          <tr><td class="prijzen-plek">12</td><td>Schoenenschoonmaakset</td><td class="prijzen-bedrag">€ 17,50</td></tr>
+        </tbody>
+      </table>
     </details>
   </div>
 
