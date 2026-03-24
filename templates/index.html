@@ -868,7 +868,6 @@
   (function() {
     var rijen = document.querySelectorAll('.sponsor-rij');
     if (!rijen.length) return;
-    var gepauzeerd = false;
 
     rijen.forEach(function(rij, idx) {
       var pos = 0;
@@ -881,20 +880,13 @@
         if (richting < 0) pos = halfBreedte; // rechts begint halverwege
         var snelheid = halfBreedte / (duur * 60);
         function frame() {
-          if (!gepauzeerd) {
-            pos += richting * snelheid;
-            if (pos >= halfBreedte) pos -= halfBreedte;
-            if (pos < 0) pos += halfBreedte;
-            rij.style.transform = 'translateX(-' + pos.toFixed(2) + 'px)';
-          }
+          pos += richting * snelheid;
+          if (pos >= halfBreedte) pos -= halfBreedte;
+          if (pos < 0) pos += halfBreedte;
+          rij.style.transform = 'translateX(-' + pos.toFixed(2) + 'px)';
           requestAnimationFrame(frame);
         }
         requestAnimationFrame(frame);
-      }
-
-      if (window.matchMedia('(hover: hover)').matches) {
-        rij.addEventListener('mouseenter', function() { gepauzeerd = true; });
-        rij.addEventListener('mouseleave', function() { gepauzeerd = false; });
       }
 
       if (document.readyState === 'complete') { start(); }
