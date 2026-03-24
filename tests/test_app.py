@@ -4195,14 +4195,14 @@ class TestSponsorStrip(unittest.TestCase):
         """Als de sponsormap leeg is, verschijnt er geen sponsorsectie."""
         r = self._get_index([])
         self.assertEqual(r.status_code, 200)
-        self.assertNotIn(b"Mogelijk gemaakt door onze sponsors", r.data)
+        self.assertNotIn(b"Met dank aan onze sponsors", r.data)
 
     def test_map_bestaat_niet_geen_sectie(self):
         """Als de sponsormap niet bestaat, verschijnt er geen sponsorsectie."""
         with patch("app.os.path.isdir", return_value=False):
             r = self.client.get("/")
         self.assertEqual(r.status_code, 200)
-        self.assertNotIn(b"Mogelijk gemaakt door onze sponsors", r.data)
+        self.assertNotIn(b"Met dank aan onze sponsors", r.data)
 
     def test_een_sponsor_toont_statische_layout(self):
         """Met 1 sponsor wordt de statische layout getoond (geen scrollanimatie)."""
@@ -4222,6 +4222,11 @@ class TestSponsorStrip(unittest.TestCase):
         r = self._get_index(["a.png", "b.png", "c.jpg", "d.svg", "e.webp"])
         self.assertIn(b'class="sponsor-baan"', r.data)
         self.assertNotIn(b'class="sponsor-rij-statisch"', r.data)
+
+    def test_vijf_sponsors_toont_twee_rijen(self):
+        """Met 5+ sponsors worden twee scrollende rijen getoond."""
+        r = self._get_index(["a.png", "b.png", "c.jpg", "d.svg", "e.webp"])
+        self.assertEqual(r.data.count(b'class="sponsor-baan"'), 2)
 
     def test_niet_ondersteund_bestandstype_wordt_genegeerd(self):
         """Bestanden met een niet-ondersteund type (.gif, .pdf) worden genegeerd."""
@@ -4250,7 +4255,7 @@ class TestSponsorStrip(unittest.TestCase):
     def test_sponsor_titel_zichtbaar_bij_sponsors(self):
         """De sectietitel 'sponsors' is zichtbaar als er sponsors zijn."""
         r = self._get_index(["logo.png"])
-        self.assertIn(b"Mogelijk gemaakt door onze sponsors", r.data)
+        self.assertIn(b"Met dank aan onze sponsors", r.data)
 
 
 # ══════════════════════════════════════════════════════════════════════════════

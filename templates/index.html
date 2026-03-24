@@ -434,30 +434,30 @@
 
     /* Sponsorstrip */
     .sponsor-kaart {
-      background: rgba(255,255,255,0.12);
-      backdrop-filter: blur(10px);
-      border: 1px solid rgba(255,255,255,0.25);
+      background: white;
       border-radius: 20px;
-      padding: 20px 0 28px;
+      padding: 20px 0 24px;
       margin-bottom: 24px;
       overflow: hidden;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.12);
     }
     .sponsor-titel {
       font-family: 'Fredoka One', cursive;
       font-size: 1.1rem;
-      color: var(--geel);
+      color: var(--blauw);
       text-align: center;
       margin-bottom: 16px;
       letter-spacing: 0.5px;
     }
     .sponsor-baan {
       overflow: hidden;
-      mask-image: linear-gradient(to right, transparent 0%, black 12%, black 88%, transparent 100%);
-      -webkit-mask-image: linear-gradient(to right, transparent 0%, black 12%, black 88%, transparent 100%);
+      mask-image: linear-gradient(to right, transparent 0%, black 10%, black 90%, transparent 100%);
+      -webkit-mask-image: linear-gradient(to right, transparent 0%, black 10%, black 90%, transparent 100%);
       transform: translateZ(0);
       -webkit-transform: translateZ(0);
       will-change: transform;
     }
+    .sponsor-baan + .sponsor-baan { margin-top: 10px; }
     @media (max-width: 600px) {
       .sponsor-baan {
         mask-image: none;
@@ -470,7 +470,7 @@
       will-change: transform;
     }
     .sponsor-rij .sponsor-logo {
-      margin-right: 32px;
+      margin-right: 28px;
     }
     .sponsor-rij-statisch {
       display: flex;
@@ -487,15 +487,16 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      background: rgba(255,255,255,0.92);
+      background: #F8FAFC;
+      border: 1px solid #E8EDF2;
       border-radius: 12px;
       padding: 10px 20px;
-      height: 72px;
+      height: 90px;
       min-width: 130px;
       flex-shrink: 0;
     }
     .sponsor-logo img {
-      max-height: 52px;
+      max-height: 68px;
       max-width: 160px;
       object-fit: contain;
       display: block;
@@ -599,6 +600,40 @@
     </div>
     <div class="voortgang-label" id="voortgangLabel">{{ max_eendjes }} eendjes beschikbaar</div>
   </div>
+
+  <!-- Sponsorstrip -->
+  {% if sponsor_bestanden %}
+  <div class="sponsor-kaart">
+    <div class="sponsor-titel">Met dank aan onze sponsors</div>
+    {% if sponsor_bestanden|length <= 4 %}
+    <div class="sponsor-rij-statisch">
+      {% for bestand in sponsor_bestanden %}
+      <div class="sponsor-logo">
+        <img src="{{ url_for('static', filename='img/sponsors/' ~ bestand) }}" alt="Sponsor">
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    {% for rij_sponsors in sponsor_bestanden|slice(2) %}
+    <div class="sponsor-baan">
+      <div class="sponsor-rij">
+        {% for bestand in rij_sponsors %}
+        <div class="sponsor-logo">
+          <img src="{{ url_for('static', filename='img/sponsors/' ~ bestand) }}" alt="Sponsor">
+        </div>
+        {% endfor %}
+        {# Duplicaat voor naadloze loop #}
+        {% for bestand in rij_sponsors %}
+        <div class="sponsor-logo">
+          <img src="{{ url_for('static', filename='img/sponsors/' ~ bestand) }}" alt="Sponsor">
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+    {% endif %}
+  </div>
+  {% endif %}
 
   <!-- Bestelformulier -->
   <div class="kaart">
@@ -728,38 +763,6 @@
       </ol>
     </details>
   </div>
-  <!-- Sponsorstrip -->
-  {% if sponsor_bestanden %}
-  <div class="sponsor-kaart">
-    <div class="sponsor-titel">Mogelijk gemaakt door onze sponsors</div>
-    {% if sponsor_bestanden|length <= 4 %}
-    <div class="sponsor-rij-statisch">
-      {% for bestand in sponsor_bestanden %}
-      <div class="sponsor-logo">
-        <img src="{{ url_for('static', filename='img/sponsors/' ~ bestand) }}" alt="Sponsor">
-      </div>
-      {% endfor %}
-    </div>
-    {% else %}
-    <div class="sponsor-baan">
-      <div class="sponsor-rij">
-        {% for bestand in sponsor_bestanden %}
-        <div class="sponsor-logo">
-          <img src="{{ url_for('static', filename='img/sponsors/' ~ bestand) }}" alt="Sponsor">
-        </div>
-        {% endfor %}
-        {# Duplicaat voor naadloze loop #}
-        {% for bestand in sponsor_bestanden %}
-        <div class="sponsor-logo">
-          <img src="{{ url_for('static', filename='img/sponsors/' ~ bestand) }}" alt="Sponsor">
-        </div>
-        {% endfor %}
-      </div>
-    </div>
-    {% endif %}
-  </div>
-  {% endif %}
-
   <!-- Footer -->
   <footer class="site-footer">
     <p><strong style="color:rgba(255,255,255,0.85);">Diaconie Hervormde gemeente te Wapenveld</strong></p>
@@ -861,36 +864,42 @@
     if (sluit) sluit.addEventListener('click', verbergFormulier);
   })();
 
-  // Sponsorstrip: vloeiende scroll via requestAnimationFrame (geen CSS loop-reset)
+  // Sponsorstrip: twee rijen met tegengestelde scroll via requestAnimationFrame
   (function() {
-    const rij = document.querySelector('.sponsor-rij');
-    if (!rij) return;
-    let pos = 0;
-    let gepauzeerd = false;
-    let halfBreedte = 0;
+    var rijen = document.querySelectorAll('.sponsor-rij');
+    if (!rijen.length) return;
+    var gepauzeerd = false;
 
-    function start() {
-      halfBreedte = rij.scrollWidth / 2;
-      if (halfBreedte <= 0) return;
-      const snelheid = halfBreedte / (20 * 60); // 20s bij 60fps
-      function frame() {
-        if (!gepauzeerd) {
-          pos += snelheid;
-          if (pos >= halfBreedte) pos -= halfBreedte;
-          rij.style.transform = 'translateX(-' + pos.toFixed(2) + 'px)';
+    rijen.forEach(function(rij, idx) {
+      var pos = 0;
+      var richting = idx % 2 === 0 ? 1 : -1; // rij 0: links, rij 1: rechts
+      var duur = idx % 2 === 0 ? 20 : 25;     // verschillende snelheden
+
+      function start() {
+        var halfBreedte = rij.scrollWidth / 2;
+        if (halfBreedte <= 0) return;
+        if (richting < 0) pos = halfBreedte; // rechts begint halverwege
+        var snelheid = halfBreedte / (duur * 60);
+        function frame() {
+          if (!gepauzeerd) {
+            pos += richting * snelheid;
+            if (pos >= halfBreedte) pos -= halfBreedte;
+            if (pos < 0) pos += halfBreedte;
+            rij.style.transform = 'translateX(-' + pos.toFixed(2) + 'px)';
+          }
+          requestAnimationFrame(frame);
         }
         requestAnimationFrame(frame);
       }
-      requestAnimationFrame(frame);
-    }
 
-    if (window.matchMedia('(hover: hover)').matches) {
-      rij.addEventListener('mouseenter', function() { gepauzeerd = true; });
-      rij.addEventListener('mouseleave', function() { gepauzeerd = false; });
-    }
+      if (window.matchMedia('(hover: hover)').matches) {
+        rij.addEventListener('mouseenter', function() { gepauzeerd = true; });
+        rij.addEventListener('mouseleave', function() { gepauzeerd = false; });
+      }
 
-    if (document.readyState === 'complete') { start(); }
-    else { window.addEventListener('load', start); }
+      if (document.readyState === 'complete') { start(); }
+      else { window.addEventListener('load', start); }
+    });
   })();
 
   // Auto-refresh beschikbaarheid elke 30 seconden
