@@ -1873,7 +1873,7 @@ class TestMailHeader(unittest.TestCase):
 
     def test_mail_html_bevat_tijd(self):
         params = self._vang_mail_params()
-        self.assertIn("19:30", params.get("html", ""))
+        self.assertIn("19:00", params.get("html", ""))
 
     def test_mail_html_praktische_info_icoon_niet_agenda(self):
         """Header van praktische-infoblok mag niet hetzelfde icoon als de datumregel gebruiken."""

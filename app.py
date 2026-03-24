@@ -564,7 +564,7 @@ def stuur_bevestigingsmail(voornaam, achternaam, email, aantal, lot_van, lot_tot
           <p style="margin:0 0 6px;font-weight:bold;color:#0077B6;">&#x2139;&#xFE0F; Praktische informatie</p>
           <p style="margin:0;font-size:.95rem;color:#01579B;line-height:1.8;">
             &#x1F4C5; <strong>Datum:</strong> Zaterdag 30 mei 2026<br>
-            &#x1F559; <strong>Tijd:</strong> Rond 19:30 uur<br>
+            &#x1F559; <strong>Tijd:</strong> Rond 19:00 uur<br>
             &#x1F4CD; <strong>Locatie:</strong> Het Apeldoorns Kanaal, bij de Manenbergerbrug / de Loswal in Wapenveld
           </p>
         </div>
