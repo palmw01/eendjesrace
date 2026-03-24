@@ -185,7 +185,10 @@ De app ondersteunt meerdere beheerdersaccounts. Wachtwoorden worden gehasht opge
 | `/admin/2fa/bevestigen` | Activeer 2FA na verificatie van de eerste code |
 | `/admin/2fa/uitschakelen` | Schakel 2FA uit met huidige TOTP-code |
 | `/admin/login/totp` | Tweede loginstap (TOTP-code) wanneer 2FA actief is |
+| `/admin/beheerder-wachtwoord-reset/<id>` | Reset wachtwoord van een ander beheerdersaccount |
 | `/admin/audit-wissen` | Wis de volledige audit-log |
+| `/setup` | Eenmalig formulier voor aanmaken eerste beheerdersaccount (vereist token uit console) |
+| `/health` | Health check endpoint — controleert DB en Mollie bereikbaarheid (JSON) |
 | `/.well-known/security.txt` | Beveiligingscontactinformatie (RFC 9116) |
 
 ---
@@ -272,4 +275,4 @@ PYTHONPATH=. .venv/bin/pytest tests/test_app.py -v
 PYTHONPATH=. .venv/bin/python tests/test_app.py
 ```
 
-De testsuite stubt Mollie, Resend, Flask-WTF en Flask-Limiter. `conftest.py` zorgt voor automatische testdatabase-cleanup (vereist voor Python 3.14 + SQLite WAL mode). **479 tests.**
+De testsuite stubt Mollie, Resend, Flask-WTF en Flask-Limiter. `conftest.py` zorgt voor automatische testdatabase-cleanup (vereist voor Python 3.14 + SQLite WAL mode). **499 tests.**
