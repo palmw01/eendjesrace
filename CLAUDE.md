@@ -139,7 +139,7 @@ Sponsors worden automatisch geladen vanuit `static/img/sponsors/`. Ondersteunde 
 - **≤ 4 sponsors**: statische gecentreerde rij (`sponsor-rij-statisch`), geen animatie. Minimumbreedte 160px per logo-blok zodat het er verzorgd uitziet met weinig sponsors.
 - **≥ 5 sponsors**: twee tegengesteld scrollende rijen (`sponsor-baan` × 2, `sponsor-rij` per baan). De lijst wordt met Jinja's `slice(2)` filter in twee helften gesplitst. Rij 1 scrolt links (20s), rij 2 rechts (25s). Elk gedupliceerd voor naadloze loop. Pauzeert bij hover.
 - **Geen sponsors**: sectie wordt volledig verborgen.
-- **Positie**: sponsor-kaart staat tussen de voortgangsbalk en het bestelformulier.
+- **Positie**: sponsor-kaart staat tussen de evenementinfo en de footer.
 - **Titel**: "Met dank aan onze sponsors". Kaart heeft witte achtergrond met box-shadow. Logo-blokken 90px hoog met lichtgrijs achtergrond en subtiele rand.
 
 Logo's toevoegen: afbeelding in `static/img/sponsors/` plaatsen — geen code aanpassen nodig.
