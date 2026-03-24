@@ -4223,10 +4223,10 @@ class TestSponsorStrip(unittest.TestCase):
         self.assertIn(b'class="sponsor-baan"', r.data)
         self.assertNotIn(b'class="sponsor-rij-statisch"', r.data)
 
-    def test_vijf_sponsors_toont_twee_rijen(self):
-        """Met 5+ sponsors worden twee scrollende rijen getoond."""
+    def test_vijf_sponsors_toont_drie_rijen(self):
+        """Met 5+ sponsors worden drie scrollende rijen getoond."""
         r = self._get_index(["a.png", "b.png", "c.jpg", "d.svg", "e.webp"])
-        self.assertEqual(r.data.count(b'class="sponsor-baan"'), 2)
+        self.assertEqual(r.data.count(b'class="sponsor-baan"'), 3)
 
     def test_niet_ondersteund_bestandstype_wordt_genegeerd(self):
         """Bestanden met een niet-ondersteund type (.gif, .pdf) worden genegeerd."""
