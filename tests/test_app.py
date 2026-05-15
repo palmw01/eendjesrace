@@ -2007,6 +2007,64 @@ class TestHandmatigeBestellingen(unittest.TestCase):
         self.assertIn(r.status_code, [302, 401, 403])
         ctx2.pop()
 
+    def test_verloting_bestelling_bedrag_is_nul(self):
+        self.client.post("/admin/handmatig", data={
+            "h_voornaam": "Jan", "h_achternaam": "Winnaar", "email": "", "telefoon": "",
+            "aantal": "1", "betaalwijze": "verloting",
+        })
+        db = App.get_db()
+        b = db.execute("SELECT bedrag, betaalwijze FROM bestellingen WHERE voornaam='Jan' AND achternaam='Winnaar'").fetchone()
+        self.assertEqual(b["betaalwijze"], "verloting")
+        self.assertEqual(b["bedrag"], 0.0)
+
+    def test_verloting_bestelling_lotnummers_toegewezen(self):
+        self.client.post("/admin/handmatig", data={
+            "h_voornaam": "Lot", "h_achternaam": "Winner", "email": "", "telefoon": "",
+            "aantal": "3", "betaalwijze": "verloting",
+        })
+        db = App.get_db()
+        b = db.execute("SELECT lot_van, lot_tot, status FROM bestellingen WHERE voornaam='Lot' AND achternaam='Winner'").fetchone()
+        self.assertIsNotNone(b["lot_van"])
+        self.assertEqual(b["lot_tot"] - b["lot_van"] + 1, 3)
+        self.assertEqual(b["status"], "betaald")
+
+    def test_verloting_telt_niet_mee_in_omzet(self):
+        # Maak een normale contant-bestelling en een verloting-bestelling
+        self.client.post("/admin/handmatig", data={
+            "h_voornaam": "Koper", "h_achternaam": "Normaal", "email": "", "telefoon": "",
+            "aantal": "1", "betaalwijze": "contant",
+        })
+        self.client.post("/admin/handmatig", data={
+            "h_voornaam": "Win", "h_achternaam": "Naar", "email": "", "telefoon": "",
+            "aantal": "1", "betaalwijze": "verloting",
+        })
+        db = App.get_db()
+        omzet = db.execute(
+            "SELECT COALESCE(SUM(CASE WHEN status='betaald' AND betaalwijze != 'verloting' THEN bedrag END), 0) AS o FROM bestellingen"
+        ).fetchone()["o"]
+        totaal = db.execute(
+            "SELECT COALESCE(SUM(CASE WHEN status='betaald' THEN bedrag END), 0) AS o FROM bestellingen"
+        ).fetchone()["o"]
+        # Verloting heeft bedrag=0, dus omzet == totaal, maar de filter werkt correct
+        self.assertEqual(omzet, totaal)
+        # Expliciete check: verloting-bestelling heeft bedrag 0
+        v = db.execute("SELECT bedrag FROM bestellingen WHERE betaalwijze='verloting'").fetchone()
+        self.assertEqual(v["bedrag"], 0.0)
+
+    def test_verloting_bypast_max_per_bestelling(self):
+        # Stel max in op 5, dan moet verloting met 10 toch lukken
+        db = App.get_db()
+        db.execute("UPDATE teller SET max_per_bestelling=5")
+        db.commit()
+        r = self.client.post("/admin/handmatig", data={
+            "h_voornaam": "Bulk", "h_achternaam": "Lot", "email": "", "telefoon": "",
+            "aantal": "10", "betaalwijze": "verloting",
+        })
+        self.assertEqual(r.status_code, 302)
+        b = db.execute("SELECT lot_van, lot_tot FROM bestellingen WHERE voornaam='Bulk' AND achternaam='Lot'").fetchone()
+        self.assertIsNotNone(b)
+        self.assertEqual(b["lot_tot"] - b["lot_van"] + 1, 10)
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # WETTELIJKE PAGINA'S

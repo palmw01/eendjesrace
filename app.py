@@ -1398,7 +1398,7 @@ def admin():
             SELECT
                 COUNT(*)                                                          AS totaal_bestellingen,
                 COALESCE(SUM(CASE WHEN status='betaald' THEN aantal END), 0)     AS verkochte_eendjes,
-                COALESCE(SUM(CASE WHEN status='betaald' THEN bedrag END), 0)     AS totaal_omzet,
+                COALESCE(SUM(CASE WHEN status='betaald' AND betaalwijze != 'verloting' THEN bedrag END), 0) AS totaal_omzet,
                 COALESCE(SUM(CASE WHEN status='betaald'
                                    AND mail_verstuurd=0 THEN 1 END), 0)          AS mails_mislukt,
                 COALESCE(SUM(CASE WHEN status='aangemaakt' THEN 1 END), 0)       AS openstaand,
@@ -2034,7 +2034,7 @@ def handmatige_bestelling():
         flash("Ongeldig aantal opgegeven.", "fout")
         return redirect(url_for("admin"))
 
-    if betaalwijze not in ("contant", "overboeking"):
+    if betaalwijze not in ("contant", "overboeking", "verloting"):
         betaalwijze = "contant"
 
     fouten = []
@@ -2052,16 +2052,20 @@ def handmatige_bestelling():
         fouten.append("Ongeldig telefoonnummer.")
     if aantal < 1:
         fouten.append("Aantal moet minimaal 1 zijn.")
-    max_per = get_max_per_bestelling()
-    if aantal > max_per:
-        fouten.append(f"Maximaal {max_per} eendjes per bestelling.")
+    if betaalwijze != "verloting":
+        max_per = get_max_per_bestelling()
+        if aantal > max_per:
+            fouten.append(f"Maximaal {max_per} eendjes per bestelling.")
 
     if fouten:
         for f in fouten:
             flash(f, "fout")
         return redirect(url_for("admin"))
 
-    bedrag = bereken_bedrag(aantal, get_prijs_per_stuk(), get_prijs_vijf_stuks())
+    if betaalwijze == "verloting":
+        bedrag = 0.0
+    else:
+        bedrag = bereken_bedrag(aantal, get_prijs_per_stuk(), get_prijs_vijf_stuks())
 
     try:
         db = get_db()

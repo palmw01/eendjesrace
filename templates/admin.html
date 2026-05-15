@@ -154,6 +154,7 @@
     .badge-ideal       { background: #E3F2FD; color: #0277BD; }
     .badge-contant     { background: #E8F5E9; color: #1B5E20; }
     .badge-overboeking { background: #F3E5F5; color: #4A148C; }
+    .badge-verloting   { background: #FFF9C4; color: #F57F17; }
     .badge-handmatig   { background: #FFF8E1; color: #E65100; }
 
     /* Inklapbare kaarten via <details> */
@@ -521,7 +522,7 @@
   <details class="instelling-kaart" style="margin-top:28px;">
     <summary>➕ Handmatige bestelling toevoegen</summary>
     <p style="font-size:.9rem;color:#555;margin-bottom:16px;">
-      Voor verkoop buiten iDEAL om (contant of overboeking). Lotnummers worden direct toegewezen.
+      Voor verkoop buiten iDEAL om (contant, overboeking of verloting). Lotnummers worden direct toegewezen.
       E-mail en telefoon zijn optioneel — als een e-mailadres is ingevuld, wordt automatisch een bevestigingsmail gestuurd.
     </p>
     <form method="POST" action="/admin/handmatig">
@@ -551,6 +552,7 @@
         <select class="instelling-input" id="h_betaalwijze" name="betaalwijze">
           <option value="contant">Contant</option>
           <option value="overboeking">Overboeking</option>
+          <option value="verloting">Verloting (gratis, telt niet mee in omzet)</option>
         </select>
       </div>
       <button type="submit" class="instelling-knop">Bestelling aanmaken</button>
