@@ -813,9 +813,11 @@ def index():
             f for f in os.listdir(sponsors_map)
             if f.lower().endswith((".png", ".jpg", ".jpeg", ".svg", ".webp"))
         ) if os.path.isdir(sponsors_map) else []
+        beschikbaar = max(0, max_eendjes - betaald)
         return render_template("index.html",
                                verkocht=betaald,
-                               beschikbaar=max(0, max_eendjes - betaald),
+                               beschikbaar=beschikbaar,
+                               uitverkocht=(beschikbaar <= 0),
                                max_eendjes=max_eendjes,
                                max_per_bestelling=get_max_per_bestelling(),
                                transactiekosten=get_transactiekosten(),
@@ -860,6 +862,7 @@ def api_beschikbaar():
             "beschikbaar":        beschikbaar,
             "max_eendjes":        max_eendjes,
             "max_per_bestelling": max_per_bestelling,
+            "uitverkocht":        beschikbaar <= 0,
         })
     except sqlite3.Error as e:
         app.logger.error(f"DB-fout api_beschikbaar: {e}")

@@ -3163,6 +3163,75 @@ class TestHomepageEnApi(unittest.TestCase):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# UITVERKOCHT-MODUS
+#     Homepage toont feestelijke kaart i.p.v. bestelformulier; vallende eendjes;
+#     API geeft uitverkocht=true; titel/JSON-LD weerspiegelen SoldOut.
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestUitverkochtModus(unittest.TestCase):
+
+    def setUp(self):
+        self.client, self.ctx = maak_flask_client()
+        # Maak alles "verkocht" door één bestelling te plaatsen die alle eendjes claimt
+        db = App.get_db()
+        max_e = db.execute("SELECT max_eendjes FROM teller WHERE id=1").fetchone()["max_eendjes"]
+        db.execute(
+            "INSERT INTO bestellingen (voornaam,achternaam,telefoon,email,aantal,bedrag,status,lot_van,lot_tot) "
+            "VALUES (?,?,?,?,?,?,?,?,?)",
+            ("Test", "Uitverkocht", "06", "t@t.nl", max_e, 0.0, "betaald", 1, max_e),
+        )
+
+    def tearDown(self):
+        self.ctx.pop()
+
+    def test_homepage_toont_uitverkocht_kaart(self):
+        r = self.client.get("/")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(b'id="uitverkochtKaart"', r.data)
+        self.assertIn("Alle eendjes zijn verkocht".encode("utf-8"), r.data)
+
+    def test_homepage_verbergt_bestelformulier_bij_uitverkocht(self):
+        r = self.client.get("/")
+        self.assertNotIn(b'id="bestelForm"', r.data)
+        self.assertNotIn(b'id="bestelCta"', r.data)
+        self.assertNotIn(b'action="/bestellen"', r.data)
+
+    def test_homepage_bevat_vallende_eendjes_script(self):
+        """Bij uitverkocht moet het vallende-eendjes JS-script aanwezig zijn."""
+        r = self.client.get("/")
+        self.assertIn(b"vallend-eendje", r.data)
+        self.assertIn(b"valEend", r.data)
+        # Wij gebruiken 40 eendjes voor de homepage-viering
+        self.assertIn(b"AANTAL = 40", r.data)
+
+    def test_homepage_titel_toont_uitverkocht(self):
+        r = self.client.get("/")
+        self.assertIn("Uitverkocht".encode("utf-8"), r.data.split(b"</title>")[0])
+
+    def test_homepage_json_ld_toont_soldout(self):
+        r = self.client.get("/")
+        self.assertIn(b"schema.org/SoldOut", r.data)
+        self.assertNotIn(b"schema.org/InStock", r.data)
+
+    def test_voortgangsbalk_toont_uitverkocht_label(self):
+        r = self.client.get("/")
+        self.assertIn("Uitverkocht!".encode("utf-8"), r.data)
+        self.assertIn(b"uitverkocht", r.data)  # CSS-klasse op voortgang-fill
+
+    def test_api_beschikbaar_geeft_uitverkocht_true(self):
+        d = self.client.get("/api/beschikbaar").get_json()
+        self.assertTrue(d.get("uitverkocht"))
+        self.assertEqual(d["beschikbaar"], 0)
+
+    def test_api_beschikbaar_geeft_uitverkocht_false_bij_voorraad(self):
+        """Sanity-check: zonder verkochte bestellingen is uitverkocht=false."""
+        # Verwijder eerst de seed-bestelling van setUp
+        App.get_db().execute("DELETE FROM bestellingen")
+        d = self.client.get("/api/beschikbaar").get_json()
+        self.assertFalse(d.get("uitverkocht"))
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # SECURITY HEADERS — AANVULLEND
 #     X-XSS-Protection, onderdrukt Server-header, CSP base-uri / form-action
 # ══════════════════════════════════════════════════════════════════════════════
