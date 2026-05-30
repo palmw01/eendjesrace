@@ -18,3 +18,6 @@ logs/
 
 # OS
 .DS_Store
+
+# Claude Code (lokale config per machine)
+.claude/
