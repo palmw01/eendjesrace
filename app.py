@@ -29,7 +29,8 @@ from functools import wraps
 from logging.handlers import RotatingFileHandler
 from flask import (
     Flask, request, render_template, redirect,
-    url_for, jsonify, session, abort, g, Response, flash, get_flashed_messages
+    url_for, jsonify, session, abort, g, Response, flash, get_flashed_messages,
+    send_from_directory
 )
 from werkzeug.middleware.proxy_fix import ProxyFix
 from flask_wtf import CSRFProtect
@@ -731,6 +732,26 @@ def security_txt():
         f"Canonical: {BASE_URL}/.well-known/security.txt\n"
     )
     return Response(inhoud, mimetype="text/plain")
+
+
+# ─── favicon (root-level voor crawlers) ───────────────────────────────────────
+@app.route("/favicon.ico")
+def favicon_ico():
+    return send_from_directory(
+        os.path.join(app.root_path, "static", "img", "favicons"),
+        "favicon.ico",
+        mimetype="image/vnd.microsoft.icon",
+    )
+
+
+@app.route("/apple-touch-icon.png")
+@app.route("/apple-touch-icon-precomposed.png")
+def apple_touch_icon():
+    return send_from_directory(
+        os.path.join(app.root_path, "static", "img", "favicons"),
+        "apple-touch-icon.png",
+        mimetype="image/png",
+    )
 
 
 # ─── robots.txt + sitemap.xml ─────────────────────────────────────────────────
