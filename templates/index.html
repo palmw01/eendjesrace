@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>{% if uitverkocht %}🎉 Uitverkocht – {% endif %}Badeendjesrace Wapenveld{% if not uitverkocht %} – Bestel je loten{% endif %}</title>
+  <title>{% if race_afgelopen %}🏆 Race gevaren – Badeendjesrace Wapenveld{% elif uitverkocht %}🎉 Uitverkocht – Badeendjesrace Wapenveld{% else %}Badeendjesrace Wapenveld – Bestel je loten{% endif %}</title>
   <meta name="description" content="Doe mee aan de Badeendjesrace in Wapenveld! Bestel lotnummers vanaf €2,50 per stuk en steun het diaconale project 'Ik geloof, ik deel' van de HGJB-commissie. Meedoen is eenvoudig en veilig via iDEAL.">
   <meta name="robots" content="index, follow">
   <link rel="canonical" href="{{ base_url }}/">
@@ -611,7 +611,29 @@
     }
     .uitverkocht-bedankt strong { color: var(--blauw); }
 
-    /* Vallende eendjes-animatie (op homepage bij uitverkocht) */
+    /* Winnaars-lijst (op homepage bij race_afgelopen) */
+    .winnaars-lijst {
+      list-style: none;
+      padding: 0;
+      margin: 14px auto 8px;
+      max-width: 360px;
+    }
+    .winnaars-lijst li {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #FFF8E1;
+      border-radius: 10px;
+      padding: 10px 16px;
+      margin-bottom: 6px;
+      font-family: 'Fredoka One', cursive;
+    }
+    .winnaars-lijst .plek { color: #555; font-size: .95rem; }
+    .winnaars-lijst .plek::before { content: 'Plek '; }
+    .winnaars-lijst .lot  { font-size: 1.15rem; color: var(--donker); }
+    .winnaars-lijst .lot::before { content: 'Lot '; color: #888; font-size: .85rem; margin-right: 4px; font-weight: normal; }
+
+    /* Vallende eendjes-animatie (op homepage bij uitverkocht of race-afgelopen) */
     @keyframes valEend {
       0%   { transform: translateY(-80px) rotate(0deg);   opacity: 1; }
       80%  { opacity: 1; }
@@ -651,7 +673,7 @@
       "price": "2.50",
       "priceCurrency": "EUR",
       "url": "{{ base_url }}/",
-      "availability": "https://schema.org/{% if uitverkocht %}SoldOut{% else %}InStock{% endif %}"
+      "availability": "https://schema.org/{% if uitverkocht or race_afgelopen %}SoldOut{% else %}InStock{% endif %}"
     }
   }
   </script>
@@ -677,6 +699,7 @@
 
   <!-- Voortgangsbalk -->
   {% set pct = ((verkocht / max_eendjes * 100)|round(1)) if max_eendjes else 0 %}
+  {% if not race_afgelopen %}
   <div class="voortgang-card">
     <div class="voortgang-header">
       <span id="tellerVerkocht"><img class="eend-inline" src="{{ url_for('static', filename='img/eend.png') }}" alt=""> {{ verkocht }} verkocht</span>
@@ -687,8 +710,38 @@
     </div>
     <div class="voortgang-label" id="voortgangLabel">{% if uitverkocht %}🎉 Alle {{ max_eendjes }} eendjes verkocht{% else %}{{ max_eendjes }} eendjes beschikbaar{% endif %}</div>
   </div>
+  {% endif %}
 
-  {% if uitverkocht %}
+  {% if race_afgelopen %}
+  <!-- Race-afgelopen kaart (vervangt het bestelformulier én de uitverkocht-kaart) -->
+  <div class="uitverkocht-kaart" id="raceAfgelopenKaart">
+    <span class="uitverkocht-icoon">🏆</span>
+    <h2>De race is gevaren!</h2>
+    <p class="ondertitel">Bedankt aan iedereen die heeft meegedaan, wat een feest!</p>
+    <div class="uitverkocht-statistiek">🎉 De winnaars zijn bekend</div>
+    <p class="uitverkocht-bedankt">
+      Hieronder vind je de winnende lotnummers per plek.
+      winnaars worden persoonlijk benaderd.
+    </p>
+    <ol class="winnaars-lijst">
+      <li><span class="plek">1</span><span class="lot">1036</span></li>
+      <li><span class="plek">2</span><span class="lot">2351</span></li>
+      <li><span class="plek">3</span><span class="lot">1649</span></li>
+      <li><span class="plek">4</span><span class="lot">2706</span></li>
+      <li><span class="plek">5</span><span class="lot">1143</span></li>
+      <li><span class="plek">6</span><span class="lot">624</span></li>
+      <li><span class="plek">7</span><span class="lot">2104</span></li>
+      <li><span class="plek">8</span><span class="lot">747</span></li>
+      <li><span class="plek">9</span><span class="lot">1643</span></li>
+      <li><span class="plek">10</span><span class="lot">227</span></li>
+      <li><span class="plek">11</span><span class="lot">1507</span></li>
+      <li><span class="plek">12</span><span class="lot">1581</span></li>
+    </ol>
+    <p class="uitverkocht-bedankt" style="margin-top:14px;">
+      De opbrengst gaat naar het diaconale project <strong>'Ik geloof, ik deel'</strong>.
+    </p>
+  </div>
+  {% elif uitverkocht %}
   <!-- Uitverkocht-kaart (vervangt het bestelformulier) -->
   <div class="uitverkocht-kaart" id="uitverkochtKaart">
     <span class="uitverkocht-icoon">🎉</span>
@@ -796,7 +849,7 @@
     {% endif %}
     </div>{# /formulierInhoud #}
   </div>
-  {% endif %}{# /uitverkocht #}
+  {% endif %}{# /race_afgelopen / uitverkocht #}
 
   <!-- Evenementinformatie -->
   <div class="info-kaart">
@@ -1013,9 +1066,9 @@
     });
   })();
 
-  // Vallende eendjes bij uitverkocht (eenmalig bij paginaload)
+  // Vallende eendjes bij uitverkocht of race-afgelopen (eenmalig bij paginaload)
   (function() {
-    if (!document.getElementById('uitverkochtKaart')) return;
+    if (!document.getElementById('uitverkochtKaart') && !document.getElementById('raceAfgelopenKaart')) return;
     var SRC    = "{{ url_for('static', filename='img/eend.png') }}";
     var AANTAL = 40;
     var MATEN  = [28, 34, 40, 48];
@@ -1049,14 +1102,20 @@
     const overEl     = document.getElementById('tellerOver');
     const labelEl    = document.getElementById('voortgangLabel');
     const aantalEl   = document.getElementById('aantal');
-    const isUitverkocht = !!document.getElementById('uitverkochtKaart');
-    if (!fillEl) return;
+    const isUitverkocht   = !!document.getElementById('uitverkochtKaart');
+    const isRaceAfgelopen = !!document.getElementById('raceAfgelopenKaart');
 
     setInterval(function() {
       fetch('/api/beschikbaar')
         .then(function(r) { return r.ok ? r.json() : null; })
         .then(function(d) {
           if (!d || d.fout) return;
+          // Overgang naar race-afgelopen of uit race-afgelopen: ververs de pagina
+          if (d.race_afgelopen !== isRaceAfgelopen) {
+            window.location.reload();
+            return;
+          }
+          if (!fillEl) return;
           // Overgang naar uitverkocht: ververs de pagina zodat de uitverkocht-modus verschijnt
           if (d.uitverkocht && !isUitverkocht) {
             window.location.reload();

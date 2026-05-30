@@ -336,6 +336,10 @@ def init_db():
         conn.execute("ALTER TABLE teller ADD COLUMN onderhoudsmodus INTEGER NOT NULL DEFAULT 0")
     except sqlite3.OperationalError:
         pass  # kolom bestaat al
+    try:
+        conn.execute("ALTER TABLE teller ADD COLUMN race_afgelopen INTEGER NOT NULL DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass  # kolom bestaat al
     # Migratie: naam → voornaam + achternaam
     try:
         cols = [r[1] for r in conn.execute("PRAGMA table_info(bestellingen)").fetchall()]
@@ -468,6 +472,11 @@ def get_transactiekosten():
 def get_onderhoudsmodus():
     row = get_db().execute("SELECT onderhoudsmodus FROM teller WHERE id = 1").fetchone()
     return bool(row["onderhoudsmodus"]) if row else False
+
+
+def get_race_afgelopen():
+    row = get_db().execute("SELECT race_afgelopen FROM teller WHERE id = 1").fetchone()
+    return bool(row["race_afgelopen"]) if row else False
 
 
 # ─── Business logica ──────────────────────────────────────────────────────────
@@ -818,6 +827,7 @@ def index():
                                verkocht=betaald,
                                beschikbaar=beschikbaar,
                                uitverkocht=(beschikbaar <= 0),
+                               race_afgelopen=get_race_afgelopen(),
                                max_eendjes=max_eendjes,
                                max_per_bestelling=get_max_per_bestelling(),
                                transactiekosten=get_transactiekosten(),
@@ -863,6 +873,7 @@ def api_beschikbaar():
             "max_eendjes":        max_eendjes,
             "max_per_bestelling": max_per_bestelling,
             "uitverkocht":        beschikbaar <= 0,
+            "race_afgelopen":     get_race_afgelopen(),
         })
     except sqlite3.Error as e:
         app.logger.error(f"DB-fout api_beschikbaar: {e}")
@@ -1463,6 +1474,7 @@ def admin_beheer():
                                prijs_vijf_stuks=get_prijs_vijf_stuks(),
                                transactiekosten=get_transactiekosten(),
                                onderhoudsmodus=get_onderhoudsmodus(),
+                               race_afgelopen=get_race_afgelopen(),
                                beheerders=beheerders_lijst,
                                audit_regels=audit_regels,
                                eigen_totp_actief=eigen_totp_actief,
@@ -1544,6 +1556,11 @@ def admin_instellingen():
         updates["onderhoudsmodus"] = modus
         meldingen.append("Onderhoudsmodus ingeschakeld." if modus else "Onderhoudsmodus uitgeschakeld.")
 
+        # race_afgelopen (checkbox: aanwezig = aan, afwezig = uit)
+        race_af = 1 if request.form.get("race_afgelopen") else 0
+        updates["race_afgelopen"] = race_af
+        meldingen.append("Race-afgelopen modus ingeschakeld." if race_af else "Race-afgelopen modus uitgeschakeld.")
+
         if fouten:
             for f in fouten:
                 flash(f, "fout")
@@ -1552,6 +1569,7 @@ def admin_instellingen():
             _TOEGESTANE_KOLOMMEN = {
                 "max_eendjes", "max_per_bestelling", "prijs_per_stuk",
                 "prijs_vijf_stuks", "transactiekosten", "onderhoudsmodus",
+                "race_afgelopen",
             }
             for _kolom in updates:
                 if _kolom not in _TOEGESTANE_KOLOMMEN:

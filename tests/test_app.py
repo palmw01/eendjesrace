@@ -4090,6 +4090,153 @@ class TestOnderhoudsmodus(unittest.TestCase):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# Race-afgelopen modus (winnaarsblok op homepage)
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestRaceAfgelopenModus(unittest.TestCase):
+
+    LOTNUMMERS = ["1036", "2351", "1649", "2706", "1143", "624",
+                  "2104", "747", "1643", "227", "1507", "1581"]
+
+    def setUp(self):
+        self.client, self.ctx = maak_flask_client()
+        self.client.post("/admin/login",
+                         data={"gebruiker": "admin", "wachtwoord": "testpass12345"})
+
+    def tearDown(self):
+        # Zet altijd alle modi uit na elke test
+        self.client.post("/admin/instellingen", data={})
+        self.ctx.pop()
+
+    def _zet_modus(self, aan: bool):
+        data = {"race_afgelopen": "1"} if aan else {}
+        self.client.post("/admin/instellingen", data=data)
+
+    def test_race_afgelopen_standaard_uit(self):
+        from app import get_race_afgelopen
+        self.assertFalse(get_race_afgelopen())
+
+    def test_race_afgelopen_inschakelen_slaat_op(self):
+        from app import get_race_afgelopen
+        self._zet_modus(True)
+        self.assertTrue(get_race_afgelopen())
+
+    def test_race_afgelopen_uitschakelen_slaat_op(self):
+        from app import get_race_afgelopen
+        self._zet_modus(True)
+        self._zet_modus(False)
+        self.assertFalse(get_race_afgelopen())
+
+    def test_homepage_toont_winnaarsblok(self):
+        self._zet_modus(True)
+        r = self.client.get("/")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(b'id="raceAfgelopenKaart"', r.data)
+        self.assertIn("De race is gevaren".encode("utf-8"), r.data)
+
+    def test_homepage_toont_alle_twaalf_lotnummers(self):
+        self._zet_modus(True)
+        r = self.client.get("/")
+        for nr in self.LOTNUMMERS:
+            self.assertIn(f">{nr}<".encode("utf-8"), r.data,
+                          f"Lotnummer {nr} ontbreekt op winnaarspagina")
+
+    def test_homepage_geen_namen_op_winnaarspagina(self):
+        """Bevestig dat geen namen worden getoond bij de winnaarspagina."""
+        self._zet_modus(True)
+        r = self.client.get("/")
+        for naam in [b"Meijerink", b"Christianne", b"Harmke", b"Draaijer",
+                     b"Eilander", b"Hetty", b"Wolf", b"Mark", b"Alie", b"Stijf",
+                     b"Vorderman", b"Hendrien", b"Palm", b"Stefano",
+                     b"VERSPRILLE", b"Eilert", b"Berkum"]:
+            self.assertNotIn(naam, r.data,
+                             f"Naam '{naam.decode()}' mag niet op winnaarspagina staan")
+
+    def test_homepage_verbergt_bestelformulier(self):
+        self._zet_modus(True)
+        r = self.client.get("/")
+        self.assertNotIn(b'id="bestelForm"', r.data)
+        self.assertNotIn(b'id="bestelCta"', r.data)
+        self.assertNotIn(b'action="/bestellen"', r.data)
+
+    def test_homepage_verbergt_uitverkochtkaart_zelfs_bij_uitverkocht(self):
+        """Priority-check: race-afgelopen wint van uitverkocht."""
+        # Verkoop alles, ook race-afgelopen aan
+        db = App.get_db()
+        max_e = db.execute("SELECT max_eendjes FROM teller WHERE id=1").fetchone()["max_eendjes"]
+        db.execute(
+            "INSERT INTO bestellingen (voornaam,achternaam,telefoon,email,aantal,bedrag,status,lot_van,lot_tot) "
+            "VALUES (?,?,?,?,?,?,?,?,?)",
+            ("T", "U", "06", "t@t.nl", max_e, 0.0, "betaald", 1, max_e),
+        )
+        self._zet_modus(True)
+        r = self.client.get("/")
+        self.assertIn(b'id="raceAfgelopenKaart"', r.data)
+        self.assertNotIn(b'id="uitverkochtKaart"', r.data)
+
+    def test_homepage_verbergt_voortgangsbalk(self):
+        self._zet_modus(True)
+        r = self.client.get("/")
+        self.assertNotIn(b'id="voortgangFill"', r.data)
+        self.assertNotIn(b'id="tellerVerkocht"', r.data)
+
+    def test_homepage_titel_toont_race_gevaren(self):
+        self._zet_modus(True)
+        r = self.client.get("/")
+        titel = r.data.split(b"</title>")[0]
+        self.assertIn("Race gevaren".encode("utf-8"), titel)
+
+    def test_homepage_json_ld_toont_soldout(self):
+        self._zet_modus(True)
+        r = self.client.get("/")
+        self.assertIn(b"schema.org/SoldOut", r.data)
+        self.assertNotIn(b"schema.org/InStock", r.data)
+
+    def test_homepage_bevat_vallende_eendjes_script(self):
+        """Bij race-afgelopen moet ook het vallende-eendjes JS-script triggeren."""
+        self._zet_modus(True)
+        r = self.client.get("/")
+        self.assertIn(b"raceAfgelopenKaart", r.data)
+        self.assertIn(b"vallend-eendje", r.data)
+        self.assertIn(b"valEend", r.data)
+
+    def test_api_beschikbaar_geeft_race_afgelopen_veld(self):
+        d = self.client.get("/api/beschikbaar").get_json()
+        self.assertIn("race_afgelopen", d)
+        self.assertFalse(d["race_afgelopen"])
+        self._zet_modus(True)
+        d = self.client.get("/api/beschikbaar").get_json()
+        self.assertTrue(d["race_afgelopen"])
+
+    def test_admin_beheer_toont_race_afgelopen_checkbox(self):
+        r = self.client.get("/admin/beheer")
+        self.assertIn(b"race_afgelopen", r.data)
+        self.assertIn("Race afgelopen".encode("utf-8"), r.data)
+
+    def test_inschakelen_toont_flashmelding(self):
+        r = self.client.post("/admin/instellingen",
+                             data={"race_afgelopen": "1"},
+                             follow_redirects=True)
+        self.assertIn("Race-afgelopen".encode("utf-8"), r.data)
+        self.assertIn(b"ngeschakeld", r.data)
+
+    def test_inschakelen_logt_in_audit_log(self):
+        self._zet_modus(True)
+        rij = App.get_db().execute(
+            "SELECT details FROM audit_log WHERE actie='instellingen_gewijzigd' "
+            "ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+        self.assertIsNotNone(rij)
+        self.assertIn("Race-afgelopen", rij["details"])
+
+    def test_normale_modus_toont_geen_winnaarsblok(self):
+        r = self.client.get("/")
+        self.assertNotIn(b'id="raceAfgelopenKaart"', r.data)
+        for nr in self.LOTNUMMERS:
+            self.assertNotIn(f">{nr}<".encode("utf-8"), r.data)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # Setup-pagina (eerste beheerdersaccount)
 # ══════════════════════════════════════════════════════════════════════════════
 

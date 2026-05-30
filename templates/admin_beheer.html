@@ -261,6 +261,16 @@
           </span>
         </label>
       </div>
+      <div class="instelling-rij" style="margin-top:8px;">
+        <span class="instelling-label">Race afgelopen</span>
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+          <input type="checkbox" name="race_afgelopen" value="1" {% if race_afgelopen %}checked{% endif %}
+                 style="width:18px;height:18px;cursor:pointer;accent-color:#4CAF50;">
+          <span style="font-size:.9rem;color:{% if race_afgelopen %}#2E7D32{% else %}#555{% endif %};">
+            {% if race_afgelopen %}Aan — homepage toont winnaars-aankondiging{% else %}Uit — homepage normaal{% endif %}
+          </span>
+        </label>
+      </div>
       <button type="submit" class="instelling-knop">Opslaan</button>
     </form>
   </details>
