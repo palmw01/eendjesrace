@@ -710,6 +710,7 @@ def security_headers(response):
         "font-src https://fonts.gstatic.com; "
         f"script-src 'self' 'nonce-{nonce}'; "
         "img-src 'self' data:; "
+        "frame-src https://www.youtube-nocookie.com; "
         "base-uri 'self'; "
         "form-action 'self' https://www.mollie.com https://pay.ideal.nl; "
         "frame-ancestors 'none';"

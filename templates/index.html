@@ -640,6 +640,25 @@
     .winnaars-lijst .lot  { font-size: 1.15rem; color: var(--donker); }
     .winnaars-lijst .lot::before { content: 'Lot '; color: #888; font-size: .85rem; margin-right: 4px; font-weight: normal; }
 
+    /* Video-embed (aftermovie in de race-afgelopen kaart) */
+    .video-wrapper {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      margin: 18px 0 4px;
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+      background: #000;
+    }
+    .video-wrapper iframe {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border: 0;
+    }
+
     /* Vallende eendjes-animatie (op homepage bij uitverkocht of race-afgelopen) */
     @keyframes valEend {
       0%   { transform: translateY(-80px) rotate(0deg);   opacity: 1; }
@@ -744,6 +763,14 @@
       <li><span class="plek">11</span><span class="lot">1507</span></li>
       <li><span class="plek">12</span><span class="lot">1581</span></li>
     </ol>
+    <div class="video-wrapper">
+      <iframe src="https://www.youtube-nocookie.com/embed/nCzV35HyfGU"
+              title="Badeendjesrace HGJB-project – Hervormde gemeente Wapenveld"
+              loading="lazy"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              referrerpolicy="strict-origin-when-cross-origin"
+              allowfullscreen></iframe>
+    </div>
     <p class="uitverkocht-bedankt" style="margin-top:14px;">
       De opbrengst gaat naar het diaconale project <strong>'Ik geloof, ik deel'</strong>.
     </p>
